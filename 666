@@ -55,7 +55,7 @@ local espHighlights = {}
 local lastEspUpdate = 0
 local lastQuickFlash = 0
 local myLastPos = nil
-local espUpdateInterval = 0.1
+local espUpdateInterval = 0.5
 local quickFlashInterval = 5
 local isQuickFlashing = false
 
@@ -205,26 +205,21 @@ task.spawn(function()
     while true do
         task.wait(espUpdateInterval)
         if espEnabled then
-            for player, billboard in pairs(espBillboards) do
-                if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
-                    espBillboards[player] = nil
+            local myChar = LocalPlayer.Character
+            local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
+            if myPos and (not myLastPos or (myPos - myLastPos).Magnitude >= 0.1) then
+                myLastPos = myPos
+                for player, billboard in pairs(espBillboards) do
+                    if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
+                        local distLabel = billboard:FindFirstChild("DistLabel")
+                        if distLabel then
+                            local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+                            distLabel.Text = string.format("%.0fm", dist)
+                        end
+                    else
+                        espBillboards[player] = nil
+                    end
                 end
-            end
-        end
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if not espEnabled then return end
-    local myChar = LocalPlayer.Character
-    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
-    if not myPos then return end
-    for player, billboard in pairs(espBillboards) do
-        if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
-            local distLabel = billboard:FindFirstChild("DistLabel")
-            if distLabel then
-                local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
-                distLabel.Text = string.format("%.0fm", dist)
             end
         end
     end
@@ -2069,6 +2064,19 @@ local function startImpersonate(targetName)
 
     local cloneHum = clone:FindFirstChildOfClass("Humanoid")
     local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+
+    if cloneHum then
+        cloneHum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+        cloneHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        cloneHum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        cloneHum:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
+        cloneHum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+    end
+    for _, v in ipairs(clone:GetDescendants()) do
+        if v:IsA("BodyMover") or v:IsA("LinearVelocity") or v:IsA("VectorForce") or v:IsA("AlignPosition") or v:IsA("AlignOrientation") or v:IsA("Torque") then
+            v:Destroy()
+        end
+    end
 
     for _, v in ipairs(realChar:GetDescendants()) do
         if v:IsA("BasePart") or v:IsA("Decal") then
