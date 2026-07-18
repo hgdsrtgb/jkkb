@@ -2024,7 +2024,11 @@ local function resetImpersonate()
     local realChar = impersonateRealChar
     if realChar and realChar.Parent then
         LocalPlayer.Character = realChar
-        Camera.CameraSubject = realChar:FindFirstChildOfClass("Humanoid")
+        local rh = realChar:FindFirstChildOfClass("Humanoid")
+        if rh then
+            rh.PlatformStand = false
+        end
+        Camera.CameraSubject = rh
         for _, v in ipairs(realChar:GetDescendants()) do
             if v:IsA("BasePart") or v:IsA("Decal") then
                 v.Transparency = 0
@@ -2106,9 +2110,21 @@ local function startImpersonate(targetName)
         end)
     end
 
+    local realHum2 = realChar:FindFirstChildOfClass("Humanoid")
+    if realHum2 then
+        realHum2.PlatformStand = true
+    end
     impersonateHeartbeat = RunService.Heartbeat:Connect(function()
         if clone and clone.Parent and cloneRoot and impersonateRealChar and impersonateRealChar:FindFirstChild("HumanoidRootPart") then
-            impersonateRealChar.HumanoidRootPart.CFrame = cloneRoot.CFrame
+            local realRoot = impersonateRealChar.HumanoidRootPart
+            realRoot.CFrame = cloneRoot.CFrame
+            realRoot.AssemblyLinearVelocity = Vector3.zero
+            realRoot.AssemblyAngularVelocity = Vector3.zero
+            for _, v in ipairs(impersonateRealChar:GetDescendants()) do
+                if v:IsA("BasePart") and v.CanCollide then
+                    v.CanCollide = false
+                end
+            end
             if cloneHum and cloneHum:GetState() == Enum.HumanoidStateType.Climbing then
                 cloneHum:ChangeState(Enum.HumanoidStateType.Running)
             end
