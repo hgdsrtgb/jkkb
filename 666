@@ -55,7 +55,7 @@ local espHighlights = {}
 local lastEspUpdate = 0
 local lastQuickFlash = 0
 local myLastPos = nil
-local espUpdateInterval = 0.5
+local espUpdateInterval = 0.1
 local quickFlashInterval = 5
 local isQuickFlashing = false
 
@@ -205,21 +205,26 @@ task.spawn(function()
     while true do
         task.wait(espUpdateInterval)
         if espEnabled then
-            local myChar = LocalPlayer.Character
-            local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
-            if myPos and (not myLastPos or (myPos - myLastPos).Magnitude >= 0.1) then
-                myLastPos = myPos
-                for player, billboard in pairs(espBillboards) do
-                    if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
-                        local distLabel = billboard:FindFirstChild("DistLabel")
-                        if distLabel then
-                            local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
-                            distLabel.Text = string.format("%.0fm", dist)
-                        end
-                    else
-                        espBillboards[player] = nil
-                    end
+            for player, billboard in pairs(espBillboards) do
+                if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
+                    espBillboards[player] = nil
                 end
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+    local myChar = LocalPlayer.Character
+    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
+    if not myPos then return end
+    for player, billboard in pairs(espBillboards) do
+        if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
+            local distLabel = billboard:FindFirstChild("DistLabel")
+            if distLabel then
+                local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+                distLabel.Text = string.format("%.0fm", dist)
             end
         end
     end
@@ -1718,7 +1723,7 @@ local eyeConns = {}
 
 local function eyeApplyPart(d)
     if d:IsA("BasePart") then
-        d.LocalTransparencyModifier = 0.5
+        d.LocalTransparencyModifier = 1
     end
 end
 
@@ -1751,8 +1756,8 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
-Tabs.SecondaryTab:Toggle({
-    Title = "隐身",
+Tabs.MiscTab:Toggle({
+    Title = "隐身（别人看不到）",
     Value = false,
     Callback = function(state)
         eyeEnabled = state
@@ -2009,20 +2014,32 @@ Tabs.MainTab:Toggle({
 
 local activeImpersonateClone = nil
 local selectedImpersonateName = ""
+local impersonateHeartbeat = nil
+local impersonateRealChar = nil
 
 local function resetImpersonate()
+    if impersonateHeartbeat then
+        impersonateHeartbeat:Disconnect()
+        impersonateHeartbeat = nil
+    end
     if activeImpersonateClone then
         activeImpersonateClone:Destroy()
         activeImpersonateClone = nil
     end
-    local realChar = LocalPlayer.Character
-    if realChar then
+    local realChar = impersonateRealChar
+    if realChar and realChar.Parent then
+        LocalPlayer.Character = realChar
+        Camera.CameraSubject = realChar:FindFirstChildOfClass("Humanoid")
         for _, v in ipairs(realChar:GetDescendants()) do
             if v:IsA("BasePart") or v:IsA("Decal") then
                 v.Transparency = 0
             end
         end
+        if realChar:FindFirstChild("HumanoidRootPart") then
+            realChar.HumanoidRootPart.CanCollide = true
+        end
     end
+    impersonateRealChar = nil
 end
 
 local function startImpersonate(targetName)
@@ -2041,31 +2058,34 @@ local function startImpersonate(targetName)
         WindUI:Notify({Title = "错误", Content = "你的角色未加载", Type = "error"})
         return
     end
+    impersonateRealChar = realChar
 
     targetChar.Archivable = true
     local clone = targetChar:Clone()
-    clone.Name = "ImpersonateClone"
-    local cloneHum = clone:FindFirstChildOfClass("Humanoid")
-    if cloneHum then
-        cloneHum.DisplayName = targetName
-        local animator = cloneHum:FindFirstChildOfClass("Animator")
-        if animator then animator:Destroy() end
-    end
-    for _, v in ipairs(clone:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.Anchored = true
-            v.CanCollide = false
-        end
-    end
+    clone.Name = "PossessedClone"
     clone.Parent = workspace
     activeImpersonateClone = clone
 
-    if realChar then
-        for _, v in ipairs(realChar:GetDescendants()) do
-            if v:IsA("BasePart") or v:IsA("Decal") then
-                v.Transparency = 1
-            end
+    local cloneHum = clone:FindFirstChildOfClass("Humanoid")
+    local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+
+    for _, v in ipairs(realChar:GetDescendants()) do
+        if v:IsA("BasePart") or v:IsA("Decal") then
+            v.Transparency = 1
         end
+    end
+    if realChar:FindFirstChild("HumanoidRootPart") then
+        realChar.HumanoidRootPart.CanCollide = false
+    end
+
+    LocalPlayer.Character = clone
+    Camera.CameraSubject = cloneHum
+
+    local animate = clone:FindFirstChild("Animate")
+    if animate then
+        animate.Disabled = true
+        task.wait(0.1)
+        animate.Disabled = false
     end
 
     local realHum = realChar:FindFirstChildOfClass("Humanoid")
@@ -2075,16 +2095,9 @@ local function startImpersonate(targetName)
         end)
     end
 
-    task.spawn(function()
-        while activeImpersonateClone and activeImpersonateClone.Parent do
-            local myChar = LocalPlayer.Character
-            if myChar then
-                local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-                if myRoot then
-                    activeImpersonateClone:PivotTo(myRoot.CFrame)
-                end
-            end
-            task.wait()
+    impersonateHeartbeat = RunService.Heartbeat:Connect(function()
+        if clone and clone.Parent and cloneRoot and impersonateRealChar and impersonateRealChar:FindFirstChild("HumanoidRootPart") then
+            impersonateRealChar.HumanoidRootPart.CFrame = cloneRoot.CFrame
         end
     end)
 
