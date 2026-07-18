@@ -2032,7 +2032,7 @@ local function resetImpersonate()
         end
         if realChar:FindFirstChild("HumanoidRootPart") then
             realChar.HumanoidRootPart.Anchored = false
-            realChar.HumanoidRootPart.CanCollide = true
+            realChar.HumanoidRootPart.CanCollide = false
         end
     end
     impersonateRealChar = nil
@@ -2082,9 +2082,13 @@ local function startImpersonate(targetName)
         if v:IsA("BasePart") or v:IsA("Decal") then
             v.Transparency = 1
         end
+        if v:IsA("BasePart") then
+            v.CanCollide = false
+        end
     end
     if realChar:FindFirstChild("HumanoidRootPart") then
-        realChar.HumanoidRootPart.CanCollide = false
+        realChar.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+        realChar.HumanoidRootPart.AssemblyAngularVelocity = Vector3.zero
         realChar.HumanoidRootPart.Anchored = true
     end
 
@@ -2112,6 +2116,9 @@ local function startImpersonate(targetName)
         lastImpersonateSync = now
         if clone and clone.Parent and cloneRoot and impersonateRealChar and impersonateRealChar:FindFirstChild("HumanoidRootPart") then
             impersonateRealChar.HumanoidRootPart.CFrame = cloneRoot.CFrame
+            if cloneHum and cloneHum:GetState() == Enum.HumanoidStateType.Climbing then
+                cloneHum:ChangeState(Enum.HumanoidStateType.Running)
+            end
         end
     end)
 
