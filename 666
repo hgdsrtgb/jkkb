@@ -2031,7 +2031,6 @@ local function resetImpersonate()
             end
         end
         if realChar:FindFirstChild("HumanoidRootPart") then
-            realChar.HumanoidRootPart.Anchored = false
             realChar.HumanoidRootPart.CanCollide = false
         end
     end
@@ -2087,9 +2086,7 @@ local function startImpersonate(targetName)
         end
     end
     if realChar:FindFirstChild("HumanoidRootPart") then
-        realChar.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-        realChar.HumanoidRootPart.AssemblyAngularVelocity = Vector3.zero
-        realChar.HumanoidRootPart.Anchored = true
+        realChar.HumanoidRootPart.CanCollide = false
     end
 
     LocalPlayer.Character = clone
@@ -2109,11 +2106,7 @@ local function startImpersonate(targetName)
         end)
     end
 
-    local lastImpersonateSync = 0
     impersonateHeartbeat = RunService.Heartbeat:Connect(function()
-        local now = tick()
-        if now - lastImpersonateSync < 0.1 then return end
-        lastImpersonateSync = now
         if clone and clone.Parent and cloneRoot and impersonateRealChar and impersonateRealChar:FindFirstChild("HumanoidRootPart") then
             impersonateRealChar.HumanoidRootPart.CFrame = cloneRoot.CFrame
             if cloneHum and cloneHum:GetState() == Enum.HumanoidStateType.Climbing then
