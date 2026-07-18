@@ -2068,6 +2068,14 @@ local function startImpersonate(targetName)
     local cloneHum = clone:FindFirstChildOfClass("Humanoid")
     local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
 
+    for _, v in ipairs(clone:GetDescendants()) do
+        if v:IsA("SelectionBox") or v:IsA("SelectionSphere") or v:IsA("BoxHandleAdornment") or v:IsA("Highlight") then
+            v:Destroy()
+        end
+    end
+    if cloneRoot then
+        cloneRoot.Transparency = 1
+    end
     if cloneHum then
         cloneHum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
         cloneHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
@@ -2121,8 +2129,15 @@ local function startImpersonate(targetName)
             realRoot.AssemblyLinearVelocity = Vector3.zero
             realRoot.AssemblyAngularVelocity = Vector3.zero
             for _, v in ipairs(impersonateRealChar:GetDescendants()) do
-                if v:IsA("BasePart") and v.CanCollide then
-                    v.CanCollide = false
+                if v:IsA("BasePart") then
+                    if v.CanCollide then
+                        v.CanCollide = false
+                    end
+                    if v.Transparency < 1 then
+                        v.Transparency = 1
+                    end
+                elseif v:IsA("Decal") and v.Transparency < 1 then
+                    v.Transparency = 1
                 end
             end
             if cloneHum and cloneHum:GetState() == Enum.HumanoidStateType.Climbing then
