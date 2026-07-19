@@ -1489,11 +1489,6 @@ Tabs.NotifyTab:Paragraph({
     Desc = kbFormatDiff((kbAnnivTime - os.time()) / 60),
 })
 
-Tabs.NotifyTab:Paragraph({
-    Title = "目前捐赠最多的人",
-    Desc = "宥\nQQ: 1072765538\n总捐赠金额：32",
-})
-
 Tabs.NotifyTab:Divider()
 
 Tabs.NotifyTab:Button({
@@ -1590,17 +1585,12 @@ Tabs.NotifyTab:Button({
     end
 })
 
-Tabs.NotifyTab:Divider()
-
-Tabs.NotifyTab:Button({
-    Title = "给脚本点赞",
-    Callback = function()
-        WindUI:Notify({ Title = "点赞", Content = "正在点赞中...", Duration = 3 })
-        task.spawn(function()
-            loadstring(game:HttpGet("https://raw.soteria.rip/3574634146445068"))()
-        end)
-    end
+Tabs.NotifyTab:Paragraph({
+    Title = "目前捐赠最多的人",
+    Desc = "宥\nQQ: 1072765538\n总捐赠金额：32",
 })
+
+Tabs.NotifyTab:Divider()
 
 Tabs.NotifyTab:Button({
     Title = "ROB脚本v2",
