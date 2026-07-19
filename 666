@@ -1091,7 +1091,6 @@ local harassDirection = 1
 local function startHarass()
     if harassConnection then harassConnection:Disconnect() end
     local lastHarassUpdate = 0
-    local hasTeleported = false
     harassConnection = RunService.Heartbeat:Connect(function(dt)
         if not harassEnabled or not harassTarget or not harassTarget:IsDescendantOf(Players) or not harassTarget.Character then return end
         local now = tick()
@@ -1105,11 +1104,6 @@ local function startHarass()
         local targetPos = targetRoot.Position
         local targetLook = targetRoot.CFrame.LookVector
         local behindPos = targetPos - targetLook * 1
-        if not hasTeleported then
-            myRoot.CFrame = CFrame.new(behindPos, targetPos)
-            hasTeleported = true
-            return
-        end
         local speed = math.max(harassSpeed, 0.1)
         local moveDist = speed * dt
         harassOffset = harassOffset + harassDirection * moveDist
@@ -1429,6 +1423,7 @@ Tabs.NotifyTab:Button({
         end)
     end
 })
+Tabs.NotifyTab:Divider()
 
 Tabs.NotifyTab:Button({
     Title = "复制作者QQ",
@@ -1524,7 +1519,6 @@ Tabs.NotifyTab:Paragraph({
     Title = "目前捐赠最多的人：",
     Desc = "宥\nQQ：1072765538\n捐赠金额：32（牛逼）",
 })
-Tabs.NotifyTab:Divider()
 
 Tabs.MainTab:Toggle({
     Title = "透视",
@@ -2217,7 +2211,7 @@ local function refreshAllDropdowns()
     if followDropdown then followDropdown:Refresh(names) end
     if harassDropdown then harassDropdown:Refresh(names) end
     if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
-    
+
 end
 Players.PlayerAdded:Connect(refreshAllDropdowns)
 Players.PlayerRemoving:Connect(refreshAllDropdowns)
@@ -2390,6 +2384,19 @@ Tabs.SecondaryTab:Button({
         if currentHarassTarget and currentHarassTarget.Parent then
             harassTarget = currentHarassTarget
             harassEnabled = true
+            local myChar = LocalPlayer.Character
+            if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+                local myRoot = myChar.HumanoidRootPart
+                local targetRoot = currentHarassTarget.Character and currentHarassTarget.Character:FindFirstChild("HumanoidRootPart")
+                if targetRoot then
+                    local targetPos = targetRoot.Position
+                    local targetLook = targetRoot.CFrame.LookVector
+                    local behindPos = targetPos - targetLook * 1
+                    myRoot.CFrame = CFrame.new(behindPos, targetPos)
+                end
+            end
+            harassOffset = 0
+            harassDirection = 1
             startHarass()
             WindUI:Notify({ Title = "操人", Content = "开始疯狂操 " .. currentHarassTarget.Name .. "！", Duration = 3 })
         else
@@ -2415,6 +2422,19 @@ Tabs.SecondaryTab:Button({
             if nearest then
                 harassTarget = nearest
                 harassEnabled = true
+                local myChar = LocalPlayer.Character
+                if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+                    local myRoot = myChar.HumanoidRootPart
+                    local targetRoot = nearest.Character and nearest.Character:FindFirstChild("HumanoidRootPart")
+                    if targetRoot then
+                        local targetPos = targetRoot.Position
+                        local targetLook = targetRoot.CFrame.LookVector
+                        local behindPos = targetPos - targetLook * 1
+                        myRoot.CFrame = CFrame.new(behindPos, targetPos)
+                    end
+                end
+                harassOffset = 0
+                harassDirection = 1
                 startHarass()
                 WindUI:Notify({ Title = "操人", Content = "开始疯狂操 " .. nearest.Name .. "！", Duration = 3 })
             else
@@ -2423,6 +2443,7 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
+refreshAllDropdowns()
 Tabs.SecondaryTab:Toggle({
     Title = "原地旋转",
     Value = false,
