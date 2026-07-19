@@ -55,7 +55,7 @@ local espHighlights = {}
 local lastEspUpdate = 0
 local lastQuickFlash = 0
 local myLastPos = nil
-local espUpdateInterval = 0.5
+local espUpdateInterval = 0.1
 local quickFlashInterval = 5
 local isQuickFlashing = false
 
@@ -205,21 +205,26 @@ task.spawn(function()
     while true do
         task.wait(espUpdateInterval)
         if espEnabled then
-            local myChar = LocalPlayer.Character
-            local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
-            if myPos and (not myLastPos or (myPos - myLastPos).Magnitude >= 0.1) then
-                myLastPos = myPos
-                for player, billboard in pairs(espBillboards) do
-                    if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
-                        local distLabel = billboard:FindFirstChild("DistLabel")
-                        if distLabel then
-                            local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
-                            distLabel.Text = string.format("%.0fm", dist)
-                        end
-                    else
-                        espBillboards[player] = nil
-                    end
+            for player, billboard in pairs(espBillboards) do
+                if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
+                    espBillboards[player] = nil
                 end
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+    local myChar = LocalPlayer.Character
+    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
+    if not myPos then return end
+    for player, billboard in pairs(espBillboards) do
+        if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
+            local distLabel = billboard:FindFirstChild("DistLabel")
+            if distLabel then
+                local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+                distLabel.Text = string.format("%.0fm", dist)
             end
         end
     end
