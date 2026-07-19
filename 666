@@ -235,6 +235,13 @@ local antiFlingCharAddedConns = {}
 local FieldOfViewValue = 70
 local CameraModeConn = nil
 local FOVConn = nil
+local selfFlyEnabled = false
+local selfFlySpeed = 100
+local selfFlyConn = nil
+local selfFlyBV = nil
+local selfFlyBG = nil
+local selfFlyKeys = {}
+
 local function disablePlayerCollision(player)
     if player == LocalPlayer then return end
     local char = player.Character
@@ -408,6 +415,14 @@ UserInputService.JumpRequest:Connect(function()
         end
     end
 end)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    selfFlyKeys[input.KeyCode] = true
+end)
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    selfFlyKeys[input.KeyCode] = false
+end)
+
 local followTarget = nil
 local followConnection = nil
 local followRange = 5
@@ -1072,35 +1087,39 @@ local harassTarget = nil
 local harassConnection = nil
 local harassSpeed = 5
 local harassDistance = 3
-local lastSwitchTime = 0
-local isBehind = true
+local harassCycle = 0
 local function startHarass()
     if harassConnection then harassConnection:Disconnect() end
-    lastSwitchTime = tick()
-    isBehind = true
+    harassCycle = 0
+    local myChar = LocalPlayer.Character
+    local targetChar = harassTarget and harassTarget.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+    if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") then return end
+    local myRoot = myChar.HumanoidRootPart
+    local targetRoot = targetChar.HumanoidRootPart
+    local targetLook = targetRoot.CFrame.LookVector
+    local behindPos = targetRoot.Position + targetLook * (-harassDistance)
+    myRoot.CFrame = CFrame.new(behindPos, targetRoot.Position)
+    local lastUpdate = 0
     harassConnection = RunService.Heartbeat:Connect(function(dt)
         if not harassEnabled or not harassTarget or not harassTarget.Character then return end
         local now = tick()
-        local myChar = LocalPlayer.Character
-        if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
-        local targetRoot = harassTarget.Character:FindFirstChild("HumanoidRootPart")
-        if not targetRoot then return end
-        local switchInterval = 1 / math.max(harassSpeed, 0.1)
-        local myRoot = myChar.HumanoidRootPart
-        local targetPos = targetRoot.Position
-        local targetLook = targetRoot.CFrame.LookVector
-        if now - lastSwitchTime >= switchInterval then
-            lastSwitchTime = now
-            isBehind = not isBehind
-        end
-        local goalPos
-        if isBehind then
-            goalPos = targetPos + targetLook * -harassDistance
-        else
-            goalPos = targetPos + targetLook * harassDistance
-        end
-        local newPos = myRoot.Position:Lerp(goalPos, math.min(dt * 10, 1))
-        myRoot.CFrame = CFrame.new(newPos, goalPos + targetLook)
+        if now - lastUpdate < 0.02 then return end
+        lastUpdate = now
+        local mc = LocalPlayer.Character
+        if not mc or not mc:FindFirstChild("HumanoidRootPart") then return end
+        local tr = harassTarget.Character:FindFirstChild("HumanoidRootPart")
+        if not tr then return end
+        local mr = mc.HumanoidRootPart
+        local tPos = tr.Position
+        local tLook = tr.CFrame.LookVector
+        harassCycle = harassCycle + dt * harassSpeed
+        local cycle = harassCycle % (math.pi * 2)
+        local amp = math.max(harassDistance - 0.5, 0.5)
+        local offset = (1 - math.cos(cycle)) * 0.5 * amp
+        local currentDist = harassDistance - offset
+        local goalPos = tPos + tLook * (-currentDist)
+        mr.CFrame = CFrame.new(goalPos, tPos)
     end)
 end
 local function stopHarass()
@@ -1406,7 +1425,7 @@ Tabs.NotifyTab:Button({
         end)
     end
 })
-
+Tabs.NotifyTab:Divider()
 Tabs.NotifyTab:Button({
     Title = "复制作者QQ",
     Callback = function()
@@ -1501,7 +1520,6 @@ Tabs.NotifyTab:Paragraph({
     Title = "目前捐赠最多的人：",
     Desc = "宥\nQQ：1072765538\n捐赠金额：32（牛逼）",
 })
-Tabs.NotifyTab:Divider()
 
 Tabs.MainTab:Toggle({
     Title = "透视",
@@ -1530,6 +1548,91 @@ local flyV2Speed = 50
 local flyV2Conn = nil
 local flyV2BV = nil
 local flyV2BG = nil
+local function stopSelfFly()
+    selfFlyEnabled = false
+    if selfFlyConn then selfFlyConn:Disconnect() selfFlyConn = nil end
+    local character = LocalPlayer.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then humanoid.PlatformStand = false end
+    if hrp then
+        local bv = hrp:FindFirstChild("SelfFlyBV")
+        if bv then bv:Destroy() end
+        local bg = hrp:FindFirstChild("SelfFlyBG")
+        if bg then bg:Destroy() end
+    end
+end
+
+local function startSelfFly()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not hrp or not humanoid then return end
+    humanoid.PlatformStand = true
+    if selfFlyBV then selfFlyBV:Destroy() end
+    if selfFlyBG then selfFlyBG:Destroy() end
+    if selfFlyConn then selfFlyConn:Disconnect() end
+    selfFlyBV = Instance.new("BodyVelocity")
+    selfFlyBV.Name = "SelfFlyBV"
+    selfFlyBV.MaxForce = Vector3.new(100000, 100000, 100000)
+    selfFlyBV.Velocity = Vector3.new(0, 0, 0)
+    selfFlyBV.Parent = hrp
+    selfFlyBG = Instance.new("BodyGyro")
+    selfFlyBG.Name = "SelfFlyBG"
+    selfFlyBG.MaxTorque = Vector3.new(100000, 100000, 100000)
+    selfFlyBG.P = 10000
+    selfFlyBG.Parent = hrp
+    selfFlyConn = RunService.RenderStepped:Connect(function()
+        if not selfFlyEnabled then return end
+        if not LocalPlayer.Character or LocalPlayer.Character ~= character then
+            stopSelfFly()
+            return
+        end
+        local currentHrp = character:FindFirstChild("HumanoidRootPart")
+        local currentHumanoid = character:FindFirstChild("Humanoid")
+        if not currentHrp or not currentHumanoid then
+            stopSelfFly()
+            return
+        end
+        local moveDir = Vector3.new(0, 0, 0)
+        if selfFlyKeys[Enum.KeyCode.W] then
+            moveDir = moveDir + Camera.CFrame.LookVector
+        end
+        if selfFlyKeys[Enum.KeyCode.S] then
+            moveDir = moveDir - Camera.CFrame.LookVector
+        end
+        if selfFlyKeys[Enum.KeyCode.D] then
+            moveDir = moveDir + Camera.CFrame.RightVector
+        end
+        if selfFlyKeys[Enum.KeyCode.A] then
+            moveDir = moveDir - Camera.CFrame.RightVector
+        end
+        local md = currentHumanoid.MoveDirection
+        if md.Magnitude > 0 then
+            local camLook = Camera.CFrame.LookVector
+            local camRight = Camera.CFrame.RightVector
+            local camLookH = Vector3.new(camLook.X, 0, camLook.Z)
+            local camRightH = Vector3.new(camRight.X, 0, camRight.Z)
+            if camLookH.Magnitude > 0.001 then
+                camLookH = camLookH.Unit
+            end
+            if camRightH.Magnitude > 0.001 then
+                camRightH = camRightH.Unit
+            end
+            local forward = md:Dot(camLookH)
+            local right = md:Dot(camRightH)
+            moveDir = moveDir + camLook * forward + camRight * right
+        end
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit * selfFlySpeed
+        end
+        selfFlyBV.Velocity = moveDir
+        selfFlyBG.CFrame = CFrame.new(currentHrp.Position, currentHrp.Position + Camera.CFrame.LookVector)
+    end)
+end
+
 local function stopFlyV2()
     if flyV2Conn then flyV2Conn:Disconnect() flyV2Conn = nil end
     if flyV2BV then flyV2BV:Destroy() flyV2BV = nil end
@@ -1578,6 +1681,13 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         startFlyV2()
     end
 end)
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if selfFlyEnabled then
+        task.wait(1)
+        startSelfFly()
+    end
+end)
+
 Tabs.MainTab:Toggle({
     Title = "飞行v2",
     Value = false,
@@ -1602,6 +1712,31 @@ sliderReleaseActions["flyv2speed"] = function(v)
     flyV2Speed = v
     WindUI:Notify({ Title = "飞行v2速度", Content = "已设置为：" .. v, Duration = 2 })
 end
+Tabs.MainTab:Toggle({
+    Title = "自制飞行",
+    Value = false,
+    Callback = function(state)
+        selfFlyEnabled = state
+        if state then startSelfFly() else stopSelfFly() end
+        WindUI:Notify({ Title = "自制飞行", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+Tabs.MainTab:Slider({
+    Title = "自制飞行速度 (当前: 100)",
+    Value = {
+        Min = 10,
+        Max = 500,
+        Default = 100,
+    },
+    Callback = function(value)
+        pendingSliderValues["selfflyspeed"] = value
+    end
+})
+sliderReleaseActions["selfflyspeed"] = function(v)
+    selfFlySpeed = v
+    WindUI:Notify({ Title = "自制飞行速度", Content = "已设置为：" .. v, Duration = 2 })
+end
+
 Tabs.MainTab:Toggle({
     Title = "无限跳",
     Value = false,
@@ -1674,37 +1809,28 @@ Tabs.MainTab:Toggle({
         local Players = game:GetService("Players")
         if state then
             Clipon = true
-            if not Stepped or not Stepped.Connected then
-                Stepped = game:GetService("RunService").Stepped:Connect(function()
-                    if not Clipon then return end
-                    for _, child in pairs(workspace:GetChildren()) do
-                        if child.Name == Players.LocalPlayer.Name then
-                            for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                                if part:IsA("BasePart") then
-                                    part.CanCollide = false
-                                end
+        else
+            Clipon = false
+        end
+        if Stepped then pcall(function() Stepped:Disconnect() end) end
+        Stepped = game:GetService("RunService").Stepped:Connect(function()
+            if Clipon then
+                for _, child in pairs(workspace:GetChildren()) do
+                    if child.Name == Players.LocalPlayer.Name then
+                        for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
                             end
                         end
                     end
-                end)
-            end
-        else
-            Clipon = false
-            if Stepped then Stepped:Disconnect() end
-            for _, child in pairs(workspace:GetChildren()) do
-                if child.Name == Players.LocalPlayer.Name then
-                    for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = true
-                        end
-                    end
                 end
+            else
+                pcall(function() Stepped:Disconnect() end)
             end
-        end
+        end)
         WindUI:Notify({ Title = "穿墙", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
-})
-local speedToggle = false
+})local speedToggle = false
 local speedValue = 16
 Tabs.MainTab:Toggle({
     Title = "修改移速",
@@ -2086,6 +2212,7 @@ local function refreshAllDropdowns()
     if followDropdown then followDropdown:Refresh(names) end
     if harassDropdown then harassDropdown:Refresh(names) end
     if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
+    
 end
 Players.PlayerAdded:Connect(refreshAllDropdowns)
 Players.PlayerRemoving:Connect(refreshAllDropdowns)
@@ -2222,66 +2349,7 @@ Tabs.SecondaryTab:Button({
     end
 })
 local currentSmoothTarget = nil
-smoothDropdown = Tabs.SecondaryTab:Dropdown({
-    Title = "选定平滑跟随玩家",
-    Values = {},
-    Callback = function(name)
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p.Name == name and p ~= LocalPlayer then
-                currentSmoothTarget = p
-                smoothDropdown:SetTitle("已选定: " .. p.Name)
-                WindUI:Notify({ Title = "平滑跟随", Content = "已选定 " .. p.Name .. "，点击确定开始平滑跟随", Duration = 3 })
-                break
-            end
-        end
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "确定执行平滑跟随",
-    Callback = function()
-        if currentSmoothTarget and currentSmoothTarget.Parent then
-            startSmoothFollow(currentSmoothTarget)
-        else
-            WindUI:Notify({ Title = "平滑跟随", Content = "请先选择玩家", Duration = 3 })
-        end
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "停止平滑跟随",
-    Callback = function()
-        stopSmoothFollow()
-        currentSmoothTarget = nil
-        smoothDropdown:SetTitle("选定平滑跟随玩家")
-    end
-})
 
-Tabs.SecondaryTab:Slider({
-    Title = "平滑跟随距离 (当前: 3)",
-    Value = {
-        Min = 1,
-        Max = 50,
-        Default = 3,
-    },
-    Callback = function(value)
-        smoothFollowDistance = value
-        WindUI:Notify({ Title = "平滑跟随距离", Content = "已设置为：" .. value, Duration = 2 })
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "平滑跟随最近的人",
-    Callback = function()
-        if smoothFollowConnection then
-            stopSmoothFollow()
-        else
-            local nearest = getNearestPlayer()
-            if nearest then
-                startSmoothFollow(nearest)
-            else
-                WindUI:Notify({ Title = "平滑跟随", Content = "未找到其他玩家", Duration = 3 })
-            end
-        end
-    end
-})
 Tabs.SecondaryTab:Button({
     Title = "撸管",
     Callback = function()
@@ -2350,6 +2418,15 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
+Tabs.SecondaryTab:Toggle({
+    Title = "原地旋转",
+    Value = false,
+    Callback = function(state)
+        SpinEnabled = state
+        if state then startSpin() else stopSpin() end
+        WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
 Tabs.SecondaryTab:Slider({
     Title = "操人速度 (当前: 5)",
     Value = {
@@ -2369,26 +2446,17 @@ Tabs.SecondaryTab:Slider({
     Title = "操人距离 (当前: 3)",
     Value = {
         Min = 1,
-        Max = 20,
+        Max = 10,
         Default = 3,
     },
     Callback = function(value)
-        pendingSliderValues["harassdistance"] = value
+        pendingSliderValues["harassdist"] = value
     end
 })
-sliderReleaseActions["harassdistance"] = function(dist)
-    harassDistance = dist
-    WindUI:Notify({ Title = "操人距离", Content = "已设置为：" .. dist .. " 米", Duration = 2 })
+sliderReleaseActions["harassdist"] = function(v)
+    harassDistance = v
+    WindUI:Notify({ Title = "操人距离", Content = "已设置为：" .. v .. " 米", Duration = 2 })
 end
-Tabs.SecondaryTab:Toggle({
-    Title = "原地旋转",
-    Value = false,
-    Callback = function(state)
-        SpinEnabled = state
-        if state then startSpin() else stopSpin() end
-        WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
-    end
-})
 Tabs.SecondaryTab:Slider({
     Title = "旋转速度 (当前: 360)",
     Value = {
