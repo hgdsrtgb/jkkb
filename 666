@@ -196,9 +196,7 @@ Players.PlayerRemoving:Connect(function(player)
     cleanupESP(player)
 end)
 
-
 local function quickFlashCleanup()
-
 end
 
 task.spawn(function()
@@ -1469,8 +1467,11 @@ local function kbFormatDiff(mins)
     return string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
 end
 local kbNowDate = os.date("*t")
-local kbUpdateTime = os.time({year = 2026, month = 7, day = 19, hour = 8, min = 20, sec = 0})
-local kbBirthTime = os.time({year = 2026, month = 2, day = 9, hour = 2, min = 27, sec = 0})
+local kbUpdateTime = os.time({year = kbNowDate.year, month = 7, day = 18, hour = 0, min = 47, sec = 0})
+local kbBirthTime = os.time({year = kbNowDate.year, month = 2, day = 9, hour = 2, min = 27, sec = 0})
+if kbBirthTime > os.time() then
+    kbBirthTime = os.time({year = kbNowDate.year - 1, month = 2, day = 9, hour = 2, min = 27, sec = 0})
+end
 local kbBirthYear = os.date("*t", kbBirthTime).year
 local kbAnnivTime = os.time({year = kbBirthYear + 1, month = 2, day = 9, hour = 2, min = 27, sec = 0})
 
@@ -1480,7 +1481,7 @@ Tabs.NotifyTab:Paragraph({
 })
 
 Tabs.NotifyTab:Paragraph({
-    Title = "脚本诞生日期：2026年2月9日 2:27",
+    Title = "脚本诞生日期：2月9日 2:27",
     Desc = "已诞生 " .. kbFormatDiff((os.time() - kbBirthTime) / 60),
 })
 
@@ -2152,7 +2153,6 @@ local function startImpersonate(targetName)
 end
 
 
-
 local respawnEnabled = false
 local respawnPos = nil
 local deathPos = nil
@@ -2787,8 +2787,11 @@ Tabs.MiscTab:Button({
 })
 
 
-Tabs.GamesTab:Paragraph({
-    Title = "根据你所在的服务器，加载对应的恐脚本支持的服务器",
+Tabs.GamesTab:Button({
+    Title = "复制加载器代码",
+    Callback = function()
+        copyToClipboard('loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()', "加载器代码")
+    end
 })
 
 Tabs.GamesTab:Button({
@@ -2798,12 +2801,6 @@ Tabs.GamesTab:Button({
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()
         end)
-    end
-})
-Tabs.GamesTab:Button({
-    Title = "复制加载器代码",
-    Callback = function()
-        copyToClipboard('loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()', "加载器代码")
     end
 })
 
