@@ -201,34 +201,7 @@ local function quickFlashCleanup()
 
 end
 
-task.spawn(function()
-    while true do
-        task.wait(espUpdateInterval)
-        if espEnabled then
-            for player, billboard in pairs(espBillboards) do
-                if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
-                    espBillboards[player] = nil
-                end
-            end
-        end
-    end
-end)
 
-RunService.RenderStepped:Connect(function()
-    if not espEnabled then return end
-    local myChar = LocalPlayer.Character
-    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
-    if not myPos then return end
-    for player, billboard in pairs(espBillboards) do
-        if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
-            local distLabel = billboard:FindFirstChild("DistLabel")
-            if distLabel then
-                local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
-                distLabel.Text = string.format("%.0fm", dist)
-            end
-        end
-    end
-end)
 
 
 
@@ -245,9 +218,8 @@ local translatedTexts = {}
 local speedAntiPull = nil
 local SpinEnabled = false
 local SpinSpeed = 360
-local spinConnection = nil
 local antiAFKEnabled = false
-local antiAFKConnection = nil
+local antiAFKThread = nil
 local UIButtons = {}
 local AntiFlingEnabled = false
 local AntiFlingConnection = nil
@@ -394,42 +366,32 @@ Players.PlayerRemoving:Connect(function(player)
     cleanupAntiFlingForPlayer(player)
 end)
 
-local function startSpin()
-    if spinConnection then spinConnection:Disconnect() end
-    local lastSpin = 0
-    spinConnection = RunService.Heartbeat:Connect(function(dt)
-        if not SpinEnabled then return end
-        local now = tick()
-        if now - lastSpin < 0.2 then return end
-        lastSpin = now
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local root = char.HumanoidRootPart
-        local currentCF = root.CFrame
-        local newCF = currentCF * CFrame.Angles(0, math.rad(SpinSpeed * dt), 0)
-        root.CFrame = newCF
-    end)
+local function doSpin()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local root = char.HumanoidRootPart
+    root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(SpinSpeed), 0)
 end
 
-local function stopSpin()
-    SpinEnabled = false
-    if spinConnection then spinConnection:Disconnect() end
-    spinConnection = nil
-end
+
 
 local function startAntiAFK()
-    if antiAFKConnection then antiAFKConnection:Disconnect() end
-    antiAFKConnection = LocalPlayer.Idled:Connect(function()
-        local vu = game:GetService("VirtualUser")
-        vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-        wait(1)
-        vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    if antiAFKThread then return end
+    antiAFKThread = task.spawn(function()
+        while antiAFKEnabled do
+            local vim = game:GetService("VirtualInputManager")
+            vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            task.wait(19)
+        end
+        antiAFKThread = nil
     end)
 end
 
 local function stopAntiAFK()
-    if antiAFKConnection then antiAFKConnection:Disconnect() end
-    antiAFKConnection = nil
+    antiAFKEnabled = false
+    antiAFKThread = nil
 end
 
 local function getHumanoid()
@@ -464,21 +426,11 @@ local function startFollow(targetPlayer)
             WindUI:Notify({ Title = "跟随", Content = "目标已消失，跟随停止", Duration = 3 })
             return
         end
-        local now = tick()
-        if now - lastFollow < 0.5 then return end
-        lastFollow = now
         local myChar = LocalPlayer.Character
         if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
         local myRoot = myChar.HumanoidRootPart
-        local myHum = myChar:FindFirstChildOfClass("Humanoid")
-        if not myHum then return end
         local targetRoot = followTarget.Character.HumanoidRootPart
-        local dist = (targetRoot.Position - myRoot.Position).Magnitude
-        if dist > followRange then
-            myHum:MoveTo(targetRoot.Position)
-        else
-            myHum:MoveTo(myRoot.Position)
-        end
+        myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
     end)
     WindUI:Notify({ Title = "跟随", Content = "开始跟随 " .. targetPlayer.Name, Duration = 3 })
 end
@@ -487,13 +439,6 @@ local function stopFollow()
     if followConnection then followConnection:Disconnect() end
     followConnection = nil
     followTarget = nil
-    local myChar = LocalPlayer.Character
-    if myChar then
-        local myHum = myChar:FindFirstChildOfClass("Humanoid")
-        if myHum then
-            myHum:MoveTo(myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position or myChar:GetPivot().Position)
-        end
-    end
     WindUI:Notify({ Title = "跟随", Content = "已停止跟随", Duration = 3 })
 end
 
@@ -576,22 +521,33 @@ local function createCrosshair()
 end
 
 local crosshairLastUpdate = 0
-local crosshairConn = RunService.Heartbeat:Connect(function()
-    local now = tick()
-    if now - crosshairLastUpdate < 0.2 then return end
-    crosshairLastUpdate = now
-    if not CrosshairEnabled then
-        if CrosshairFrame then CrosshairFrame.Visible = false end
-        return
-    end
-    if not CrosshairGui then createCrosshair() end
-    if CrosshairSpinEnabled then
-        CrosshairFrame.Rotation = (CrosshairFrame.Rotation + 2) % 360
-    else
-        CrosshairFrame.Rotation = 0
-    end
-    CrosshairFrame.Visible = true
-end)
+local crosshairConn = nil
+
+local function startCrosshairLoop()
+    if crosshairConn then return end
+    crosshairConn = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if now - crosshairLastUpdate < 0.2 then return end
+        crosshairLastUpdate = now
+        if not CrosshairEnabled then
+            if CrosshairFrame then CrosshairFrame.Visible = false end
+            return
+        end
+        if not CrosshairGui then createCrosshair() end
+        if CrosshairSpinEnabled then
+            CrosshairFrame.Rotation = (CrosshairFrame.Rotation + 2) % 360
+        else
+            CrosshairFrame.Rotation = 0
+        end
+        CrosshairFrame.Visible = true
+    end)
+end
+
+local function stopCrosshairLoop()
+    if crosshairConn then crosshairConn:Disconnect() end
+    crosshairConn = nil
+    if CrosshairFrame then CrosshairFrame.Visible = false end
+end
 
 local isStealing = false
 local function stealAllItems()
@@ -1201,28 +1157,17 @@ local function startSmoothFollow(targetPlayer)
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
     smoothFollowTarget = targetPlayer
     local lastSmooth = 0
-    smoothFollowConnection = RunService.Heartbeat:Connect(function(dt)
+    smoothFollowConnection = RunService.Heartbeat:Connect(function()
         if not smoothFollowTarget or not smoothFollowTarget:IsDescendantOf(Players) or not smoothFollowTarget.Character or not smoothFollowTarget.Character:FindFirstChild("HumanoidRootPart") then
             stopSmoothFollow()
             WindUI:Notify({ Title = "平滑跟随", Content = "目标已消失，跟随停止", Duration = 3 })
             return
         end
-        local now = tick()
-        if now - lastSmooth < 0.3 then return end
-        lastSmooth = now
         local myChar = LocalPlayer.Character
         if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
         local myRoot = myChar.HumanoidRootPart
         local targetRoot = smoothFollowTarget.Character.HumanoidRootPart
-        local targetPos = targetRoot.Position
-        local myPos = myRoot.Position
-        local dist = (targetPos - myPos).Magnitude
-        if dist > 4 then
-            local direction = (targetPos - myPos).Unit
-            local speed = math.min(dist * 2, 50)
-            local newPos = myPos + direction * speed * dt
-            myRoot.CFrame = CFrame.new(newPos, targetPos)
-        end
+        myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
     end)
     WindUI:Notify({ Title = "平滑跟随", Content = "开始平滑跟随 " .. targetPlayer.Name, Duration = 3 })
 end
@@ -1612,8 +1557,10 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "透视", Content = state and "已打开" or "已关闭", Duration = 3 })
         if state then
             for _, p in ipairs(Players:GetPlayers()) do setupPlayerESP(p) end
+            startEspLoop()
         else
             for _, p in ipairs(Players:GetPlayers()) do cleanupESP(p) end
+            stopEspLoop()
         end
     end
 })
@@ -1788,34 +1735,12 @@ Tabs.MainTab:Toggle({
     Title = "穿墙",
     Value = false,
     Callback = function(state)
-        local workspace = game:GetService("Workspace")
         local Players = game:GetService("Players")
-        if state then
-            Clipon = true
-            if not Stepped or not Stepped.Connected then
-                Stepped = game:GetService("RunService").Stepped:Connect(function()
-                    if not Clipon then return end
-                    for _, child in pairs(workspace:GetChildren()) do
-                        if child.Name == Players.LocalPlayer.Name then
-                            for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                                if part:IsA("BasePart") then
-                                    part.CanCollide = false
-                                end
-                            end
-                        end
-                    end
-                end)
-            end
-        else
-            Clipon = false
-            if Stepped then Stepped:Disconnect() end
-            for _, child in pairs(workspace:GetChildren()) do
-                if child.Name == Players.LocalPlayer.Name then
-                    for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = true
-                        end
-                    end
+        local char = Players.LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = not state
                 end
             end
         end
@@ -2523,8 +2448,8 @@ Tabs.SecondaryTab:Toggle({
     Value = false,
     Callback = function(state)
         SpinEnabled = state
-        if state then startSpin() else stopSpin() end
-        WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
+        if state then doSpin() end
+        WindUI:Notify({ Title = "原地旋转", Content = state and "已旋转" or "已关闭", Duration = 3 })
     end
 })
 
@@ -2687,11 +2612,33 @@ Tabs.MiscTab:Button({
 })
 
 Tabs.MiscTab:Toggle({
+    Title = "强制第三人称",
+    Value = false,
+    Callback = function(state)
+        ForceThirdPersonEnabled = state
+        if ForceThirdPersonEnabled then ForceFirstPersonEnabled = false end
+        if state then startCameraModeLoop() else stopCameraModeLoop() end
+        WindUI:Notify({ Title = "强制第三人称", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+
+Tabs.MiscTab:Toggle({
+    Title = "强制第一人称",
+    Value = false,
+    Callback = function(state)
+        ForceFirstPersonEnabled = state
+        if ForceFirstPersonEnabled then ForceThirdPersonEnabled = false end
+        if state then startCameraModeLoop() else stopCameraModeLoop() end
+        WindUI:Notify({ Title = "强制第一人称", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+
+Tabs.MiscTab:Toggle({
     Title = "准星",
     Value = false,
     Callback = function(state)
         CrosshairEnabled = state
-        if CrosshairFrame then CrosshairFrame.Visible = CrosshairEnabled end
+        if state then startCrosshairLoop() else stopCrosshairLoop() end
         WindUI:Notify({ Title = "准星", Content = state and "已显示" or "已隐藏", Duration = 3 })
     end
 })
