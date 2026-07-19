@@ -215,7 +215,6 @@ end)
 local InfiniteJumpEnabled = false
 local NightVisionEnabled = false
 local AutoTranslateEnabled = false
-local SmoothFollowEnabled = false
 local FollowNearestEnabled = false
 local LockViewEnabled = false
 local CrosshairEnabled = false
@@ -233,8 +232,6 @@ local AntiFlingEnabled = false
 local AntiFlingConnection = nil
 local antiFlingOriginalStates = {}
 local antiFlingCharAddedConns = {}
-local ForceThirdPersonEnabled = false
-local ForceFirstPersonEnabled = false
 local FieldOfViewValue = 70
 local CameraModeConn = nil
 local FOVConn = nil
@@ -1125,7 +1122,7 @@ local function stopSmoothFollow()
     if UIButtons.smoothFollowNearestBtn then UIButtons.smoothFollowNearestBtn.Text = "平滑跟随最近的人" end
     WindUI:Notify({ Title = "平滑跟随", Content = "已停止平滑跟随", Duration = 3 })
 end
-local smoothFollowDistance = 3
+
 
 local smoothFollowLastTargetPos = nil
 
@@ -2086,7 +2083,6 @@ local function refreshAllDropdowns()
     end
     if flingDropdown then flingDropdown:Refresh(names) end
     if followDropdown then followDropdown:Refresh(names) end
-    if smoothDropdown then smoothDropdown:Refresh(names) end
     if harassDropdown then harassDropdown:Refresh(names) end
     if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
 end
@@ -2509,28 +2505,6 @@ Tabs.MiscTab:Button({
         WindUI:Notify({ Title = "美化包", Content = "数值已修改为999（若游戏支持）", Duration = 3 })
     end
 })
-Tabs.MiscTab:Toggle({
-    Title = "强制第三人称",
-    Value = false,
-    Callback = function(state)
-        ForceThirdPersonEnabled = state
-        if ForceThirdPersonEnabled then ForceFirstPersonEnabled = false end
-        if state then startCameraModeLoop() else stopCameraModeLoop() end
-        WindUI:Notify({ Title = "强制第三人称", Content = state and "已开启" or "已关闭", Duration = 3 })
-    end
-})
-
-Tabs.MiscTab:Toggle({
-    Title = "强制第一人称",
-    Value = false,
-    Callback = function(state)
-        ForceFirstPersonEnabled = state
-        if ForceFirstPersonEnabled then ForceThirdPersonEnabled = false end
-        if state then startCameraModeLoop() else stopCameraModeLoop() end
-        WindUI:Notify({ Title = "强制第一人称", Content = state and "已开启" or "已关闭", Duration = 3 })
-    end
-})
-
 Tabs.MiscTab:Toggle({
     Title = "准星",
     Value = false,
