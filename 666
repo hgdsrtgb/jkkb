@@ -2787,11 +2787,8 @@ Tabs.MiscTab:Button({
 })
 
 
-Tabs.GamesTab:Button({
-    Title = "复制加载器代码",
-    Callback = function()
-        copyToClipboard('loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()', "加载器代码")
-    end
+Tabs.GamesTab:Paragraph({
+    Title = "根据你所在的服务器，加载对应的恐脚本支持的服务器",
 })
 
 Tabs.GamesTab:Button({
@@ -2801,6 +2798,12 @@ Tabs.GamesTab:Button({
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()
         end)
+    end
+})
+Tabs.GamesTab:Button({
+    Title = "复制加载器代码",
+    Callback = function()
+        copyToClipboard('loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()', "加载器代码")
     end
 })
 
