@@ -1085,7 +1085,7 @@ end
 local harassEnabled = false
 local harassTarget = nil
 local harassConnection = nil
-local harassSpeed = 5
+local harassSpeed = 20
 local harassDistance = 3
 local harassCycle = 0
 local function startHarass()
@@ -2419,11 +2419,11 @@ Tabs.SecondaryTab:Button({
     end
 })
 Tabs.SecondaryTab:Slider({
-    Title = "操人速度 (当前: 5)",
+    Title = "操人速度 (当前: 20)",
     Value = {
-        Min = 1,
-        Max = 20,
-        Default = 5,
+        Min = 20,
+        Max = 50,
+        Default = 20,
     },
     Callback = function(value)
         pendingSliderValues["harassspeed"] = value
