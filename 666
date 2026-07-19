@@ -1124,24 +1124,22 @@ local function stopSmoothFollow()
     if UIButtons.smoothFollowNearestBtn then UIButtons.smoothFollowNearestBtn.Text = "平滑跟随最近的人" end
     WindUI:Notify({ Title = "平滑跟随", Content = "已停止平滑跟随", Duration = 3 })
 end
+local smoothFollowDistance = 3
+
 local function startSmoothFollow(targetPlayer)
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
     smoothFollowTarget = targetPlayer
-    local lastSmooth = 0
     smoothFollowConnection = RunService.Heartbeat:Connect(function()
         if not smoothFollowTarget or not smoothFollowTarget:IsDescendantOf(Players) or not smoothFollowTarget.Character or not smoothFollowTarget.Character:FindFirstChild("HumanoidRootPart") then
             stopSmoothFollow()
             WindUI:Notify({ Title = "平滑跟随", Content = "目标已消失，跟随停止", Duration = 3 })
             return
         end
-        local now = tick()
-        if now - lastSmooth < 0.3 then return end
-        lastSmooth = now
         local myChar = LocalPlayer.Character
         if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
         local myRoot = myChar.HumanoidRootPart
         local targetRoot = smoothFollowTarget.Character.HumanoidRootPart
-        myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+        myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, smoothFollowDistance)
     end)
     WindUI:Notify({ Title = "平滑跟随", Content = "开始平滑跟随 " .. targetPlayer.Name, Duration = 3 })
 end
@@ -2248,6 +2246,19 @@ Tabs.SecondaryTab:Button({
         stopSmoothFollow()
         currentSmoothTarget = nil
         smoothDropdown:SetTitle("选定平滑跟随玩家")
+    end
+})
+
+Tabs.SecondaryTab:Slider({
+    Title = "平滑跟随距离 (当前: 3)",
+    Value = {
+        Min = 1,
+        Max = 50,
+        Default = 3,
+    },
+    Callback = function(value)
+        smoothFollowDistance = value
+        WindUI:Notify({ Title = "平滑跟随距离", Content = "已设置为：" .. value, Duration = 2 })
     end
 })
 Tabs.SecondaryTab:Button({
