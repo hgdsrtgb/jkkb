@@ -241,6 +241,7 @@ local selfFlyConn = nil
 local selfFlyBV = nil
 local selfFlyBG = nil
 local selfFlyKeys = {}
+
 local function disablePlayerCollision(player)
     if player == LocalPlayer then return end
     local char = player.Character
@@ -414,7 +415,6 @@ UserInputService.JumpRequest:Connect(function()
         end
     end
 end)
-local followTarget = nil
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     selfFlyKeys[input.KeyCode] = true
@@ -422,6 +422,8 @@ end)
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
     selfFlyKeys[input.KeyCode] = false
 end)
+
+local followTarget = nil
 local followConnection = nil
 local followRange = 5
 local function startFollow(targetPlayer)
@@ -1528,18 +1530,20 @@ Tabs.MainTab:Toggle({
         end
     end
 })
+Tabs.MainTab:Button({
+    Title = "飞行",
+    Callback = function()
+        WindUI:Notify({ Title = "飞行脚本", Content = "正在加载中...", Duration = 5 })
+        task.spawn(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
+        end)
+    end
+})
+local flyV2Enabled = false
 local flyV2Speed = 50
 local flyV2Conn = nil
 local flyV2BV = nil
 local flyV2BG = nil
-local function stopFlyV2()
-    if flyV2Conn then flyV2Conn:Disconnect() flyV2Conn = nil end
-    if flyV2BV then flyV2BV:Destroy() flyV2BV = nil end
-    if flyV2BG then flyV2BG:Destroy() flyV2BG = nil end
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then hum.PlatformStand = false end
-end
 local function stopSelfFly()
     selfFlyEnabled = false
     if selfFlyConn then selfFlyConn:Disconnect() selfFlyConn = nil end
@@ -1622,6 +1626,14 @@ local function startSelfFly()
     end)
 end
 
+local function stopFlyV2()
+    if flyV2Conn then flyV2Conn:Disconnect() flyV2Conn = nil end
+    if flyV2BV then flyV2BV:Destroy() flyV2BV = nil end
+    if flyV2BG then flyV2BG:Destroy() flyV2BG = nil end
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then hum.PlatformStand = false end
+end
 local function startFlyV2()
     stopFlyV2()
     local char = LocalPlayer.Character
@@ -1662,22 +1674,14 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         startFlyV2()
     end
 end)
-Tabs.MainTab:Toggle({
 LocalPlayer.CharacterAdded:Connect(function(char)
     if selfFlyEnabled then
         task.wait(1)
         startSelfFly()
     end
 end)
-Tabs.MainTab:Button({
-    Title = "飞行",
-    Callback = function()
-        WindUI:Notify({ Title = "飞行脚本", Content = "正在加载中...", Duration = 5 })
-        task.spawn(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
-        end)
-    end
-})
+
+Tabs.MainTab:Toggle({
     Title = "飞行v2",
     Value = false,
     Callback = function(state)
@@ -1702,7 +1706,6 @@ sliderReleaseActions["flyv2speed"] = function(v)
     WindUI:Notify({ Title = "飞行v2速度", Content = "已设置为：" .. v, Duration = 2 })
 end
 Tabs.MainTab:Toggle({
-Tabs.MainTab:Toggle({
     Title = "自制飞行",
     Value = false,
     Callback = function(state)
@@ -1726,6 +1729,8 @@ sliderReleaseActions["selfflyspeed"] = function(v)
     selfFlySpeed = v
     WindUI:Notify({ Title = "自制飞行速度", Content = "已设置为：" .. v, Duration = 2 })
 end
+
+Tabs.MainTab:Toggle({
     Title = "无限跳",
     Value = false,
     Callback = function(state)
