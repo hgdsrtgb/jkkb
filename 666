@@ -196,9 +196,7 @@ Players.PlayerRemoving:Connect(function(player)
     cleanupESP(player)
 end)
 
--- 快速闪清：每隔5秒，0.01秒内隐藏所有ESP再恢复，肉眼看不出来
 local function quickFlashCleanup()
-    -- 已移除：快速闪清会导致每5秒卡顿一次
 end
 
 task.spawn(function()
@@ -1468,8 +1466,18 @@ local function kbFormatDiff(mins)
     mins = math.max(0, math.floor(mins))
     return string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
 end
-local kbNowDate = os.date("*t")
-local kbUpdateTime = os.time({year = kbNowDate.year, month = 7, day = 18, hour = 0, min = 47, sec = 0})
+local kbUpdateTime = os.time()
+local kbUpdateSuccess = false
+pcall(function()
+    local kbUpdateRaw = game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/更新时间")
+    if kbUpdateRaw and kbUpdateRaw ~= "" then
+        local kbYear, kbMonth, kbDay, kbHour, kbMin = kbUpdateRaw:match("(%d+)%/(%d+)%/(%d+)%/(%d+):(%d+)")
+        if kbYear and kbMonth and kbDay and kbHour and kbMin then
+            kbUpdateTime = os.time({year = tonumber(kbYear), month = tonumber(kbMonth), day = tonumber(kbDay), hour = tonumber(kbHour), min = tonumber(kbMin), sec = 0})
+            kbUpdateSuccess = true
+        end
+    end
+end)
 local kbBirthTime = os.time({year = kbNowDate.year, month = 2, day = 9, hour = 2, min = 27, sec = 0})
 if kbBirthTime > os.time() then
     kbBirthTime = os.time({year = kbNowDate.year - 1, month = 2, day = 9, hour = 2, min = 27, sec = 0})
@@ -2155,7 +2163,6 @@ local function startImpersonate(targetName)
 end
 
 
--- 原地复活和设置重生点
 local respawnEnabled = false
 local respawnPos = nil
 local deathPos = nil
