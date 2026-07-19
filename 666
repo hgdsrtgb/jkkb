@@ -1491,9 +1491,7 @@ Tabs.NotifyTab:Paragraph({
 
 Tabs.NotifyTab:Paragraph({
     Title = "目前捐赠最多的人",
-    Desc = "宥
-QQ: 1072765538
-总捐赠金额：32",
+    Desc = "宥\nQQ: 1072765538\n总捐赠金额：32",
 })
 
 Tabs.NotifyTab:Divider()
