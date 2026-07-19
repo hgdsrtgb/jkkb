@@ -50,8 +50,8 @@ local Window = Library:CreateWindow({
 })
 
 Library:Notify({
-    Title = "伐木大亨二",
-    Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功",
+    Title = "小布丁 定制",
+    Description = "恐拜大帝 制作",
     Time = 5,
 })
 
@@ -64,7 +64,7 @@ local Tabs = {
 
 local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息")
 NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本')
-NoticeGroup:AddLabel('创作者：恐拜大帝')
+NoticeGroup:AddLabel('创作者：恐拜大帝\n小布丁 定制')
 
 local TreeGroup = Tabs.Main:AddLeftGroupbox("砍树")
 local LandGroup = Tabs.Main:AddLeftGroupbox("土地")
