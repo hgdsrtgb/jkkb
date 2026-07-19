@@ -384,7 +384,6 @@ local function startSpin()
     end)
 end
 local function stopSpin()
-    SpinEnabled = false
     if spinConnection then spinConnection:Disconnect() end
     spinConnection = nil
 end
@@ -2325,8 +2324,8 @@ Tabs.SecondaryTab:Toggle({
     Value = false,
     Callback = function(state)
         SpinEnabled = state
-        if state then doSpin() end
-        WindUI:Notify({ Title = "原地旋转", Content = state and "已旋转" or "已关闭", Duration = 3 })
+        if state then startSpin() else stopSpin() end
+        WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
 Tabs.SecondaryTab:Slider({
