@@ -1492,6 +1492,15 @@ Tabs.NotifyTab:Paragraph({
 Tabs.NotifyTab:Divider()
 
 Tabs.NotifyTab:Button({
+    Title = "ROB脚本v2",
+    Desc = "必须用gi加速器",
+    Callback = function()
+        WindUI:Notify({ Title = "ROB脚本v2", Content = "正在加载中...\n必须用gi加速器", Duration = 5 })
+        task.spawn(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Zyb150933/ROB/refs/heads/main/ROB.V2"))()
+        end)
+
+Tabs.NotifyTab:Button({
     Title = "复制作者QQ",
     Callback = function()
         copyToClipboard("3999698324", "作者QQ")
@@ -1587,19 +1596,11 @@ Tabs.NotifyTab:Button({
 
 Tabs.NotifyTab:Paragraph({
     Title = "目前捐赠最多的人",
-    Desc = "宥\nQQ: 1072765538\n总捐赠金额：32",
+    Desc = "宥\nQQ：1072765538\n总捐赠金额：32",
 })
 
 Tabs.NotifyTab:Divider()
 
-Tabs.NotifyTab:Button({
-    Title = "ROB脚本v2",
-    Desc = "必须用gi加速器",
-    Callback = function()
-        WindUI:Notify({ Title = "ROB脚本v2", Content = "正在加载中...\n必须用gi加速器", Duration = 5 })
-        task.spawn(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Zyb150933/ROB/refs/heads/main/ROB.V2"))()
-        end)
     end
 })
 
