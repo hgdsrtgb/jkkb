@@ -1589,7 +1589,9 @@ local flyGui = nil
 
 local function tweenFly(obj, props, dur)
     local info = TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    TweenService:Create(obj, info, props):Play()
+    local t = TweenService:Create(obj, info, props)
+    t:Play()
+    return t
 end
 
 local function showFlyPanel()
@@ -1649,7 +1651,7 @@ local function startFlyEmbedded()
     end
     flyConn = RunService.RenderStepped:Connect(function()
         if not flyActive then return end
-        if not player.Character or player.Character ~= char then
+        if not LocalPlayer.Character or LocalPlayer.Character ~= char then
             stopFlyEmbedded()
             return
         end
@@ -1688,7 +1690,7 @@ local function createFlyUIEmbedded()
     flyGui = Instance.new("ScreenGui")
     flyGui.Name = "FlyGuiEmbedded"
     flyGui.ResetOnSpawn = false
-    flyGui.Parent = player:WaitForChild("PlayerGui")
+    flyGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     flyBall = Instance.new("TextButton")
     flyBall.Name = "FlyBall"
     flyBall.Size = UDim2.new(0,60,0,60)
@@ -1776,7 +1778,7 @@ end
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     flyKeys[input.KeyCode] = true
-    if input.KeyCode == Enum.KeyCode.N and UserInputService.KeyboardEnabled then
+    if input.KeyCode == Enum.KeyCode.N then
         if not flyGui or not flyGui.Parent then
             createFlyUIEmbedded()
             showFlyPanel()
@@ -1793,7 +1795,7 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
     flyKeys[input.KeyCode] = false
 end)
 
-player.CharacterAdded:Connect(function(char)
+LocalPlayer.CharacterAdded:Connect(function(char)
     if flyActive then
         stopFlyEmbedded()
         showFlyBall()
@@ -1829,6 +1831,8 @@ Tabs.MainTab:Slider({
 sliderReleaseActions["flyspeed"] = function(v)
     flySpeed = v
     WindUI:Notify({ Title = "自制飞行速度", Content = "已设置为：" .. v, Duration = 2 })
+end
+)
 end
 Tabs.MainTab:Toggle({
     Title = "飞行v2",
