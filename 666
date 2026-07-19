@@ -110,48 +110,6 @@ local function createESP(player)
     highlight.OutlineTransparency = 0
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     espHighlights[player] = highlight
-
-local espRenderConn = nil
-local espCleanupThread = nil
-
-local function startEspLoop()
-    if espCleanupThread then return end
-    espCleanupThread = task.spawn(function()
-        while espEnabled do
-            task.wait(espUpdateInterval)
-            for player, billboard in pairs(espBillboards) do
-                if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
-                    espBillboards[player] = nil
-                end
-            end
-        end
-        espCleanupThread = nil
-    end)
-    if not espRenderConn then
-        espRenderConn = RunService.RenderStepped:Connect(function()
-            if not espEnabled then return end
-            local myChar = LocalPlayer.Character
-            local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
-            if not myPos then return end
-            for player, billboard in pairs(espBillboards) do
-                if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
-                    local distLabel = billboard:FindFirstChild("DistLabel")
-                    if distLabel then
-                        local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
-                        distLabel.Text = string.format("%.0fm", dist)
-                    end
-                end
-            end
-        end)
-    end
-end
-
-local function stopEspLoop()
-    espEnabled = false
-    espCleanupThread = nil
-    if espRenderConn then espRenderConn:Disconnect() end
-    espRenderConn = nil
-end
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "EspBillboard"
     billboard.Parent = hrp
@@ -225,6 +183,39 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     cleanupESP(player)
 end)
+
+local function quickFlashCleanup()
+end
+
+task.spawn(function()
+    while true do
+        task.wait(espUpdateInterval)
+        if espEnabled then
+            for player, billboard in pairs(espBillboards) do
+                if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
+                    espBillboards[player] = nil
+                end
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+    local myChar = LocalPlayer.Character
+    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
+    if not myPos then return end
+    for player, billboard in pairs(espBillboards) do
+        if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
+            local distLabel = billboard:FindFirstChild("DistLabel")
+            if distLabel then
+                local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+                distLabel.Text = string.format("%.0fm", dist)
+            end
+        end
+    end
+end)
+
 local function quickFlashCleanup()
 end
 local InfiniteJumpEnabled = false
@@ -1389,6 +1380,12 @@ Tabs.NotifyTab:Paragraph({
 })
 Tabs.NotifyTab:Divider()
 Tabs.NotifyTab:Button({
+    Title = "ROB脚本v2",
+    Desc = "必须用gi加速器",
+    Callback = function()
+        WindUI:Notify({ Title = "ROB脚本v2", Content = "正在加载中...\n必须用gi加速器", Duration = 5 })
+
+Tabs.NotifyTab:Button({
     Title = "复制作者QQ",
     Callback = function()
         copyToClipboard("3999698324", "作者QQ")
@@ -1482,11 +1479,7 @@ Tabs.NotifyTab:Paragraph({
 })
 
 Tabs.NotifyTab:Divider()
-Tabs.NotifyTab:Button({
-    Title = "ROB脚本v2",
-    Desc = "必须用gi加速器",
-    Callback = function()
-        WindUI:Notify({ Title = "ROB脚本v2", Content = "正在加载中...\n必须用gi加速器", Duration = 5 })
+
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/Zyb150933/ROB/refs/heads/main/ROB.V2"))()
         end)
@@ -1500,10 +1493,8 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "透视", Content = state and "已打开" or "已关闭", Duration = 3 })
         if state then
             for _, p in ipairs(Players:GetPlayers()) do setupPlayerESP(p) end
-            startEspLoop()
         else
             for _, p in ipairs(Players:GetPlayers()) do cleanupESP(p) end
-            stopEspLoop()
         end
     end
 })
@@ -1661,12 +1652,34 @@ Tabs.MainTab:Toggle({
     Title = "穿墙",
     Value = false,
     Callback = function(state)
+        local workspace = game:GetService("Workspace")
         local Players = game:GetService("Players")
-        local char = Players.LocalPlayer.Character
-        if char then
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = not state
+        if state then
+            Clipon = true
+            if not Stepped or not Stepped.Connected then
+                Stepped = game:GetService("RunService").Stepped:Connect(function()
+                    if not Clipon then return end
+                    for _, child in pairs(workspace:GetChildren()) do
+                        if child.Name == Players.LocalPlayer.Name then
+                            for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
+                                if part:IsA("BasePart") then
+                                    part.CanCollide = false
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        else
+            Clipon = false
+            if Stepped then Stepped:Disconnect() end
+            for _, child in pairs(workspace:GetChildren()) do
+                if child.Name == Players.LocalPlayer.Name then
+                    for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = true
+                        end
+                    end
                 end
             end
         end
