@@ -1086,43 +1086,49 @@ local harassEnabled = false
 local harassTarget = nil
 local harassConnection = nil
 local harassSpeed = 5
-local lastSwitchTime = 0
-local isBehind = true
+local harassOffset = 0
+local harassDirection = 1
 local function startHarass()
     if harassConnection then harassConnection:Disconnect() end
-    lastSwitchTime = tick()
-    isBehind = true
     local lastHarassUpdate = 0
+    local hasTeleported = false
     harassConnection = RunService.Heartbeat:Connect(function(dt)
-        if not harassEnabled or not harassTarget or not harassTarget.Character then return end
+        if not harassEnabled or not harassTarget or not harassTarget:IsDescendantOf(Players) or not harassTarget.Character then return end
         local now = tick()
-        if now - lastHarassUpdate < 0.1 then return end
+        if now - lastHarassUpdate < 0.03 then return end
         lastHarassUpdate = now
         local myChar = LocalPlayer.Character
         if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+        local myRoot = myChar.HumanoidRootPart
         local targetRoot = harassTarget.Character:FindFirstChild("HumanoidRootPart")
         if not targetRoot then return end
-        local switchInterval = 1.5 / math.max(harassSpeed, 0.1)
-        local myRoot = myChar.HumanoidRootPart
         local targetPos = targetRoot.Position
         local targetLook = targetRoot.CFrame.LookVector
-        if now - lastSwitchTime >= switchInterval then
-            lastSwitchTime = now
-            isBehind = not isBehind
+        local behindPos = targetPos - targetLook * 1
+        if not hasTeleported then
+            myRoot.CFrame = CFrame.new(behindPos, targetPos)
+            hasTeleported = true
+            return
         end
-        local goalPos
-        if isBehind then
-            goalPos = targetPos + targetLook * -2.5
-        else
-            goalPos = targetPos + targetLook * 2.5
+        local speed = math.max(harassSpeed, 0.1)
+        local moveDist = speed * dt
+        harassOffset = harassOffset + harassDirection * moveDist
+        if harassOffset >= 0.5 then
+            harassOffset = 0.5
+            harassDirection = -1
+        elseif harassOffset <= -0.5 then
+            harassOffset = -0.5
+            harassDirection = 1
         end
-        local newPos = myRoot.Position:Lerp(goalPos, math.min(dt * 3, 1))
-        myRoot.CFrame = CFrame.new(newPos, goalPos + targetLook)
+        local finalPos = behindPos + targetLook * harassOffset
+        myRoot.CFrame = CFrame.new(finalPos, targetPos)
     end)
 end
 local function stopHarass()
     harassEnabled = false
     harassTarget = nil
+    harassOffset = 0
+    harassDirection = 1
     if harassConnection then harassConnection:Disconnect() end
     harassConnection = nil
     if UIButtons.harassBtn then UIButtons.harassBtn.Text = "操人" end
