@@ -2418,15 +2418,6 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-Tabs.SecondaryTab:Toggle({
-    Title = "原地旋转",
-    Value = false,
-    Callback = function(state)
-        SpinEnabled = state
-        if state then startSpin() else stopSpin() end
-        WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
-    end
-})
 Tabs.SecondaryTab:Slider({
     Title = "操人速度 (当前: 5)",
     Value = {
@@ -2457,6 +2448,16 @@ sliderReleaseActions["harassdist"] = function(v)
     harassDistance = v
     WindUI:Notify({ Title = "操人距离", Content = "已设置为：" .. v .. " 米", Duration = 2 })
 end
+Tabs.SecondaryTab:Toggle({
+    Title = "原地旋转",
+    Value = false,
+    Callback = function(state)
+        SpinEnabled = state
+        if state then startSpin() else stopSpin() end
+        WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+
 Tabs.SecondaryTab:Slider({
     Title = "旋转速度 (当前: 360)",
     Value = {
