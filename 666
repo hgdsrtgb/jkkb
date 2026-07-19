@@ -1,5 +1,4 @@
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-
 local player = game:GetService("Players").LocalPlayer
 local plrId = player.UserId
 local filename = "script_count_" .. plrId .. ".txt"
@@ -10,7 +9,6 @@ if pcall(function() return readfile(filename) end) then
 end
 count = count + 1
 pcall(function() writefile(filename, tostring(count)) end)
-
 local Player = player
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -21,10 +19,8 @@ local CoreGui = game:GetService("CoreGui")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-
 local pendingSliderValues = {}
 local sliderReleaseActions = {}
-
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         for id, value in pairs(pendingSliderValues) do
@@ -35,14 +31,12 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
         end
     end
 end)
-
 WindUI:Notify({
     Title = "恐脚本--通用",
     Content = "作者：恐拜大帝\nQQ：3999698324\n感谢ROB支持",
     Icon = "rbxassetid://5107182114",
     Duration = 5,
 })
-
 local jumpFloatActive = false
 local jumpFloatGui = nil
 local jumpFloatBtn = nil
@@ -58,7 +52,6 @@ local myLastPos = nil
 local espUpdateInterval = 0.1
 local quickFlashInterval = 5
 local isQuickFlashing = false
-
 local function cleanupESP(player)
     if espConnections[player] then
         for _, conn in ipairs(espConnections[player]) do
@@ -83,7 +76,6 @@ local function cleanupESP(player)
     espBillboards[player] = nil
     espHighlights[player] = nil
 end
-
 local function createESP(player)
     if player == LocalPlayer then return end
     local char = player.Character
@@ -147,7 +139,6 @@ local function createESP(player)
     distLabel.Font = Enum.Font.SourceSans
     espBillboards[player] = billboard
 end
-
 local function setupPlayerESP(player)
     if player == LocalPlayer then return end
     if espConnections[player] then
@@ -174,13 +165,11 @@ local function setupPlayerESP(player)
         createESP(player)
     end
 end
-
 for _, player in ipairs(Players:GetPlayers()) do
     task.spawn(function()
         setupPlayerESP(player)
     end)
 end
-
 Players.PlayerAdded:Connect(function(player)
     task.spawn(function()
         setupPlayerESP(player)
@@ -191,14 +180,11 @@ Players.PlayerAdded:Connect(function(player)
         end)
     end
 end)
-
 Players.PlayerRemoving:Connect(function(player)
     cleanupESP(player)
 end)
-
 local function quickFlashCleanup()
 end
-
 task.spawn(function()
     while true do
         task.wait(espUpdateInterval)
@@ -211,7 +197,6 @@ task.spawn(function()
         end
     end
 end)
-
 RunService.RenderStepped:Connect(function()
     if not espEnabled then return end
     local myChar = LocalPlayer.Character
@@ -227,9 +212,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
-
-
 local InfiniteJumpEnabled = false
 local NightVisionEnabled = false
 local AutoTranslateEnabled = false
@@ -256,8 +238,6 @@ local ForceFirstPersonEnabled = false
 local FieldOfViewValue = 70
 local CameraModeConn = nil
 local FOVConn = nil
-
-
 local function disablePlayerCollision(player)
     if player == LocalPlayer then return end
     local char = player.Character
@@ -273,7 +253,6 @@ local function disablePlayerCollision(player)
         end
     end)
 end
-
 local function enablePlayerCollision(player)
     if player == LocalPlayer then return end
     local char = player.Character
@@ -289,7 +268,6 @@ local function enablePlayerCollision(player)
         end
     end)
 end
-
 local function enableAllPlayersCollision()
     for part, state in pairs(antiFlingOriginalStates) do
         pcall(function()
@@ -300,7 +278,6 @@ local function enableAllPlayersCollision()
     end
     antiFlingOriginalStates = {}
 end
-
 local function setupAntiFlingForPlayer(player)
     if player == LocalPlayer then return end
     disablePlayerCollision(player)
@@ -317,7 +294,6 @@ local function setupAntiFlingForPlayer(player)
         end)
     end)
 end
-
 local function cleanupAntiFlingForPlayer(player)
     if antiFlingCharAddedConns[player] then
         pcall(function() antiFlingCharAddedConns[player]:Disconnect() end)
@@ -325,7 +301,6 @@ local function cleanupAntiFlingForPlayer(player)
     end
     enablePlayerCollision(player)
 end
-
 local function startAntiFling()
     if AntiFlingConnection then AntiFlingConnection:Disconnect() end
     for _, p in ipairs(Players:GetPlayers()) do
@@ -365,7 +340,6 @@ local function startAntiFling()
         end
     end)
 end
-
 local function stopAntiFling()
     if AntiFlingConnection then AntiFlingConnection:Disconnect() end
     AntiFlingConnection = nil
@@ -375,23 +349,19 @@ local function stopAntiFling()
     antiFlingCharAddedConns = {}
     enableAllPlayersCollision()
 end
-
 for _, p in ipairs(Players:GetPlayers()) do
     if AntiFlingEnabled then
         setupAntiFlingForPlayer(p)
     end
 end
-
 Players.PlayerAdded:Connect(function(player)
     if AntiFlingEnabled then
         setupAntiFlingForPlayer(player)
     end
 end)
-
 Players.PlayerRemoving:Connect(function(player)
     cleanupAntiFlingForPlayer(player)
 end)
-
 local function startSpin()
     if spinConnection then spinConnection:Disconnect() end
     local lastSpin = 0
@@ -408,13 +378,11 @@ local function startSpin()
         root.CFrame = newCF
     end)
 end
-
 local function stopSpin()
     SpinEnabled = false
     if spinConnection then spinConnection:Disconnect() end
     spinConnection = nil
 end
-
 local function startAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect() end
     antiAFKConnection = LocalPlayer.Idled:Connect(function()
@@ -424,17 +392,14 @@ local function startAntiAFK()
         vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
     end)
 end
-
 local function stopAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect() end
     antiAFKConnection = nil
 end
-
 local function getHumanoid()
     local char = LocalPlayer.Character
     if char then return char:FindFirstChild("Humanoid") end
 end
-
 UserInputService.JumpRequest:Connect(function()
     if InfiniteJumpEnabled then
         local char = LocalPlayer.Character
@@ -446,7 +411,6 @@ UserInputService.JumpRequest:Connect(function()
         end
     end
 end)
-
 local followTarget = nil
 local followConnection = nil
 local followRange = 5
@@ -480,7 +444,6 @@ local function startFollow(targetPlayer)
     end)
     WindUI:Notify({ Title = "跟随", Content = "开始跟随 " .. targetPlayer.Name, Duration = 3 })
 end
-
 local function stopFollow()
     if followConnection then followConnection:Disconnect() end
     followConnection = nil
@@ -494,8 +457,6 @@ local function stopFollow()
     end
     WindUI:Notify({ Title = "跟随", Content = "已停止跟随", Duration = 3 })
 end
-
-
 local function updateCameraMode()
     if ForceFirstPersonEnabled then
         Camera.CameraMode = Enum.CameraMode.LockFirstPerson
@@ -503,7 +464,6 @@ local function updateCameraMode()
         Camera.CameraMode = Enum.CameraMode.Classic
     end
 end
-
 local function startCameraModeLoop()
     if CameraModeConn then CameraModeConn:Disconnect() end
     CameraModeConn = RunService.RenderStepped:Connect(function()
@@ -524,7 +484,6 @@ local function startCameraModeLoop()
         end
     end)
 end
-
 local function stopCameraModeLoop()
     if CameraModeConn then CameraModeConn:Disconnect() end
     CameraModeConn = nil
@@ -533,7 +492,6 @@ local function stopCameraModeLoop()
     Camera.CameraMode = Enum.CameraMode.Classic
     Camera.FieldOfView = 70
 end
-
 local CrosshairGui = nil
 local CrosshairFrame = nil
 local function createCrosshair()
@@ -572,7 +530,6 @@ local function createCrosshair()
     dotCorner.CornerRadius = UDim.new(1,0)
     dotCorner.Parent = dot
 end
-
 local crosshairLastUpdate = 0
 local crosshairConn = RunService.Heartbeat:Connect(function()
     local now = tick()
@@ -590,7 +547,6 @@ local crosshairConn = RunService.Heartbeat:Connect(function()
     end
     CrosshairFrame.Visible = true
 end)
-
 local isStealing = false
 local function stealAllItems()
     if isStealing then return 0 end
@@ -625,7 +581,6 @@ local function stealAllItems()
     isStealing = false
     return count
 end
-
 local function beautifyStats()
     local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
     if leaderstats then
@@ -644,7 +599,6 @@ local function beautifyStats()
         end
     end
 end
-
 local function isEnglish(text)
     if not text or text == "" then return false end
     local englishCount = 0
@@ -661,7 +615,6 @@ local function isEnglish(text)
     if totalCount == 0 then return false end
     return (englishCount / totalCount) > 0.5
 end
-
 local function translateText(text)
     if not text or text == "" or #text < 2 then return nil end
     if translatedTexts[text] then return translatedTexts[text] end
@@ -677,7 +630,6 @@ local function translateText(text)
     if success and result then translatedTexts[text] = result; return result end
     return nil
 end
-
 local function processTextObject(obj)
     if not AutoTranslateEnabled then return end
     if not obj:IsA("TextLabel") and not obj:IsA("TextButton") and not obj:IsA("TextBox") then return end
@@ -687,7 +639,6 @@ local function processTextObject(obj)
     local translated = translateText(originalText)
     if translated and translated ~= originalText then obj.Text = translated end
 end
-
 local function scanAndTranslate(container, maxCount)
     local c = 0
     for _, obj in ipairs(container:GetDescendants()) do
@@ -699,7 +650,6 @@ local function scanAndTranslate(container, maxCount)
         end
     end
 end
-
 local function startAutoTranslate()
     if translateLoop then return end
     translateLoop = true
@@ -716,11 +666,9 @@ local function startAutoTranslate()
         end
     end)
 end
-
 local function stopAutoTranslate()
     translateLoop = false
 end
-
 local function teleportToPlayer(p)
     if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
         local myChar = LocalPlayer.Character
@@ -729,7 +677,6 @@ local function teleportToPlayer(p)
         end
     end
 end
-
 local function getNearestPlayer()
     local nearest = nil
     local minDist = math.huge
@@ -743,7 +690,6 @@ local function getNearestPlayer()
     end
     return nearest
 end
-
 local function powerfulFling(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then
         WindUI:Notify({ Title = "提示", Content = "目标玩家无效", Duration = 3 })
@@ -856,7 +802,6 @@ local function powerfulFling(targetPlayer)
     Workspace.FallenPartsDestroyHeight = getgenv().FPDH
     WindUI:Notify({ Title = "甩飞完成", Content = "已完成对 " .. targetPlayer.Name .. " 的甩飞", Duration = 3 })
 end
-
 local function startSpeedAntiPull(speed)
     if speedAntiPull then speedAntiPull:Disconnect() end
     local lastCheck = 0
@@ -870,11 +815,9 @@ local function startSpeedAntiPull(speed)
         end
     end)
 end
-
 local function stopSpeedAntiPull()
     if speedAntiPull then speedAntiPull:Disconnect(); speedAntiPull = nil end
 end
-
 local flyUIVisible = false
 local screenGui = nil
 local toggleButton = nil
@@ -883,23 +826,18 @@ local active = false
 local braking = false
 local rotConn, flyConn, animTrack
 local bodyVelocity
-
 local function getCharacter()
     return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 end
-
 local function getRoot()
     return getCharacter():WaitForChild("HumanoidRootPart")
 end
-
 local function getHum()
     return getCharacter():FindFirstChildWhichIsA("Humanoid")
 end
-
 local function setTPWalk(state)
     if syn or getgenv then pcall(function() setfflag("tpwalk", state and "1" or "0") end) end
 end
-
 local function playFlyAnimation()
     local hum = getHum()
     if hum then
@@ -910,7 +848,6 @@ local function playFlyAnimation()
         animTrack:Play()
     end
 end
-
 local function playBrakeAnimation()
     local hum = getHum()
     if hum then
@@ -921,11 +858,9 @@ local function playBrakeAnimation()
         animTrack:Play()
     end
 end
-
 local function stopAnimation()
     if animTrack then animTrack:Stop() animTrack = nil end
 end
-
 local function startFlying()
     local root = getRoot()
     bodyVelocity = Instance.new("BodyVelocity")
@@ -946,12 +881,10 @@ local function startFlying()
         end
     end)
 end
-
 local function stopFlying()
     if flyConn then flyConn:Disconnect() flyConn = nil end
     if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
 end
-
 local function startRotation()
     local lastRotUpdate = 0
     rotConn = RunService.RenderStepped:Connect(function()
@@ -964,11 +897,9 @@ local function startRotation()
         end
     end)
 end
-
 local function stopRotation()
     if rotConn then rotConn:Disconnect() rotConn = nil end
 end
-
 local function activate()
     active = true
     braking = false
@@ -978,7 +909,6 @@ local function activate()
     startRotation()
     if brakeButton then brakeButton.Visible = true end
 end
-
 local function deactivate()
     active = false
     stopAnimation()
@@ -987,13 +917,11 @@ local function deactivate()
     setTPWalk(false)
     if brakeButton then brakeButton.Visible = false end
 end
-
 local function toggleBrake()
     braking = not braking
     stopAnimation()
     if braking then playBrakeAnimation() else playFlyAnimation() end
 end
-
 local function createFlyUI()
     if screenGui then return end
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -1026,7 +954,6 @@ local function createFlyUI()
     end)
     brakeButton.MouseButton1Click:Connect(toggleBrake)
 end
-
 LocalPlayer.CharacterAdded:Connect(function()
     if active then
         task.wait(1)
@@ -1034,20 +961,17 @@ LocalPlayer.CharacterAdded:Connect(function()
         if braking then toggleBrake() end
     end
 end)
-
 local function showFlyUI()
     createFlyUI()
     if toggleButton then toggleButton.Visible = true end
     flyUIVisible = true
 end
-
 local function hideFlyUI()
     if active then deactivate() end
     if toggleButton then toggleButton.Visible = false end
     if brakeButton then brakeButton.Visible = false end
     flyUIVisible = false
 end
-
 local function loadLuGuan()
     local player = game:GetService("Players").LocalPlayer
     local ToolName = "撸管（r15）"
@@ -1135,14 +1059,12 @@ local function loadLuGuan()
         giveTool()
     end)
 end
-
 local harassEnabled = false
 local harassTarget = nil
 local harassConnection = nil
 local harassSpeed = 5
 local lastSwitchTime = 0
 local isBehind = true
-
 local function startHarass()
     if harassConnection then harassConnection:Disconnect() end
     lastSwitchTime = tick()
@@ -1172,7 +1094,6 @@ local function startHarass()
         myRoot.CFrame = CFrame.new(newPos, goalPos + targetLook)
     end)
 end
-
 local function stopHarass()
     harassEnabled = false
     harassTarget = nil
@@ -1182,10 +1103,8 @@ local function stopHarass()
     if UIButtons.harassNearestBtn then UIButtons.harassNearestBtn.Text = "操最近的人" end
     WindUI:Notify({ Title = "操人", Content = "已停止操人", Duration = 2 })
 end
-
 local smoothFollowConnection = nil
 local smoothFollowTarget = nil
-
 local function stopSmoothFollow()
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
     smoothFollowConnection = nil
@@ -1194,7 +1113,6 @@ local function stopSmoothFollow()
     if UIButtons.smoothFollowNearestBtn then UIButtons.smoothFollowNearestBtn.Text = "平滑跟随最近的人" end
     WindUI:Notify({ Title = "平滑跟随", Content = "已停止平滑跟随", Duration = 3 })
 end
-
 local function startSmoothFollow(targetPlayer)
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
     smoothFollowTarget = targetPlayer
@@ -1224,7 +1142,6 @@ local function startSmoothFollow(targetPlayer)
     end)
     WindUI:Notify({ Title = "平滑跟随", Content = "开始平滑跟随 " .. targetPlayer.Name, Duration = 3 })
 end
-
 local function createJumpFloat()
     if jumpFloatGui then jumpFloatGui:Destroy() end
     jumpFloatGui = Instance.new("ScreenGui", CoreGui)
@@ -1322,14 +1239,11 @@ local function createJumpFloat()
     end
     jumpFloatBtn.MouseButton1Click:Connect(performJump)
 end
-
 local function destroyJumpFloat()
     if jumpFloatGui then jumpFloatGui:Destroy() jumpFloatGui = nil jumpPanel = nil jumpFloatBtn = nil end
 end
-
 local serversFile = "servers_" .. plrId .. ".json"
 local savedServers = {}
-
 local function loadSavedServers()
     local success, data = pcall(function() return readfile(serversFile) end)
     if success and data and data ~= "" then
@@ -1350,7 +1264,6 @@ local function loadSavedServers()
     end
     savedServers = unique
 end
-
 local function saveServers()
     task.spawn(function()
         pcall(function()
@@ -1358,7 +1271,6 @@ local function saveServers()
         end)
     end)
 end
-
 local function addServerId(id, name)
     if not id or id == "" then return end
     local sid = tostring(id)
@@ -1371,7 +1283,6 @@ local function addServerId(id, name)
     table.insert(savedServers, {id = sid, name = name or sid})
     saveServers()
 end
-
 local function removeServerId(id)
     if not id then return end
     local sid = tostring(id)
@@ -1387,7 +1298,6 @@ local function removeServerId(id)
     end)
     return true
 end
-
 local function renameServerId(id, newName)
     if not newName or newName == "" then return false end
     local sid = tostring(id)
@@ -1400,9 +1310,7 @@ local function renameServerId(id, newName)
     end
     return false
 end
-
 loadSavedServers()
-
 local function copyToClipboard(text, label)
     local success = pcall(function()
         if setclipboard then setclipboard(text)
@@ -1415,7 +1323,6 @@ local function copyToClipboard(text, label)
         Duration = 3,
     })
 end
-
 local Window = WindUI:CreateWindow({
     Title = "恐脚本--通用",
     Icon = "rbxassetid://5107182114",
@@ -1432,7 +1339,6 @@ local Window = WindUI:CreateWindow({
     ScrollBarEnabled = true,
     ToggleKey = Enum.KeyCode.RightControl,
 })
-
 Window:EditOpenButton({
     Title = "恐脚本--通用",
     Icon = "globe",
@@ -1444,24 +1350,19 @@ Window:EditOpenButton({
     ),
     Draggable = true,
 })
-
 local Tabs = {}
-
 Tabs.NotifyTab = Window:Tab({ Title = "通知", Icon = "bell" })
 Tabs.MainTab = Window:Tab({ Title = "主要", Icon = "zap" })
 Tabs.SecondaryTab = Window:Tab({ Title = "次要", Icon = "mouse-pointer-2" })
 Tabs.MiscTab = Window:Tab({ Title = "杂项", Icon = "settings" })
 Tabs.GamesTab = Window:Tab({ Title = "支持服务器", Icon = "gamepad-2" })
-
 Window:SelectTab(1)
-
 Tabs.NotifyTab:Paragraph({
     Title = "恐脚本--通用",
     Desc = "创作者：恐拜大帝\n感谢ROB支持\n您已执行 " .. count .. " 次，谢谢您的支持！",
     Image = "rbxassetid://5107182114",
     ImageSize = 42,
 })
-
 local function kbFormatDiff(mins)
     mins = math.max(0, math.floor(mins))
     return string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
@@ -1474,59 +1375,49 @@ if kbBirthTime > os.time() then
 end
 local kbBirthYear = os.date("*t", kbBirthTime).year
 local kbAnnivTime = os.time({year = kbBirthYear + 1, month = 2, day = 9, hour = 2, min = 27, sec = 0})
-
 Tabs.NotifyTab:Paragraph({
     Title = "距离最近一次更新",
     Desc = kbFormatDiff((os.time() - kbUpdateTime) / 60),
 })
-
 Tabs.NotifyTab:Paragraph({
     Title = "脚本诞生日期：2月9日 2:27",
     Desc = "已诞生 " .. kbFormatDiff((os.time() - kbBirthTime) / 60),
 })
-
 Tabs.NotifyTab:Paragraph({
     Title = "距离一周年还有",
     Desc = kbFormatDiff((kbAnnivTime - os.time()) / 60),
 })
-
 Tabs.NotifyTab:Divider()
-
 Tabs.NotifyTab:Button({
     Title = "复制作者QQ",
     Callback = function()
         copyToClipboard("3999698324", "作者QQ")
     end
 })
-
 Tabs.NotifyTab:Button({
     Title = "复制群1: 1106203175",
     Callback = function()
         copyToClipboard("1106203175", "群1")
     end
 })
-
 Tabs.NotifyTab:Button({
     Title = "复制群2: 1001577641",
     Callback = function()
         copyToClipboard("1001577641", "群2")
     end
 })
-
 Tabs.NotifyTab:Button({
     Title = "复制群3: 239824789",
     Callback = function()
         copyToClipboard("239824789", "群3")
     end
 })
-
 Tabs.NotifyTab:Button({
     Title = "复制群4: 1065927925",
     Callback = function()
         copyToClipboard("1065927925", "群4")
     end
 })
-
 local kbDonateAsset = nil
 Tabs.NotifyTab:Button({
     Title = "捐赠我",
@@ -1585,14 +1476,12 @@ Tabs.NotifyTab:Button({
         end)
     end
 })
-
 Tabs.NotifyTab:Paragraph({
     Title = "目前捐赠最多的人：",
     Desc = "宥\nQQ：1072765538\n捐赠金额：32（牛逼）",
 })
 
 Tabs.NotifyTab:Divider()
-
 Tabs.NotifyTab:Button({
     Title = "ROB脚本v2",
     Desc = "必须用gi加速器",
@@ -1603,7 +1492,6 @@ Tabs.NotifyTab:Button({
         end)
     end
 })
-
 Tabs.MainTab:Toggle({
     Title = "透视",
     Value = false,
@@ -1617,7 +1505,6 @@ Tabs.MainTab:Toggle({
         end
     end
 })
-
 Tabs.MainTab:Button({
     Title = "飞行",
     Callback = function()
@@ -1627,13 +1514,11 @@ Tabs.MainTab:Button({
         end)
     end
 })
-
 local flyV2Enabled = false
 local flyV2Speed = 50
 local flyV2Conn = nil
 local flyV2BV = nil
 local flyV2BG = nil
-
 local function stopFlyV2()
     if flyV2Conn then flyV2Conn:Disconnect() flyV2Conn = nil end
     if flyV2BV then flyV2BV:Destroy() flyV2BV = nil end
@@ -1642,7 +1527,6 @@ local function stopFlyV2()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.PlatformStand = false end
 end
-
 local function startFlyV2()
     stopFlyV2()
     local char = LocalPlayer.Character
@@ -1677,14 +1561,12 @@ local function startFlyV2()
         flyV2BG.CFrame = Camera.CFrame
     end)
 end
-
 LocalPlayer.CharacterAdded:Connect(function(char)
     if flyV2Enabled then
         task.wait(1)
         startFlyV2()
     end
 end)
-
 Tabs.MainTab:Toggle({
     Title = "飞行v2",
     Value = false,
@@ -1694,7 +1576,6 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "飞行v2", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
 Tabs.MainTab:Slider({
     Title = "飞行v2速度 (当前: 50)",
     Value = {
@@ -1710,7 +1591,6 @@ sliderReleaseActions["flyv2speed"] = function(v)
     flyV2Speed = v
     WindUI:Notify({ Title = "飞行v2速度", Content = "已设置为：" .. v, Duration = 2 })
 end
-
 Tabs.MainTab:Toggle({
     Title = "无限跳",
     Value = false,
@@ -1719,24 +1599,19 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "无限跳", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
-
 local eyeEnabled = false
 local eyeConns = {}
-
 local function eyeApplyPart(d)
     if d:IsA("BasePart") then
         d.LocalTransparencyModifier = 1
     end
 end
-
 local function eyeWatch(char)
     for _, d in ipairs(char:GetDescendants()) do
         eyeApplyPart(d)
     end
     table.insert(eyeConns, char.DescendantAdded:Connect(eyeApplyPart))
 end
-
 local function eyeClear()
     for _, c in ipairs(eyeConns) do
         c:Disconnect()
@@ -1751,14 +1626,12 @@ local function eyeClear()
         end
     end
 end
-
 LocalPlayer.CharacterAdded:Connect(function(char)
     if eyeEnabled then
         task.wait(0.5)
         eyeWatch(char)
     end
 end)
-
 Tabs.MiscTab:Toggle({
     Title = "隐身（别人看不到）",
     Value = false,
@@ -1773,7 +1646,6 @@ Tabs.MiscTab:Toggle({
         WindUI:Notify({ Title = "隐身", Content = state and "已开启，其他人将无法看到你的影像" or "已关闭", Duration = 3 })
     end
 })
-
 Tabs.MainTab:Button({
     Title = "建造方块",
     Callback = function()
@@ -1783,7 +1655,6 @@ Tabs.MainTab:Button({
         end)
     end
 })
-
 Tabs.MainTab:Toggle({
     Title = "穿墙",
     Value = false,
@@ -1822,7 +1693,6 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "穿墙", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
 local speedToggle = false
 local speedValue = 16
 Tabs.MainTab:Toggle({
@@ -1843,7 +1713,6 @@ Tabs.MainTab:Toggle({
         end
     end
 })
-
 Tabs.MainTab:Slider({
     Title = "移速数值 (当前: 16)",
     Value = {
@@ -1889,7 +1758,6 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "夜视", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
 Tabs.MainTab:Button({
     Title = "偷取道具",
     Callback = function()
@@ -1900,7 +1768,6 @@ Tabs.MainTab:Button({
         end)
     end
 })
-
 Tabs.MainTab:Toggle({
     Title = "解锁跳跃",
     Value = false,
@@ -1910,7 +1777,6 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "解锁跳跃", Content = state and "已显示跳跃按钮" or "已隐藏跳跃按钮", Duration = 3 })
     end
 })
-
 Tabs.MainTab:Button({
     Title = "甩飞全部人",
     Callback = function()
@@ -1928,7 +1794,6 @@ Tabs.MainTab:Button({
         end)
     end
 })
-
 Tabs.MainTab:Button({
     Title = "甩飞最近的人",
     Callback = function()
@@ -1953,7 +1818,6 @@ Tabs.MainTab:Button({
         end
     end
 })
-
 local currentFlingTarget = nil
 flingDropdown = Tabs.MainTab:Dropdown({
     Title = "选定甩飞玩家",
@@ -1968,7 +1832,6 @@ flingDropdown = Tabs.MainTab:Dropdown({
         end
     end
 })
-
 Tabs.MainTab:Button({
     Title = "确定执行甩飞",
     Callback = function()
@@ -1982,7 +1845,6 @@ Tabs.MainTab:Button({
         end
     end
 })
-
 Tabs.MainTab:Button({
     Title = "祖国人汉化",
     Callback = function()
@@ -1992,7 +1854,6 @@ Tabs.MainTab:Button({
         end)
     end
 })
-
 Tabs.MainTab:Button({
     Title = "自瞄",
     Callback = function()
@@ -2002,7 +1863,6 @@ Tabs.MainTab:Button({
         end)
     end
 })
-
 Tabs.MainTab:Toggle({
     Title = "防甩飞",
     Value = false,
@@ -2012,14 +1872,10 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "防甩飞", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
-
-
 local activeImpersonateClone = nil
 local selectedImpersonateName = ""
 local impersonateHeartbeat = nil
 local impersonateRealChar = nil
-
 local function resetImpersonate()
     if impersonateHeartbeat then
         impersonateHeartbeat:Disconnect()
@@ -2048,17 +1904,14 @@ local function resetImpersonate()
     end
     impersonateRealChar = nil
 end
-
 local function startImpersonate(targetName)
     local target = Players:FindFirstChild(targetName)
     if not target or not target.Character then
         WindUI:Notify({Title = "错误", Content = "目标玩家不存在或角色未加载", Type = "error"})
         return
     end
-
     resetImpersonate()
     task.wait(0.2)
-
     local targetChar = target.Character
     local realChar = LocalPlayer.Character
     if not realChar then
@@ -2066,16 +1919,13 @@ local function startImpersonate(targetName)
         return
     end
     impersonateRealChar = realChar
-
     targetChar.Archivable = true
     local clone = targetChar:Clone()
     clone.Name = "PossessedClone"
     clone.Parent = workspace
     activeImpersonateClone = clone
-
     local cloneHum = clone:FindFirstChildOfClass("Humanoid")
     local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
-
     for _, v in ipairs(clone:GetDescendants()) do
         if v:IsA("SelectionBox") or v:IsA("SelectionSphere") or v:IsA("BoxHandleAdornment") or v:IsA("Highlight") then
             v:Destroy()
@@ -2096,7 +1946,6 @@ local function startImpersonate(targetName)
             v:Destroy()
         end
     end
-
     for _, v in ipairs(realChar:GetDescendants()) do
         if v:IsA("BasePart") or v:IsA("Decal") then
             v.Transparency = 1
@@ -2108,24 +1957,20 @@ local function startImpersonate(targetName)
     if realChar:FindFirstChild("HumanoidRootPart") then
         realChar.HumanoidRootPart.CanCollide = false
     end
-
     LocalPlayer.Character = clone
     Camera.CameraSubject = cloneHum
-
     local animate = clone:FindFirstChild("Animate")
     if animate then
         animate.Disabled = true
         task.wait(0.1)
         animate.Disabled = false
     end
-
     local realHum = realChar:FindFirstChildOfClass("Humanoid")
     if realHum then
         realHum.Died:Connect(function()
             resetImpersonate()
         end)
     end
-
     local realHum2 = realChar:FindFirstChildOfClass("Humanoid")
     if realHum2 then
         realHum2.PlatformStand = true
@@ -2153,15 +1998,11 @@ local function startImpersonate(targetName)
             end
         end
     end)
-
     WindUI:Notify({Title = "成功", Content = "已伪装成: " .. targetName .. "（仅自己可见）", Type = "success"})
 end
-
-
 local respawnEnabled = false
 local respawnPos = nil
 local deathPos = nil
-
 local function setupRespawnListener(char)
     local humanoid = char:WaitForChild("Humanoid", 5)
     if not humanoid then return end
@@ -2172,7 +2013,6 @@ local function setupRespawnListener(char)
         end
     end)
 end
-
 if player.Character then
     setupRespawnListener(player.Character)
 end
@@ -2189,7 +2029,6 @@ player.CharacterAdded:Connect(function(char)
         end)
     end
 end)
-
 Tabs.MainTab:Toggle({
     Title = "原地复活",
     Value = false,
@@ -2198,7 +2037,6 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "原地复活", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
 Tabs.MainTab:Button({
     Title = "设置重生点",
     Callback = function()
@@ -2206,7 +2044,6 @@ Tabs.MainTab:Button({
         if not char then return end
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-
         respawnPos = hrp.Position
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj:IsA("SpawnLocation") then
@@ -2219,7 +2056,6 @@ Tabs.MainTab:Button({
         WindUI:Notify({ Title = "设置重生点", Content = "重生点已设置", Duration = 3 })
     end
 })
-
 local ImpersonateDropdown = Tabs.MainTab:Dropdown({
     Title = "选择要伪装成的玩家",
     Multi = false,
@@ -2228,7 +2064,6 @@ local ImpersonateDropdown = Tabs.MainTab:Dropdown({
         selectedImpersonateName = value
     end,
 })
-
 local function refreshAllDropdowns()
     local names = {}
     for _, p in ipairs(Players:GetPlayers()) do
@@ -2242,18 +2077,14 @@ local function refreshAllDropdowns()
     if harassDropdown then harassDropdown:Refresh(names) end
     if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
 end
-
 Players.PlayerAdded:Connect(refreshAllDropdowns)
 Players.PlayerRemoving:Connect(refreshAllDropdowns)
-
-
 Tabs.MainTab:Button({
     Title = "刷新玩家列表",
     Callback = function()
         refreshAllDropdowns()
     end,
 })
-
 Tabs.MainTab:Button({
     Title = "变身成他人（栽赃）",
     Callback = function()
@@ -2264,7 +2095,6 @@ Tabs.MainTab:Button({
         end
     end,
 })
-
 Tabs.MainTab:Button({
     Title = "取消伪装",
     Callback = function()
@@ -2272,7 +2102,6 @@ Tabs.MainTab:Button({
         WindUI:Notify({Title = "提示", Content = "已取消伪装", Type = "info"})
     end,
 })
-
 refreshAllDropdowns()
 Tabs.SecondaryTab:Button({
     Title = "自动翻译",
@@ -2283,7 +2112,6 @@ Tabs.SecondaryTab:Button({
         end)
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "传送最近玩家",
     Callback = function()
@@ -2309,7 +2137,6 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-
 local currentFollowTarget = nil
 followDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定跟随玩家",
@@ -2325,7 +2152,6 @@ followDropdown = Tabs.SecondaryTab:Dropdown({
         end
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "确定执行跟随",
     Callback = function()
@@ -2336,14 +2162,12 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "停止跟随",
     Callback = function()
         stopFollow()
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "复制当前坐标",
     Callback = function()
@@ -2357,7 +2181,6 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-
 local tpCoordStr = ""
 Tabs.SecondaryTab:Input({
     Title = "输入坐标 (X,Y,Z)",
@@ -2366,7 +2189,6 @@ Tabs.SecondaryTab:Input({
         tpCoordStr = v
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "执行坐标传送",
     Callback = function()
@@ -2383,14 +2205,12 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "爬墙",
     Callback = function()
         loadstring(game:HttpGet("https://pastebin.com/raw/zXk4Rq2r"))()
     end
 })
-
 local currentSmoothTarget = nil
 smoothDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定平滑跟随玩家",
@@ -2406,7 +2226,6 @@ smoothDropdown = Tabs.SecondaryTab:Dropdown({
         end
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "确定执行平滑跟随",
     Callback = function()
@@ -2417,7 +2236,6 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "停止平滑跟随",
     Callback = function()
@@ -2426,7 +2244,6 @@ Tabs.SecondaryTab:Button({
         smoothDropdown:SetTitle("选定平滑跟随玩家")
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "平滑跟随最近的人",
     Callback = function()
@@ -2442,7 +2259,6 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "撸管",
     Callback = function()
@@ -2450,7 +2266,6 @@ Tabs.SecondaryTab:Button({
         task.spawn(function() loadLuGuan() end)
     end
 })
-
 Tabs.SecondaryTab:Toggle({
     Title = "飞行控制",
     Value = false,
@@ -2458,7 +2273,6 @@ Tabs.SecondaryTab:Toggle({
         if state then showFlyUI() else hideFlyUI() end
     end
 })
-
 local currentHarassTarget = nil
 harassDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定操人目标",
@@ -2474,7 +2288,6 @@ harassDropdown = Tabs.SecondaryTab:Dropdown({
         end
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "确定执行操人",
     Callback = function()
@@ -2488,7 +2301,6 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "停止操人",
     Callback = function()
@@ -2497,7 +2309,6 @@ Tabs.SecondaryTab:Button({
         harassDropdown:SetTitle("选定操人目标")
     end
 })
-
 Tabs.SecondaryTab:Button({
     Title = "操最近的人",
     Callback = function()
@@ -2516,7 +2327,6 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-
 Tabs.SecondaryTab:Toggle({
     Title = "原地旋转",
     Value = false,
@@ -2526,7 +2336,6 @@ Tabs.SecondaryTab:Toggle({
         WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
 Tabs.SecondaryTab:Slider({
     Title = "操人速度 (当前: 5)",
     Value = {
@@ -2542,7 +2351,6 @@ sliderReleaseActions["harassspeed"] = function(speed)
     harassSpeed = speed
     WindUI:Notify({ Title = "操人速度", Content = "已设置为：" .. speed .. " 次/秒", Duration = 2 })
 end
-
 Tabs.SecondaryTab:Slider({
     Title = "旋转速度 (当前: 360)",
     Value = {
@@ -2558,10 +2366,8 @@ sliderReleaseActions["spinspeed"] = function(speed)
     SpinSpeed = speed
     WindUI:Notify({ Title = "旋转速度", Content = "已设置为：" .. speed .. " 度/秒", Duration = 2 })
 end
-
 local musicId = ""
 local musicSound = nil
-
 local kbOldSky = nil
 Tabs.MiscTab:Toggle({
     Title = "修改天空盒子（有两秒延迟）",
@@ -2594,7 +2400,6 @@ Tabs.MiscTab:Toggle({
         end
     end
 })
-
 Tabs.MiscTab:Input({
     Title = "输入音乐ID",
     Placeholder = "输入音乐ID",
@@ -2602,7 +2407,6 @@ Tabs.MiscTab:Input({
         musicId = v
     end
 })
-
 Tabs.MiscTab:Button({
     Title = "确认播放",
     Callback = function()
@@ -2629,7 +2433,6 @@ Tabs.MiscTab:Button({
         WindUI:Notify({ Title = "音乐", Content = "正在播放: " .. id, Duration = 3 })
     end
 })
-
 Tabs.MiscTab:Button({
     Title = "取消播放",
     Callback = function()
@@ -2643,7 +2446,6 @@ Tabs.MiscTab:Button({
         end
     end
 })
-
 Tabs.MiscTab:Button({
     Title = "停止播放",
     Callback = function()
@@ -2655,7 +2457,6 @@ Tabs.MiscTab:Button({
         end
     end
 })
-
 Tabs.MiscTab:Button({
     Title = "实体动作游泳",
     Desc = "先点击此按钮一次之后点击飞，然后再点击此按钮一次",
@@ -2666,7 +2467,6 @@ Tabs.MiscTab:Button({
         end)
     end
 })
-
 Tabs.MiscTab:Button({
     Title = "显示时间",
     Callback = function()
@@ -2676,7 +2476,6 @@ Tabs.MiscTab:Button({
         end)
     end
 })
-
 Tabs.MiscTab:Button({
     Title = "美化包排行榜第一",
     Callback = function()
@@ -2684,7 +2483,6 @@ Tabs.MiscTab:Button({
         WindUI:Notify({ Title = "美化包", Content = "数值已修改为999（若游戏支持）", Duration = 3 })
     end
 })
-
 Tabs.MiscTab:Toggle({
     Title = "准星",
     Value = false,
@@ -2694,7 +2492,6 @@ Tabs.MiscTab:Toggle({
         WindUI:Notify({ Title = "准星", Content = state and "已显示" or "已隐藏", Duration = 3 })
     end
 })
-
 Tabs.MiscTab:Toggle({
     Title = "准星旋转",
     Value = false,
@@ -2703,7 +2500,6 @@ Tabs.MiscTab:Toggle({
         WindUI:Notify({ Title = "准星旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
 Tabs.MiscTab:Toggle({
     Title = "反挂机踢出",
     Value = false,
@@ -2713,7 +2509,6 @@ Tabs.MiscTab:Toggle({
         WindUI:Notify({ Title = "反挂机踢出", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-
 Tabs.MiscTab:Button({
     Title = "复制实例ID (JobId)",
     Callback = function()
@@ -2721,7 +2516,6 @@ Tabs.MiscTab:Button({
         copyToClipboard(id, "实例ID")
     end
 })
-
 Tabs.MiscTab:Button({
     Title = "复制数字ID (PlaceId)",
     Callback = function()
@@ -2729,7 +2523,6 @@ Tabs.MiscTab:Button({
         copyToClipboard(id, "数字ID")
     end
 })
-
 Tabs.MiscTab:Input({
     Title = "数字ID传送",
     Placeholder = "输入PlaceId，例如: 286090429",
@@ -2746,7 +2539,6 @@ Tabs.MiscTab:Input({
         end
     end
 })
-
 local kickTitle, kickContent = "你被踢出了游戏", "Error Code: 267"
 Tabs.MiscTab:Input({
     Title = "自定义踢出标题",
@@ -2768,7 +2560,6 @@ Tabs.MiscTab:Button({
         LocalPlayer:Kick(kickContent)
     end
 })
-
 local confirmTitle, confirmContent = "确认操作", "你确定要执行此操作吗？"
 Tabs.MiscTab:Input({
     Title = "弹窗标题",
@@ -2790,15 +2581,12 @@ Tabs.MiscTab:Button({
         WindUI:Notify({ Title = confirmTitle, Content = confirmContent, Duration = 10 })
     end
 })
-
-
 Tabs.GamesTab:Button({
     Title = "复制加载器代码",
     Callback = function()
         copyToClipboard('loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()', "加载器代码")
     end
 })
-
 Tabs.GamesTab:Button({
     Title = "执行加载器",
     Callback = function()
@@ -2808,12 +2596,9 @@ Tabs.GamesTab:Button({
         end)
     end
 })
-
 Tabs.GamesTab:Divider()
-
 local serverListText = "加载中..."
 local serverListLabel = nil
-
 task.spawn(function()
     local success, result = pcall(function()
         return game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/支持服务器")
@@ -2829,12 +2614,10 @@ task.spawn(function()
         end)
     end
 end)
-
 serverListLabel = Tabs.GamesTab:Paragraph({
     Title = "恐脚本支持的服务器：",
     Desc = serverListText,
 })
-
 Tabs.GamesTab:Paragraph({
     Title = "恐脚本--通用",
     Desc = "作者：恐拜大帝",
@@ -2843,14 +2626,6 @@ Tabs.GamesTab:Paragraph({
     Thumbnail = "rbxassetid://113517588654522",
     ThumbnailSize = 220,
 })
-
-
-
-
-
-
-
-
 Window:OnClose(function()
     print("界面已关闭。")
 end)
