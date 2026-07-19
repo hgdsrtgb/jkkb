@@ -260,6 +260,7 @@ local CameraModeConn = nil
 local FOVConn = nil
 local bumpFlingEnabled = false
 local bumpFlingConnections = {}
+local lastBumpTimes = {}
 
 
 local function disablePlayerCollision(player)
@@ -1980,15 +1981,32 @@ Tabs.MainTab:Button({
 })
 
 
+local function bumpFlingTarget(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return end
+    local tChar = targetPlayer.Character
+    local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+    if not tRoot then return end
+    pcall(function()
+        tRoot.Velocity = Vector3.new(math.random(-50, 50), 800, math.random(-50, 50))
+        tRoot.AssemblyLinearVelocity = Vector3.new(math.random(-50, 50), 800, math.random(-50, 50))
+        tRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    end)
+end
+
+local lastBumpTimes = {}
+
 local function onBumpFlingTouched(hit)
     if not bumpFlingEnabled then return end
     local model = hit:FindFirstAncestorOfClass("Model")
     if not model then return end
     local targetPlayer = Players:GetPlayerFromCharacter(model)
     if not targetPlayer or targetPlayer == LocalPlayer then return end
+    local now = tick()
+    if lastBumpTimes[targetPlayer] and now - lastBumpTimes[targetPlayer] < 0.1 then return end
+    lastBumpTimes[targetPlayer] = now
     task.spawn(function()
         pcall(function()
-            powerfulFling(targetPlayer)
+            bumpFlingTarget(targetPlayer)
         end)
     end)
 end
@@ -2026,13 +2044,9 @@ local function stopBumpFling()
     bumpFlingConnections = {}
 end
 
-Tabs.MainTab:Paragraph({
-    Title = "",
-    Desc = "碰到别人就把他碰飞",
-})
-
 Tabs.MainTab:Toggle({
     Title = "碰飞",
+    Desc = "碰到别人直接把他弹飞",
     Value = false,
     Callback = function(state)
         bumpFlingEnabled = state
