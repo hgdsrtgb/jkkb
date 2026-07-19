@@ -33,7 +33,7 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 end)
 WindUI:Notify({
     Title = "恐脚本--通用",
-    Content = "作者：恐拜大帝\nQQ：3999698324\n感谢ROB支持\n电脑端按N键开启/缩小自制飞行",
+    Content = "作者：恐拜大帝\nQQ：3999698324\n感谢ROB支持",
     Icon = "rbxassetid://5107182114",
     Duration = 5,
 })
@@ -235,6 +235,12 @@ local antiFlingCharAddedConns = {}
 local FieldOfViewValue = 70
 local CameraModeConn = nil
 local FOVConn = nil
+local selfFlyEnabled = false
+local selfFlySpeed = 100
+local selfFlyConn = nil
+local selfFlyBV = nil
+local selfFlyBG = nil
+local selfFlyKeys = {}
 local function disablePlayerCollision(player)
     if player == LocalPlayer then return end
     local char = player.Character
@@ -409,6 +415,13 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 local followTarget = nil
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    selfFlyKeys[input.KeyCode] = true
+end)
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    selfFlyKeys[input.KeyCode] = false
+end)
 local followConnection = nil
 local followRange = 5
 local function startFollow(targetPlayer)
@@ -1515,16 +1528,6 @@ Tabs.MainTab:Toggle({
         end
     end
 })
-Tabs.MainTab:Button({
-    Title = "飞行",
-    Callback = function()
-        WindUI:Notify({ Title = "飞行脚本", Content = "正在加载中...", Duration = 5 })
-        task.spawn(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
-        end)
-    end
-})
-local flyV2Enabled = false
 local flyV2Speed = 50
 local flyV2Conn = nil
 local flyV2BV = nil
@@ -1537,6 +1540,88 @@ local function stopFlyV2()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.PlatformStand = false end
 end
+local function stopSelfFly()
+    selfFlyEnabled = false
+    if selfFlyConn then selfFlyConn:Disconnect() selfFlyConn = nil end
+    local character = LocalPlayer.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local bv = hrp:FindFirstChild("SelfFlyBV")
+        if bv then bv:Destroy() end
+        local bg = hrp:FindFirstChild("SelfFlyBG")
+        if bg then bg:Destroy() end
+    end
+end
+
+local function startSelfFly()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not hrp or not humanoid then return end
+    if selfFlyBV then selfFlyBV:Destroy() end
+    if selfFlyBG then selfFlyBG:Destroy() end
+    if selfFlyConn then selfFlyConn:Disconnect() end
+    selfFlyBV = Instance.new("BodyVelocity")
+    selfFlyBV.Name = "SelfFlyBV"
+    selfFlyBV.MaxForce = Vector3.new(100000, 100000, 100000)
+    selfFlyBV.Velocity = Vector3.new(0, 0, 0)
+    selfFlyBV.Parent = hrp
+    selfFlyBG = Instance.new("BodyGyro")
+    selfFlyBG.Name = "SelfFlyBG"
+    selfFlyBG.MaxTorque = Vector3.new(100000, 100000, 100000)
+    selfFlyBG.P = 10000
+    selfFlyBG.Parent = hrp
+    selfFlyConn = RunService.RenderStepped:Connect(function()
+        if not selfFlyEnabled then return end
+        if not LocalPlayer.Character or LocalPlayer.Character ~= character then
+            stopSelfFly()
+            return
+        end
+        local currentHrp = character:FindFirstChild("HumanoidRootPart")
+        local currentHumanoid = character:FindFirstChild("Humanoid")
+        if not currentHrp or not currentHumanoid then
+            stopSelfFly()
+            return
+        end
+        local moveDir = Vector3.new(0, 0, 0)
+        if selfFlyKeys[Enum.KeyCode.W] then
+            moveDir = moveDir + Camera.CFrame.LookVector
+        end
+        if selfFlyKeys[Enum.KeyCode.S] then
+            moveDir = moveDir - Camera.CFrame.LookVector
+        end
+        if selfFlyKeys[Enum.KeyCode.D] then
+            moveDir = moveDir + Camera.CFrame.RightVector
+        end
+        if selfFlyKeys[Enum.KeyCode.A] then
+            moveDir = moveDir - Camera.CFrame.RightVector
+        end
+        local md = currentHumanoid.MoveDirection
+        if md.Magnitude > 0 then
+            local camLook = Camera.CFrame.LookVector
+            local camRight = Camera.CFrame.RightVector
+            local camLookH = Vector3.new(camLook.X, 0, camLook.Z)
+            local camRightH = Vector3.new(camRight.X, 0, camRight.Z)
+            if camLookH.Magnitude > 0.001 then
+                camLookH = camLookH.Unit
+            end
+            if camRightH.Magnitude > 0.001 then
+                camRightH = camRightH.Unit
+            end
+            local forward = md:Dot(camLookH)
+            local right = md:Dot(camRightH)
+            moveDir = moveDir + camLook * forward + camRight * right
+        end
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit * selfFlySpeed
+        end
+        selfFlyBV.Velocity = moveDir
+        selfFlyBG.CFrame = CFrame.new(currentHrp.Position, currentHrp.Position + Camera.CFrame.LookVector)
+    end)
+end
+
 local function startFlyV2()
     stopFlyV2()
     local char = LocalPlayer.Character
@@ -1577,264 +1662,22 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         startFlyV2()
     end
 end)
-local flySpeed = 100
-local flyActive = false
-local flyConn = nil
-local flyBV = nil
-local flyBG = nil
-local flyKeys = {}
-local flyBall = nil
-local flyPanel = nil
-local flyGui = nil
-
-local function tweenFly(obj, props, dur)
-    local info = TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local t = TweenService:Create(obj, info, props)
-    t:Play()
-    return t
-end
-
-local function showFlyPanel()
-    flyPanel.Visible = true
-    local tb = tweenFly(flyBall, {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}, 0.3)
-    tweenFly(flyPanel, {Size = UDim2.new(0,280,0,160)}, 0.3)
-    tb.Completed:Connect(function() flyBall.Visible = false end)
-end
-
-local function showFlyBall()
-    flyBall.Visible = true
-    local tp = tweenFly(flyPanel, {Size = UDim2.new(0,0,0,0)}, 0.3)
-    tweenFly(flyBall, {Size = UDim2.new(0,60,0,60), BackgroundTransparency = 0}, 0.3)
-    tp.Completed:Connect(function() flyPanel.Visible = false end)
-end
-
-local function stopFlyEmbedded()
-    flyActive = false
-    if flyConn then flyConn:Disconnect() flyConn = nil end
-    if flyBV then flyBV:Destroy() flyBV = nil end
-    if flyBG then flyBG:Destroy() flyBG = nil end
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        local bv = hrp:FindFirstChild("FlyVelocity")
-        if bv then bv:Destroy() end
-        local bg = hrp:FindFirstChild("FlyGyro")
-        if bg then bg:Destroy() end
-    end
-    if flyPanel then
-        local btn = flyPanel:FindFirstChild("FlyActionBtn", true)
-        if btn then btn.Text = "飞行" btn.BackgroundColor3 = Color3.fromRGB(0,170,255) end
-    end
-end
-
-local function startFlyEmbedded()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum then return end
-    flyActive = true
-    flyBV = Instance.new("BodyVelocity")
-    flyBV.Name = "FlyVelocity"
-    flyBV.MaxForce = Vector3.new(100000,100000,100000)
-    flyBV.Velocity = Vector3.new(0,0,0)
-    flyBV.Parent = hrp
-    flyBG = Instance.new("BodyGyro")
-    flyBG.Name = "FlyGyro"
-    flyBG.MaxTorque = Vector3.new(100000,100000,100000)
-    flyBG.P = 10000
-    flyBG.Parent = hrp
-    if flyPanel then
-        local btn = flyPanel:FindFirstChild("FlyActionBtn", true)
-        if btn then btn.Text = "停止飞行" btn.BackgroundColor3 = Color3.fromRGB(255,80,80) end
-    end
-    flyConn = RunService.RenderStepped:Connect(function()
-        if not flyActive then return end
-        if not LocalPlayer.Character or LocalPlayer.Character ~= char then
-            stopFlyEmbedded()
-            return
-        end
-        local cr = char:FindFirstChild("HumanoidRootPart")
-        local ch = char:FindFirstChildOfClass("Humanoid")
-        if not cr or not ch then
-            stopFlyEmbedded()
-            return
-        end
-        local md = ch.MoveDirection
-        local cam = Camera.CFrame
-        local look = cam.LookVector
-        local right = cam.RightVector
-        local moveDir = Vector3.new(0,0,0)
-        if flyKeys[Enum.KeyCode.W] then moveDir = moveDir + look end
-        if flyKeys[Enum.KeyCode.S] then moveDir = moveDir - look end
-        if flyKeys[Enum.KeyCode.D] then moveDir = moveDir + right end
-        if flyKeys[Enum.KeyCode.A] then moveDir = moveDir - right end
-        if md.Magnitude > 0 then
-            local camLookH = Vector3.new(look.X,0,look.Z)
-            local camRightH = Vector3.new(right.X,0,right.Z)
-            if camLookH.Magnitude > 0.001 then camLookH = camLookH.Unit end
-            if camRightH.Magnitude > 0.001 then camRightH = camRightH.Unit end
-            local forward = md:Dot(camLookH)
-            local rightV = md:Dot(camRightH)
-            moveDir = moveDir + look * forward + right * rightV
-        end
-        if moveDir.Magnitude > 0 then moveDir = moveDir.Unit * flySpeed end
-        flyBV.Velocity = moveDir
-        flyBG.CFrame = CFrame.new(cr.Position, cr.Position + look)
-    end)
-end
-
-local function createFlyUIEmbedded()
-    if flyGui then return end
-    flyGui = Instance.new("ScreenGui")
-    flyGui.Name = "FlyGuiEmbedded"
-    flyGui.ResetOnSpawn = false
-    flyGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    flyBall = Instance.new("TextButton")
-    flyBall.Name = "FlyBall"
-    flyBall.Size = UDim2.new(0,60,0,60)
-    flyBall.Position = UDim2.new(0.5,-30,0.8,0)
-    flyBall.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    flyBall.Text = "飞"
-    flyBall.TextColor3 = Color3.fromRGB(0,0,0)
-    flyBall.TextSize = 20
-    flyBall.Parent = flyGui
-    Instance.new("UICorner", flyBall).CornerRadius = UDim.new(1,0)
-    flyPanel = Instance.new("Frame")
-    flyPanel.Name = "FlyPanel"
-    flyPanel.AnchorPoint = Vector2.new(0.5,0.5)
-    flyPanel.Size = UDim2.new(0,0,0,0)
-    flyPanel.Position = UDim2.new(0.5,0,0.5,0)
-    flyPanel.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    flyPanel.BorderSizePixel = 0
-    flyPanel.Visible = false
-    flyPanel.Parent = flyGui
-    Instance.new("UICorner", flyPanel).CornerRadius = UDim.new(0,12)
-    local titleBar = Instance.new("Frame", flyPanel)
-    titleBar.Size = UDim2.new(1,0,0,36)
-    titleBar.BackgroundColor3 = Color3.fromRGB(240,240,240)
-    titleBar.BorderSizePixel = 0
-    Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0,12)
-    local minBtn = Instance.new("TextButton", titleBar)
-    minBtn.Size = UDim2.new(0,30,0,30)
-    minBtn.Position = UDim2.new(0,4,0,3)
-    minBtn.BackgroundColor3 = Color3.fromRGB(200,200,200)
-    minBtn.Text = "⛶"
-    minBtn.TextColor3 = Color3.fromRGB(0,0,0)
-    minBtn.TextSize = 16
-    local closeBtn = Instance.new("TextButton", titleBar)
-    closeBtn.Size = UDim2.new(0,30,0,30)
-    closeBtn.Position = UDim2.new(0,38,0,3)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(255,100,100)
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    closeBtn.TextSize = 16
-    local actionBtn = Instance.new("TextButton", flyPanel)
-    actionBtn.Name = "FlyActionBtn"
-    actionBtn.Size = UDim2.new(0,160,0,50)
-    actionBtn.Position = UDim2.new(0.5,-80,0.5,-10)
-    actionBtn.BackgroundColor3 = Color3.fromRGB(0,170,255)
-    actionBtn.Text = "飞行"
-    actionBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    actionBtn.TextSize = 20
-    Instance.new("UICorner", actionBtn).CornerRadius = UDim.new(0,8)
-    actionBtn.MouseButton1Click:Connect(function()
-        if flyActive then stopFlyEmbedded() else startFlyEmbedded() end
-    end)
-    minBtn.MouseButton1Click:Connect(showFlyBall)
-    closeBtn.MouseButton1Click:Connect(function()
-        stopFlyEmbedded()
-        showFlyBall()
-    end)
-    local dragToggle = false
-    local dragStart = nil
-    local startPos = nil
-    local dragInput = nil
-    flyBall.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragToggle = true
-            dragStart = input.Position
-            startPos = flyBall.Position
-            dragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragToggle then
-            local delta = input.Position - dragStart
-            flyBall.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input == dragInput then
-            local wasClick = (input.Position - dragStart).Magnitude < 5
-            dragToggle = false
-            dragInput = nil
-            if wasClick then showFlyPanel() end
-        end
-    end)
-end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    flyKeys[input.KeyCode] = true
-    if input.KeyCode == Enum.KeyCode.N then
-        if not flyGui or not flyGui.Parent then
-            createFlyUIEmbedded()
-            showFlyPanel()
-        else
-            if flyPanel and flyPanel.Visible then
-                showFlyBall()
-            else
-                showFlyPanel()
-            end
-        end
-    end
-end)
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    flyKeys[input.KeyCode] = false
-end)
-
+Tabs.MainTab:Toggle({
 LocalPlayer.CharacterAdded:Connect(function(char)
-    if flyActive then
-        stopFlyEmbedded()
-        showFlyBall()
+    if selfFlyEnabled then
+        task.wait(1)
+        startSelfFly()
     end
 end)
-
-Tabs.MainTab:Toggle({
-    Title = "自制飞行",
-    Value = false,
-    Callback = function(state)
-        if state then
-            createFlyUIEmbedded()
-            showFlyPanel()
-            WindUI:Notify({ Title = "自制飞行", Content = "已开启，点击面板中的飞行按钮开始飞行", Duration = 3 })
-        else
-            stopFlyEmbedded()
-            if flyGui then flyGui:Destroy() flyGui = nil flyBall = nil flyPanel = nil end
-            WindUI:Notify({ Title = "自制飞行", Content = "已关闭", Duration = 3 })
-        end
+Tabs.MainTab:Button({
+    Title = "飞行",
+    Callback = function()
+        WindUI:Notify({ Title = "飞行脚本", Content = "正在加载中...", Duration = 5 })
+        task.spawn(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
+        end)
     end
 })
-Tabs.MainTab:Slider({
-    Title = "自制飞行速度 (当前: 100)",
-    Value = {
-        Min = 10,
-        Max = 500,
-        Default = 100,
-    },
-    Callback = function(value)
-        pendingSliderValues["flyspeed"] = value
-    end
-})
-sliderReleaseActions["flyspeed"] = function(v)
-    flySpeed = v
-    WindUI:Notify({ Title = "自制飞行速度", Content = "已设置为：" .. v, Duration = 2 })
-end
-)
-end
-Tabs.MainTab:Toggle({
     Title = "飞行v2",
     Value = false,
     Callback = function(state)
@@ -1859,6 +1702,30 @@ sliderReleaseActions["flyv2speed"] = function(v)
     WindUI:Notify({ Title = "飞行v2速度", Content = "已设置为：" .. v, Duration = 2 })
 end
 Tabs.MainTab:Toggle({
+Tabs.MainTab:Toggle({
+    Title = "自制飞行",
+    Value = false,
+    Callback = function(state)
+        selfFlyEnabled = state
+        if state then startSelfFly() else stopSelfFly() end
+        WindUI:Notify({ Title = "自制飞行", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+Tabs.MainTab:Slider({
+    Title = "自制飞行速度 (当前: 100)",
+    Value = {
+        Min = 10,
+        Max = 500,
+        Default = 100,
+    },
+    Callback = function(value)
+        pendingSliderValues["selfflyspeed"] = value
+    end
+})
+sliderReleaseActions["selfflyspeed"] = function(v)
+    selfFlySpeed = v
+    WindUI:Notify({ Title = "自制飞行速度", Content = "已设置为：" .. v, Duration = 2 })
+end
     Title = "无限跳",
     Value = false,
     Callback = function(state)
