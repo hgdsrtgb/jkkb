@@ -1550,6 +1550,8 @@ local function stopSelfFly()
     local character = LocalPlayer.Character
     if not character then return end
     local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then humanoid.PlatformStand = false end
     if hrp then
         local bv = hrp:FindFirstChild("SelfFlyBV")
         if bv then bv:Destroy() end
@@ -1564,6 +1566,7 @@ local function startSelfFly()
     local hrp = character:FindFirstChild("HumanoidRootPart")
     local humanoid = character:FindFirstChild("Humanoid")
     if not hrp or not humanoid then return end
+    humanoid.PlatformStand = true
     if selfFlyBV then selfFlyBV:Destroy() end
     if selfFlyBG then selfFlyBG:Destroy() end
     if selfFlyConn then selfFlyConn:Disconnect() end
@@ -1802,37 +1805,28 @@ Tabs.MainTab:Toggle({
         local Players = game:GetService("Players")
         if state then
             Clipon = true
-            if not Stepped or not Stepped.Connected then
-                Stepped = game:GetService("RunService").Stepped:Connect(function()
-                    if not Clipon then return end
-                    for _, child in pairs(workspace:GetChildren()) do
-                        if child.Name == Players.LocalPlayer.Name then
-                            for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                                if part:IsA("BasePart") then
-                                    part.CanCollide = false
-                                end
+        else
+            Clipon = false
+        end
+        if Stepped then pcall(function() Stepped:Disconnect() end) end
+        Stepped = game:GetService("RunService").Stepped:Connect(function()
+            if Clipon then
+                for _, child in pairs(workspace:GetChildren()) do
+                    if child.Name == Players.LocalPlayer.Name then
+                        for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
                             end
                         end
                     end
-                end)
-            end
-        else
-            Clipon = false
-            if Stepped then Stepped:Disconnect() end
-            for _, child in pairs(workspace:GetChildren()) do
-                if child.Name == Players.LocalPlayer.Name then
-                    for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = true
-                        end
-                    end
                 end
+            else
+                pcall(function() Stepped:Disconnect() end)
             end
-        end
+        end)
         WindUI:Notify({ Title = "穿墙", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
-})
-local speedToggle = false
+})local speedToggle = false
 local speedValue = 16
 Tabs.MainTab:Toggle({
     Title = "修改移速",
