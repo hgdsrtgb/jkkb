@@ -1120,15 +1120,19 @@ local function stopSmoothFollow()
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
     smoothFollowConnection = nil
     smoothFollowTarget = nil
+    smoothFollowLastTargetPos = nil
     if UIButtons.smoothFollowSelectBtn then UIButtons.smoothFollowSelectBtn.Text = "平滑跟随选定人" end
     if UIButtons.smoothFollowNearestBtn then UIButtons.smoothFollowNearestBtn.Text = "平滑跟随最近的人" end
     WindUI:Notify({ Title = "平滑跟随", Content = "已停止平滑跟随", Duration = 3 })
 end
 local smoothFollowDistance = 3
 
+local smoothFollowLastTargetPos = nil
+
 local function startSmoothFollow(targetPlayer)
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
     smoothFollowTarget = targetPlayer
+    smoothFollowLastTargetPos = nil
     smoothFollowConnection = RunService.Heartbeat:Connect(function()
         if not smoothFollowTarget or not smoothFollowTarget:IsDescendantOf(Players) or not smoothFollowTarget.Character or not smoothFollowTarget.Character:FindFirstChild("HumanoidRootPart") then
             stopSmoothFollow()
@@ -1139,6 +1143,11 @@ local function startSmoothFollow(targetPlayer)
         if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
         local myRoot = myChar.HumanoidRootPart
         local targetRoot = smoothFollowTarget.Character.HumanoidRootPart
+        local targetPos = targetRoot.Position
+        if smoothFollowLastTargetPos and (targetPos - smoothFollowLastTargetPos).Magnitude < 0.1 then
+            return
+        end
+        smoothFollowLastTargetPos = targetPos
         myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, smoothFollowDistance)
     end)
     WindUI:Notify({ Title = "平滑跟随", Content = "开始平滑跟随 " .. targetPlayer.Name, Duration = 3 })
