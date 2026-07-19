@@ -531,22 +531,33 @@ local function createCrosshair()
     dotCorner.Parent = dot
 end
 local crosshairLastUpdate = 0
-local crosshairConn = RunService.Heartbeat:Connect(function()
-    local now = tick()
-    if now - crosshairLastUpdate < 0.2 then return end
-    crosshairLastUpdate = now
-    if not CrosshairEnabled then
-        if CrosshairFrame then CrosshairFrame.Visible = false end
-        return
-    end
-    if not CrosshairGui then createCrosshair() end
-    if CrosshairSpinEnabled then
-        CrosshairFrame.Rotation = (CrosshairFrame.Rotation + 2) % 360
-    else
-        CrosshairFrame.Rotation = 0
-    end
-    CrosshairFrame.Visible = true
-end)
+local crosshairConn = nil
+
+local function startCrosshairLoop()
+    if crosshairConn then return end
+    crosshairConn = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if now - crosshairLastUpdate < 0.2 then return end
+        crosshairLastUpdate = now
+        if not CrosshairEnabled then
+            if CrosshairFrame then CrosshairFrame.Visible = false end
+            return
+        end
+        if not CrosshairGui then createCrosshair() end
+        if CrosshairSpinEnabled then
+            CrosshairFrame.Rotation = (CrosshairFrame.Rotation + 2) % 360
+        else
+            CrosshairFrame.Rotation = 0
+        end
+        CrosshairFrame.Visible = true
+    end)
+end
+
+local function stopCrosshairLoop()
+    if crosshairConn then crosshairConn:Disconnect() end
+    crosshairConn = nil
+    if CrosshairFrame then CrosshairFrame.Visible = false end
+end
 local isStealing = false
 local function stealAllItems()
     if isStealing then return 0 end
@@ -1117,7 +1128,7 @@ local function startSmoothFollow(targetPlayer)
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
     smoothFollowTarget = targetPlayer
     local lastSmooth = 0
-    smoothFollowConnection = RunService.Heartbeat:Connect(function(dt)
+    smoothFollowConnection = RunService.Heartbeat:Connect(function()
         if not smoothFollowTarget or not smoothFollowTarget:IsDescendantOf(Players) or not smoothFollowTarget.Character or not smoothFollowTarget.Character:FindFirstChild("HumanoidRootPart") then
             stopSmoothFollow()
             WindUI:Notify({ Title = "平滑跟随", Content = "目标已消失，跟随停止", Duration = 3 })
@@ -1130,15 +1141,7 @@ local function startSmoothFollow(targetPlayer)
         if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
         local myRoot = myChar.HumanoidRootPart
         local targetRoot = smoothFollowTarget.Character.HumanoidRootPart
-        local targetPos = targetRoot.Position
-        local myPos = myRoot.Position
-        local dist = (targetPos - myPos).Magnitude
-        if dist > 4 then
-            local direction = (targetPos - myPos).Unit
-            local speed = math.min(dist * 2, 50)
-            local newPos = myPos + direction * speed * dt
-            myRoot.CFrame = CFrame.new(newPos, targetPos)
-        end
+        myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
     end)
     WindUI:Notify({ Title = "平滑跟随", Content = "开始平滑跟随 " .. targetPlayer.Name, Duration = 3 })
 end
@@ -1487,11 +1490,12 @@ Tabs.NotifyTab:Button({
         end)
     end
 })
+
+
 Tabs.NotifyTab:Paragraph({
     Title = "目前捐赠最多的人：",
     Desc = "宥\nQQ：1072765538\n捐赠金额：32（牛逼）",
 })
-
 Tabs.NotifyTab:Divider()
 
 Tabs.MainTab:Toggle({
@@ -2486,11 +2490,33 @@ Tabs.MiscTab:Button({
     end
 })
 Tabs.MiscTab:Toggle({
+    Title = "强制第三人称",
+    Value = false,
+    Callback = function(state)
+        ForceThirdPersonEnabled = state
+        if ForceThirdPersonEnabled then ForceFirstPersonEnabled = false end
+        if state then startCameraModeLoop() else stopCameraModeLoop() end
+        WindUI:Notify({ Title = "强制第三人称", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+
+Tabs.MiscTab:Toggle({
+    Title = "强制第一人称",
+    Value = false,
+    Callback = function(state)
+        ForceFirstPersonEnabled = state
+        if ForceFirstPersonEnabled then ForceThirdPersonEnabled = false end
+        if state then startCameraModeLoop() else stopCameraModeLoop() end
+        WindUI:Notify({ Title = "强制第一人称", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+
+Tabs.MiscTab:Toggle({
     Title = "准星",
     Value = false,
     Callback = function(state)
         CrosshairEnabled = state
-        if CrosshairFrame then CrosshairFrame.Visible = CrosshairEnabled end
+        if state then startCrosshairLoop() else stopCrosshairLoop() end
         WindUI:Notify({ Title = "准星", Content = state and "已显示" or "已隐藏", Duration = 3 })
     end
 })
