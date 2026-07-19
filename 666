@@ -1092,14 +1092,17 @@ local function startHarass()
     if harassConnection then harassConnection:Disconnect() end
     lastSwitchTime = tick()
     isBehind = true
+    local lastHarassUpdate = 0
     harassConnection = RunService.Heartbeat:Connect(function(dt)
         if not harassEnabled or not harassTarget or not harassTarget.Character then return end
         local now = tick()
+        if now - lastHarassUpdate < 0.1 then return end
+        lastHarassUpdate = now
         local myChar = LocalPlayer.Character
         if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
         local targetRoot = harassTarget.Character:FindFirstChild("HumanoidRootPart")
         if not targetRoot then return end
-        local switchInterval = 1 / math.max(harassSpeed, 0.1)
+        local switchInterval = 1.5 / math.max(harassSpeed, 0.1)
         local myRoot = myChar.HumanoidRootPart
         local targetPos = targetRoot.Position
         local targetLook = targetRoot.CFrame.LookVector
@@ -1113,7 +1116,7 @@ local function startHarass()
         else
             goalPos = targetPos + targetLook * 2.5
         end
-        local newPos = myRoot.Position:Lerp(goalPos, math.min(dt * 10, 1))
+        local newPos = myRoot.Position:Lerp(goalPos, math.min(dt * 3, 1))
         myRoot.CFrame = CFrame.new(newPos, goalPos + targetLook)
     end)
 end
@@ -2208,6 +2211,7 @@ local function refreshAllDropdowns()
     if followDropdown then followDropdown:Refresh(names) end
     if harassDropdown then harassDropdown:Refresh(names) end
     if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
+    
 end
 Players.PlayerAdded:Connect(refreshAllDropdowns)
 Players.PlayerRemoving:Connect(refreshAllDropdowns)
@@ -2344,66 +2348,7 @@ Tabs.SecondaryTab:Button({
     end
 })
 local currentSmoothTarget = nil
-smoothDropdown = Tabs.SecondaryTab:Dropdown({
-    Title = "选定平滑跟随玩家",
-    Values = {},
-    Callback = function(name)
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p.Name == name and p ~= LocalPlayer then
-                currentSmoothTarget = p
-                smoothDropdown:SetTitle("已选定: " .. p.Name)
-                WindUI:Notify({ Title = "平滑跟随", Content = "已选定 " .. p.Name .. "，点击确定开始平滑跟随", Duration = 3 })
-                break
-            end
-        end
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "确定执行平滑跟随",
-    Callback = function()
-        if currentSmoothTarget and currentSmoothTarget.Parent then
-            startSmoothFollow(currentSmoothTarget)
-        else
-            WindUI:Notify({ Title = "平滑跟随", Content = "请先选择玩家", Duration = 3 })
-        end
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "停止平滑跟随",
-    Callback = function()
-        stopSmoothFollow()
-        currentSmoothTarget = nil
-        smoothDropdown:SetTitle("选定平滑跟随玩家")
-    end
-})
 
-Tabs.SecondaryTab:Slider({
-    Title = "平滑跟随距离 (当前: 3)",
-    Value = {
-        Min = 1,
-        Max = 50,
-        Default = 3,
-    },
-    Callback = function(value)
-        smoothFollowDistance = value
-        WindUI:Notify({ Title = "平滑跟随距离", Content = "已设置为：" .. value, Duration = 2 })
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "平滑跟随最近的人",
-    Callback = function()
-        if smoothFollowConnection then
-            stopSmoothFollow()
-        else
-            local nearest = getNearestPlayer()
-            if nearest then
-                startSmoothFollow(nearest)
-            else
-                WindUI:Notify({ Title = "平滑跟随", Content = "未找到其他玩家", Duration = 3 })
-            end
-        end
-    end
-})
 Tabs.SecondaryTab:Button({
     Title = "撸管",
     Callback = function()
