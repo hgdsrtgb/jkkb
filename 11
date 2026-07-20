@@ -72,7 +72,58 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid", 5)
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart", 5)
 
-local ESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/Xingtaiduan/Script/refs/heads/main/ESPLibrary.lua"))()
+local ESP
+do
+	local espOk, espRes = pcall(function()
+		return loadstring(game:HttpGet("https://raw.githubusercontent.com/Xingtaiduan/Script/refs/heads/main/ESPLibrary.lua"))()
+	end)
+	if espOk and espRes then
+		ESP = espRes
+	else
+		local espFolder = Instance.new("Folder")
+		espFolder.Name = "ESPFolder"
+		ESP = {ESPFolder = espFolder}
+		function ESP.Add(a, b, c, d, e)
+			local obj, name, color, size, tag
+			if type(a) == "table" then
+				obj = a.Object
+				name = a.Name
+				color = a.Color
+				size = a.TextSize
+				tag = a.Tag
+			else
+				obj = a
+				name = b
+				color = c
+				size = d
+				tag = e
+			end
+			if not (typeof(obj) == "Instance" and obj.Parent) then return end
+			local bb = Instance.new("BillboardGui")
+			bb.Name = tag or "ESP"
+			bb.Adornee = obj
+			bb.AlwaysOnTop = true
+			bb.Size = UDim2.new(0, 100, 0, 30)
+			local tl = Instance.new("TextLabel")
+			tl.BackgroundTransparency = 1
+			tl.Size = UDim2.new(1, 0, 1, 0)
+			tl.Text = tostring(name)
+			tl.TextColor3 = color or Color3.new(1, 1, 1)
+			tl.TextSize = size or 12
+			tl.Font = Enum.Font.SourceSansBold
+			tl.TextStrokeTransparency = 0.5
+			tl.Parent = bb
+			bb.Parent = espFolder
+		end
+		function ESP.Clear(tag)
+			for _, v in pairs(espFolder:GetChildren()) do
+				if v.Name == tag then
+					v:Destroy()
+				end
+			end
+		end
+	end
+end
 ESP.ESPFolder.Parent = Workspace
 
 local RemotesModule, Remotes, ClientReplicator, Inventory, dvvLoad, GUID
@@ -3754,6 +3805,191 @@ OtherRight:AddToggle("CashESP", {
 			end
 		else
 			ESP.Clear("CashESP")
+		end
+	end
+})
+
+local espEnabled = false
+local espBillboards = {}
+local espConnections = {}
+local espHighlights = {}
+
+local function cleanupESP(player)
+	if espConnections[player] then
+		for _, conn in ipairs(espConnections[player]) do
+			pcall(function() conn:Disconnect() end)
+		end
+		espConnections[player] = nil
+	end
+	local char = player.Character
+	if char then
+		pcall(function()
+			local hl = char:FindFirstChild("EspHighlight")
+			if hl then hl:Destroy() end
+		end)
+		pcall(function()
+			local hrp = char:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				local bb = hrp:FindFirstChild("EspBillboard")
+				if bb then bb:Destroy() end
+			end
+		end)
+	end
+	espBillboards[player] = nil
+	espHighlights[player] = nil
+end
+
+local function createESP(player)
+	if player == LocalPlayer then return end
+	local char = player.Character
+	if not char then return end
+	pcall(function()
+		local hl = char:FindFirstChild("EspHighlight")
+		if hl then hl:Destroy() end
+	end)
+	pcall(function()
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local bb = hrp:FindFirstChild("EspBillboard")
+			if bb then bb:Destroy() end
+		end
+	end)
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		task.spawn(function()
+			local success = pcall(function() char:WaitForChild("HumanoidRootPart", 5) end)
+			if success and espEnabled and player.Parent then
+				createESP(player)
+			end
+		end)
+		return
+	end
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "EspHighlight"
+	highlight.Parent = char
+	highlight.FillTransparency = 0.5
+	highlight.FillColor = Color3.fromRGB(255, 255, 0)
+	highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	espHighlights[player] = highlight
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "EspBillboard"
+	billboard.Parent = hrp
+	billboard.Size = UDim2.new(0, 200, 0, 50)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "NameLabel"
+	nameLabel.Parent = billboard
+	nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = player.Name
+	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+	nameLabel.TextStrokeTransparency = 0
+	nameLabel.TextSize = 14
+	nameLabel.Font = Enum.Font.SourceSansBold
+	local distLabel = Instance.new("TextLabel")
+	distLabel.Name = "DistLabel"
+	distLabel.Parent = billboard
+	distLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	distLabel.Position = UDim2.new(0, 0, 0.5, 0)
+	distLabel.BackgroundTransparency = 1
+	distLabel.Text = "0m"
+	distLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+	distLabel.TextStrokeTransparency = 0
+	distLabel.TextSize = 12
+	distLabel.Font = Enum.Font.SourceSans
+	espBillboards[player] = billboard
+end
+
+local function setupPlayerESP(player)
+	if player == LocalPlayer then return end
+	if espConnections[player] then
+		for _, conn in ipairs(espConnections[player]) do
+			pcall(function() conn:Disconnect() end)
+		end
+	end
+	espConnections[player] = {}
+	local charAddedConn = player.CharacterAdded:Connect(function(char)
+		task.spawn(function()
+			pcall(function() char:WaitForChild("HumanoidRootPart", 5) end)
+			if espEnabled then
+				task.wait(0.1)
+				createESP(player)
+			end
+		end)
+	end)
+	local charRemovingConn = player.CharacterRemoving:Connect(function()
+		cleanupESP(player)
+	end)
+	table.insert(espConnections[player], charAddedConn)
+	table.insert(espConnections[player], charRemovingConn)
+	if player.Character and espEnabled then
+		createESP(player)
+	end
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	task.spawn(function()
+		setupPlayerESP(player)
+	end)
+end
+
+Players.PlayerAdded:Connect(function(player)
+	task.spawn(function()
+		setupPlayerESP(player)
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	cleanupESP(player)
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(0.1)
+		if espEnabled then
+			for player, billboard in pairs(espBillboards) do
+				if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
+					espBillboards[player] = nil
+				end
+			end
+		end
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if not espEnabled then return end
+	local myChar = LocalPlayer.Character
+	local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
+	if not myPos then return end
+	for player, billboard in pairs(espBillboards) do
+		if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
+			local distLabel = billboard:FindFirstChild("DistLabel")
+			if distLabel then
+				local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+				distLabel.Text = string.format("%.0fm", dist)
+			end
+		end
+	end
+end)
+
+OtherRight:AddToggle("PlayerESP", {
+	Text = "透视玩家",
+	Default = false,
+	Callback = function(val)
+		espEnabled = val
+		if val then
+			for _, player in ipairs(Players:GetPlayers()) do
+				task.spawn(function()
+					createESP(player)
+				end)
+			end
+		else
+			for _, player in ipairs(Players:GetPlayers()) do
+				cleanupESP(player)
+			end
 		end
 	end
 })
