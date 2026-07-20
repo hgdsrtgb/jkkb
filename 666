@@ -1358,6 +1358,7 @@ local Window = WindUI:CreateWindow({
     Folder = "恐脚本",
     Size = UDim2.fromOffset(800, 450),
     Transparent = true,
+    Background = "rbxassetid://113517588654522",
     Theme = "Dark",
     User = {
         Enabled = false,
