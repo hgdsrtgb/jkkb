@@ -1357,7 +1357,7 @@ local Window = WindUI:CreateWindow({
     Author = "恐拜大帝 | QQ:3999698324 | 已执行 " .. count .. " 次",
     Folder = "恐脚本",
     Size = UDim2.fromOffset(800, 450),
-    Transparent = true,
+    Transparent = false,
     Theme = "Dark",
     User = {
         Enabled = false,
@@ -1395,7 +1395,7 @@ local function kbFormatDiff(mins)
     return string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
 end
 local kbNowDate = os.date("*t")
-local kbUpdateTime = os.time({year = kbNowDate.year, month = 7, day = 18, hour = 0, min = 47, sec = 0})
+local kbUpdateTime = 1784534400
 local kbBirthTime = os.time({year = kbNowDate.year, month = 2, day = 9, hour = 2, min = 27, sec = 0})
 if kbBirthTime > os.time() then
     kbBirthTime = os.time({year = kbNowDate.year - 1, month = 2, day = 9, hour = 2, min = 27, sec = 0})
