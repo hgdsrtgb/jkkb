@@ -1377,7 +1377,6 @@ Window:EditOpenButton({
     ),
     Draggable = true,
 })
-Window:DisableTopbarButtons({"Minimize", "Close"})
 local Tabs = {}
 Tabs.NotifyTab = Window:Tab({ Title = "通知", Icon = "bell" })
 Tabs.MainTab = Window:Tab({ Title = "主要", Icon = "zap" })
