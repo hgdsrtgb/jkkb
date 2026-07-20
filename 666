@@ -1357,14 +1357,14 @@ local Window = WindUI:CreateWindow({
     Author = "恐拜大帝 | QQ:3999698324 | 已执行 " .. count .. " 次",
     Folder = "恐脚本",
     Size = UDim2.fromOffset(800, 450),
-    Transparent = false,
+    Transparent = true,
     Theme = "Dark",
     User = {
         Enabled = false,
     },
     SideBarWidth = 200,
     ScrollBarEnabled = true,
-    ToggleKey = Enum.KeyCode.RightControl,
+    ToggleKey = Enum.KeyCode.N,
 })
 Window:EditOpenButton({
     Title = "恐脚本--通用",
@@ -1377,6 +1377,7 @@ Window:EditOpenButton({
     ),
     Draggable = true,
 })
+Window:DisableTopbarButtons({"Minimize", "Close"})
 local Tabs = {}
 Tabs.NotifyTab = Window:Tab({ Title = "通知", Icon = "bell" })
 Tabs.MainTab = Window:Tab({ Title = "主要", Icon = "zap" })
