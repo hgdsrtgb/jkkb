@@ -187,7 +187,7 @@ local function quickFlashCleanup()
 end
 task.spawn(function()
     while true do
-        task.wait(espUpdateInterval)
+        task.wait(espEnabled and espUpdateInterval or 0.5)
         if espEnabled then
             for player, billboard in pairs(espBillboards) do
                 if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
@@ -197,21 +197,31 @@ task.spawn(function()
         end
     end
 end)
-RunService.RenderStepped:Connect(function()
-    if not espEnabled then return end
-    local myChar = LocalPlayer.Character
-    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
-    if not myPos then return end
-    for player, billboard in pairs(espBillboards) do
-        if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
-            local distLabel = billboard:FindFirstChild("DistLabel")
-            if distLabel then
-                local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
-                distLabel.Text = string.format("%.0fm", dist)
+local espDistConn = nil
+local lastEspDistUpdate = 0
+local function startEspDistLoop()
+    if espDistConn then return end
+    espDistConn = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if now - lastEspDistUpdate < 0.1 then return end
+        lastEspDistUpdate = now
+        local myChar = LocalPlayer.Character
+        local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
+        if not myPos then return end
+        for player, billboard in pairs(espBillboards) do
+            if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
+                local distLabel = billboard:FindFirstChild("DistLabel")
+                if distLabel then
+                    local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+                    distLabel.Text = string.format("%.0fm", dist)
+                end
             end
         end
-    end
-end)
+    end)
+end
+local function stopEspDistLoop()
+    if espDistConn then espDistConn:Disconnect() espDistConn = nil end
+end
 local InfiniteJumpEnabled = false
 local NightVisionEnabled = false
 local AutoTranslateEnabled = false
@@ -1530,8 +1540,10 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "透视", Content = state and "已打开" or "已关闭", Duration = 3 })
         if state then
             for _, p in ipairs(Players:GetPlayers()) do setupPlayerESP(p) end
+            startEspDistLoop()
         else
             for _, p in ipairs(Players:GetPlayers()) do cleanupESP(p) end
+            stopEspDistLoop()
         end
     end
 })
@@ -2734,16 +2746,57 @@ Tabs.GamesTab:Paragraph({
     Thumbnail = "rbxassetid://113517588654522",
     ThumbnailSize = 220,
 })
-Window:OnOpen(function()
+local kbBgVideo = nil
+task.spawn(function()
+    for i = 1, 40 do
+        task.wait(0.5)
+        local containers = {CoreGui, LocalPlayer:FindFirstChild("PlayerGui")}
+        for _, container in ipairs(containers) do
+            if container then
+                for _, gui in ipairs(container:GetChildren()) do
+                    if gui:IsA("ScreenGui") then
+                        local v = gui:FindFirstChildWhichIsA("VideoFrame", true)
+                        if v then kbBgVideo = v break end
+                    end
+                end
+            end
+            if kbBgVideo then break end
+        end
+        if kbBgVideo then break end
+    end
+end)
+local function kbSetVideoPlaying(playing)
+    if not kbBgVideo then return end
     pcall(function()
-        local v = Window.UIElements.Main.Background:FindFirstChildOfClass("VideoFrame")
-        if v then v:Play() end
+        if playing then
+            if not kbBgVideo.IsPlaying then kbBgVideo:Play() end
+        else
+            if kbBgVideo.IsPlaying then kbBgVideo:Pause() end
+        end
     end)
+end
+local function kbIsVideoActuallyVisible()
+    if not kbBgVideo then return false end
+    local node = kbBgVideo
+    while node and node ~= game do
+        if node:IsA("GuiObject") and not node.Visible then return false end
+        if node:IsA("ScreenGui") and not node.Enabled then return false end
+        node = node.Parent
+    end
+    return true
+end
+Window:OnOpen(function()
+    kbSetVideoPlaying(true)
 end)
 Window:OnClose(function()
-    pcall(function()
-        local v = Window.UIElements.Main.Background:FindFirstChildOfClass("VideoFrame")
-        if v then v:Pause() end
-    end)
+    kbSetVideoPlaying(false)
     print("界面已关闭。")
+end)
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if kbBgVideo then
+            kbSetVideoPlaying(kbIsVideoActuallyVisible())
+        end
+    end
 end)
