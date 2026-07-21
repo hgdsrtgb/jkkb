@@ -1775,6 +1775,16 @@ local autoInteractRange = 20
 local autoInteractThread = nil
 local autoCollectEnabled = false
 local autoCollectThread = nil
+local foodLootEnabled = false
+local foodLootThread = nil
+local autoEggEnabled = false
+local autoEggThread = nil
+local collectThenDiveEnabled = false
+
+local ElevatorDropoff = nil
+local PlayerLoots = nil
+pcall(function() ElevatorDropoff = Workspace.GameSystem.Loots.ElevatorCollect.SoundPlay end)
+pcall(function() PlayerLoots = Workspace.GameSystem.Loots.Player end)
 
 local function pressE()
 	pcall(function()
@@ -1791,28 +1801,36 @@ local function pressE()
 	end)
 end
 
-local function hasInteractableInRange(range)
+local function restoreCamera()
+	pcall(function()
+		local cam = Workspace.CurrentCamera
+		if cam then cam.CameraType = Enum.CameraType.Custom end
+	end)
+end
+
+local function remoteInteractItem(item)
+	if (item:IsA("Model") or item:IsA("Tool")) and item:HasTag("Interactable") and item:GetAttribute("en") then
+		pcall(function()
+			TEvent.FireRemote("Interactable", item)
+			TEvent.FireBindable("Interactable", item)
+		end)
+	end
+end
+
+local function getLootsInRange(range)
+	local results = {}
 	local char = LocalPlayer.Character
-	if not char then return false end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return false end
-	local runtime = Workspace:FindFirstChild("Runtime")
-	local scanRoot = runtime and runtime:FindFirstChild("LootPoints") or Workspace
-	for _, obj in ipairs(scanRoot:GetDescendants()) do
-		if obj:IsA("ProximityPrompt") and obj.Enabled then
-			local parent = obj.Parent
-			local pos
-			if parent and parent:IsA("BasePart") then
-				pos = parent.Position
-			elseif parent and parent:IsA("Attachment") then
-				pos = parent.WorldPosition
-			end
-			if pos and (pos - hrp.Position).Magnitude <= range then
-				return true
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return results end
+	for _, item in pairs(WorldLoots:GetChildren()) do
+		if item:IsA("Model") or item:IsA("Tool") then
+			local part = item:FindFirstChildWhichIsA("BasePart", true)
+			if part and (part.Position - hrp.Position).Magnitude <= range then
+				table.insert(results, item)
 			end
 		end
 	end
-	return false
+	return results
 end
 
 local function setAutoInteract(state)
@@ -1824,12 +1842,147 @@ local function setAutoInteract(state)
 	if state then
 		autoInteractThread = task.spawn(function()
 			while autoInteractEnabled do
-				if hasInteractableInRange(autoInteractRange) then
-					pressE()
+				for _, item in ipairs(getLootsInRange(autoInteractRange)) do
+					remoteInteractItem(item)
 				end
-				task.wait(0.1)
+				local char = LocalPlayer.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					for _, item in pairs(InteractiveItems:GetChildren()) do
+						if item:IsA("Model") or item:IsA("Tool") then
+							local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
+							if part and (part.Position - hrp.Position).Magnitude <= autoInteractRange then
+								remoteInteractItem(item)
+							end
+						end
+					end
+				end
+				task.wait(0.15)
 			end
 		end)
+	end
+end
+
+local foodKeywords = {"food","eat","meal","bread","meat","apple","banana","berry","cake","pizza","burger","sandwich","drink","water","cola","soda","snack","candy","chocolate","rice","noodle","soup","egg","milk","cheese","cookie","donut","fruit","vegetable","carrot","potato","corn","chicken","fish","ham","sausage","食物","食品","吃的","面包","肉","蛋","饭","面条","饮料","苹果","蛋糕","糖果","牛奶","鱼","鸡"}
+
+local function isFoodItem(item)
+	local lootUI = item:FindFirstChild("LootUI", true)
+	if not lootUI then return false end
+	local frame = lootUI:FindFirstChild("Frame")
+	local nameLbl = frame and frame:FindFirstChild("ItemName")
+	if not nameLbl then return false end
+	local lower = tostring(nameLbl.Text):lower()
+	for _, kw in ipairs(foodKeywords) do
+		if lower:find(kw, 1, true) then return true end
+	end
+	return false
+end
+
+local function getAimedFoodItem()
+	local cam = Workspace.CurrentCamera
+	local char = LocalPlayer.Character
+	if not cam or not char then return nil end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = {char}
+	local result = Workspace:Raycast(cam.CFrame.Position, cam.CFrame.LookVector * 60, params)
+	if not result or not result.Instance then return nil end
+	local node = result.Instance
+	while node and node ~= Workspace do
+		if node.Parent == WorldLoots and (node:IsA("Model") or node:IsA("Tool")) then
+			if isFoodItem(node) then return node end
+			return nil
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
+local function setFoodLoot(state)
+	foodLootEnabled = state
+	if foodLootThread then
+		task.cancel(foodLootThread)
+		foodLootThread = nil
+	end
+	if state then
+		foodLootThread = task.spawn(function()
+			while foodLootEnabled do
+				if getAimedFoodItem() then
+					pressE()
+				end
+				for _, item in ipairs(getLootsInRange(20)) do
+					if isFoodItem(item) then
+						remoteInteractItem(item)
+					end
+				end
+				task.wait(0.12)
+			end
+		end)
+	end
+end
+
+local function isEggCollected(eggName)
+	if not PlayerLoots then return false end
+	return PlayerLoots:FindFirstChild(eggName, true) ~= nil
+end
+
+local function setAutoCollectEgg(state)
+	autoEggEnabled = state
+	if autoEggThread then
+		task.cancel(autoEggThread)
+		autoEggThread = nil
+	end
+	if state then
+		autoEggThread = task.spawn(function()
+			while autoEggEnabled do
+				local char = LocalPlayer.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					local originalCFrame = hrp.CFrame
+					for _, loot in pairs(WorldLoots:GetChildren()) do
+						if not autoEggEnabled then break end
+						local eggPart = loot:FindFirstChild("Egg", true)
+						if eggPart and eggPart.Parent and eggPart.Parent.Parent and eggPart.Parent.Parent:IsA("Tool") then
+							local eggTool = eggPart.Parent.Parent
+							local primaryPart = eggTool.PrimaryPart or eggTool:FindFirstChildWhichIsA("BasePart")
+							if primaryPart then
+								hrp.CFrame = primaryPart.CFrame
+								task.wait(0.1)
+								for _ = 1, 10 do
+									if not autoEggEnabled then break end
+									if isEggCollected(eggTool.Name) then break end
+									remoteInteractItem(eggTool)
+									task.wait(0.1)
+								end
+								if isEggCollected(eggTool.Name) then
+									hrp.CFrame = originalCFrame
+								end
+							end
+						end
+					end
+					task.wait(0.5)
+				else
+					task.wait(0.5)
+				end
+			end
+		end)
+	end
+end
+
+local function returnToElevatorAndDive()
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		if ElevatorDropoff and ElevatorDropoff:IsA("BasePart") then
+			hrp.CFrame = ElevatorDropoff.CFrame + Vector3.new(0, 2, 0)
+		else
+			teleportToElevator()
+		end
+	end
+	task.wait(0.5)
+	for _ = 1, 3 do
+		pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
+		task.wait(1)
 	end
 end
 
@@ -1838,6 +1991,9 @@ local function setAutoCollect(state)
 	if autoCollectThread then
 		task.cancel(autoCollectThread)
 		autoCollectThread = nil
+	end
+	if not state then
+		restoreCamera()
 	end
 	if state then
 		autoCollectThread = task.spawn(function()
@@ -1859,17 +2015,27 @@ local function setAutoCollect(state)
 					end
 				end
 				if #targets == 0 then
+					restoreCamera()
 					Notify("自动收集完成")
 					autoCollectThread = nil
 					pcall(function() Library.Toggles.AutoCollect:SetValue(false) end)
+					if collectThenDiveEnabled then
+						task.spawn(returnToElevatorAndDive)
+					end
 					break
 				end
 				table.sort(targets, function(a, b) return a.dist < b.dist end)
 				local target = targets[1]
 				hrp.CFrame = target.part.CFrame + Vector3.new(0, 2, 0)
+				local cam = Workspace.CurrentCamera
+				pcall(function() cam.CameraType = Enum.CameraType.Scriptable end)
 				local startTime = os.clock()
 				while os.clock() - startTime < 1.2 and autoCollectEnabled do
 					if not target.item.Parent or not target.item:FindFirstChild("LootUI", true) then break end
+					pcall(function()
+						cam.CFrame = CFrame.lookAt(hrp.Position + Vector3.new(0, 8, 0), hrp.Position)
+					end)
+					remoteInteractItem(target.item)
 					pressE()
 					task.wait(0.15)
 				end
@@ -1998,6 +2164,9 @@ end, DoubleClick=false })
 MainRight:AddToggle("RemoteOpen",{ Text="远程打开所有容器 (持续)", Default=false, Callback=function(v)
 	SetAutoOpen(v) Notify("远程打开容器: "..(v and "开启" or "关闭"))
 end})
+MainRight:AddToggle("FoodLoot",{ Text="自动拾取和放下食物", Default=false, Callback=function(v)
+	setFoodLoot(v) Notify("自动拾取和放下食物: "..(v and "开启" or "关闭"))
+end})
 MainRight:AddToggle("AutoInteract",{ Text="自动交互", Default=false, Callback=function(v)
 	setAutoInteract(v) Notify("自动交互: "..(v and "开启" or "关闭"))
 end})
@@ -2006,6 +2175,12 @@ MainRight:AddSlider("AutoInteractRange",{ Text="自动交互范围", Default=20,
 end})
 MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
 	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddToggle("CollectThenDive",{ Text="收集完后回电梯并深入", Default=false, Callback=function(v)
+	collectThenDiveEnabled = v Notify("收集完后回电梯并深入: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddToggle("AutoEgg",{ Text="自动收集鳄鱼蛋", Default=false, Callback=function(v)
+	setAutoCollectEgg(v) Notify("自动收集鳄鱼蛋: "..(v and "开启" or "关闭"))
 end})
 MainRight:AddToggle("InfiniteStamina",{ Text="无限体力", Default=false, Callback=function(v)
 	setInfiniteStamina(v) Notify("无限体力: "..(v and "开启" or "关闭"))
