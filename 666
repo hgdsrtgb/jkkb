@@ -398,19 +398,19 @@ local function startAntiFling()
                                 part.CanCollide = false
                             end
                         end
-        local char = LocalPlayer.Character
-        if char then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then
-                if root.AssemblyLinearVelocity.Magnitude > 100 then
-                    root.AssemblyLinearVelocity = Vector3.zero
-                end
                     end)
                 end
             end
-        end
-                if root.AssemblyAngularVelocity.Magnitude > 20 then
-                    root.AssemblyAngularVelocity = Vector3.zero
+            local char = LocalPlayer.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    if root.AssemblyLinearVelocity.Magnitude > 100 then
+                        root.AssemblyLinearVelocity = Vector3.zero
+                    end
+                    if root.AssemblyAngularVelocity.Magnitude > 20 then
+                        root.AssemblyAngularVelocity = Vector3.zero
+                    end
                 end
             end
         end
@@ -1894,14 +1894,11 @@ Tabs.MainTab:Toggle({
         if Stepped then pcall(function() Stepped:Disconnect() end) end
         Stepped = game:GetService("RunService").Stepped:Connect(function()
             if Clipon then
-            local char = LocalPlayer.Character
-            if char then
-                for _, part in pairs(char:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end
+                local char = LocalPlayer.Character
+                if char then
+                    for _, part in pairs(char:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
                         end
                     end
                 end
@@ -1911,7 +1908,8 @@ Tabs.MainTab:Toggle({
         end)
         WindUI:Notify({ Title = "穿墙", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
-})local speedToggle = false
+})
+local speedToggle = false
 local speedValue = 16
 Tabs.MainTab:Toggle({
     Title = "修改移速",
