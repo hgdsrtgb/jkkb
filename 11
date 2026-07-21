@@ -1952,7 +1952,6 @@ local function interactWholeMapOnce()
 	end
 end
 
-
 local function pressG()
 	pcall(function()
 		if keypress and keyrelease then
@@ -2024,6 +2023,7 @@ local function setAnySell(state)
 		end
 	end
 end
+
 local function setAutoCollect(state)
 	autoCollectEnabled = state
 	if autoCollectThread then
@@ -2036,6 +2036,9 @@ local function setAutoCollect(state)
 	end
 	if state then
 		setAnySell(true)
+		for _, item in pairs(InteractiveItems:GetChildren()) do
+			remoteInteractItem(item)
+		end
 		autoCollectThread = task.spawn(function()
 			local fails = {}
 			local roundDone = false
