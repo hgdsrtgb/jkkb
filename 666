@@ -259,25 +259,24 @@ local autoInteractRange = 20
 local autoInteractThread = nil
 
 
-local function remoteInteractItem(item)
-	if (item:IsA("Model") or item:IsA("Tool")) and item:HasTag("Interactable") and item:GetAttribute("en") then
-		pcall(function()
-			TEvent.FireRemote("Interactable", item)
-			TEvent.FireBindable("Interactable", item)
-		end)
-	end
-end
-
-local function getLootsInRange(range)
+local function getProximityPromptsInRange(range)
 	local results = {}
 	local char = LocalPlayer.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
 	if not hrp then return results end
-	for _, item in pairs(WorldLoots:GetChildren()) do
-		if item:IsA("Model") or item:IsA("Tool") then
-			local part = item:FindFirstChildWhichIsA("BasePart", true)
-			if part and (part.Position - hrp.Position).Magnitude <= range then
-				table.insert(results, item)
+	for _, obj in pairs(workspace:GetDescendants()) do
+		if obj:IsA("ProximityPrompt") then
+			local parent = obj.Parent
+			if parent then
+				local part = nil
+				if parent:IsA("BasePart") then
+					part = parent
+				elseif parent:IsA("Model") then
+					part = parent.PrimaryPart or parent:FindFirstChildWhichIsA("BasePart", true)
+				end
+				if part and (part.Position - hrp.Position).Magnitude <= range then
+					table.insert(results, obj)
+				end
 			end
 		end
 	end
@@ -293,27 +292,18 @@ local function setAutoInteract(state)
 	if state then
 		autoInteractThread = task.spawn(function()
 			while autoInteractEnabled do
-				for _, item in ipairs(getLootsInRange(autoInteractRange)) do
-					remoteInteractItem(item)
-				end
-				local char = LocalPlayer.Character
-				local hrp = char and char:FindFirstChild("HumanoidRootPart")
-				if hrp then
-					for _, item in pairs(InteractiveItems:GetChildren()) do
-						if item:IsA("Model") or item:IsA("Tool") then
-							local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
-							if part and (part.Position - hrp.Position).Magnitude <= autoInteractRange then
-								remoteInteractItem(item)
-							end
-						end
-					end
+				for _, prompt in ipairs(getProximityPromptsInRange(autoInteractRange)) do
+					pcall(function()
+						prompt:InputHoldBegin()
+						task.wait(0.05)
+						prompt:InputHoldEnd()
+					end)
 				end
 				task.wait(0.15)
 			end
 		end)
 	end
 end
-
 local function disablePlayerCollision(player)
     if player == LocalPlayer then return end
     local char = player.Character
