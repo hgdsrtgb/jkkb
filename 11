@@ -10,7 +10,6 @@ local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 
-local autoDropEnabled = false
 local anySellEnabled = false
 local anySellCharConn = nil
 
@@ -1461,20 +1460,7 @@ local function teleportToElevator()
 	local char = LocalPlayer.Character
 	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 	local hrp = char.HumanoidRootPart
-	local elevator = findNearestElevator(hrp.Position)
-	if elevator then
-		local model = elevator:FindFirstAncestorOfClass("Model")
-		if model then
-			local center = model:GetBoundingBox().Position
-			hrp.CFrame = CFrame.new(center.X, elevator.Position.Y + 2, center.Z)
-		else
-			hrp.CFrame = CFrame.new(elevator.Position + Vector3.new(0, 2, 0))
-		end
-	end
-	if autoDropEnabled then
-		task.wait(0.3)
-		dropAllItems()
-	end
+	hrp.CFrame = CFrame.new(-310.8, 323.8, 411.3)
 end
 
 
@@ -1927,10 +1913,6 @@ local function returnToElevatorAndDive()
 			teleportToElevator()
 		end
 	end
-	if autoDropEnabled then
-		task.wait(0.3)
-		dropAllItems()
-	end
 	task.wait(0.5)
 	for _ = 1, 3 do
 		pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
@@ -1945,32 +1927,6 @@ local function interactWholeMapOnce()
 	for _, item in pairs(InteractiveItems:GetChildren()) do
 		remoteInteractItem(item)
 	end
-end
-
-local function pressG()
-	pcall(function()
-		if keypress and keyrelease then
-			keypress(0x47)
-			task.wait(0.05)
-			keyrelease(0x47)
-		else
-			local VirtualInputManager = game:GetService("VirtualInputManager")
-			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
-			task.wait(0.05)
-			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
-		end
-	end)
-end
-
-local function dropAllItems()
-	for i = 1, 15 do
-		pressG()
-		task.wait(0.1)
-	end
-end
-
-local function isInElevatorZone(pos)
-	return pos.X >= -323.1 and pos.X <= -297.2 and pos.Z >= 396.9 and pos.Z <= 413.8
 end
 
 local function setAnySell(state)
@@ -2039,7 +1995,6 @@ local function setAutoCollect(state)
 				local targets = {}
 				for _, item in pairs(WorldLoots:GetChildren()) do
 					local part = item:FindFirstChildWhichIsA("BasePart", true)
-					if part and isInElevatorZone(part.Position) then continue end
 					if (item:IsA("Model") or item:IsA("Tool")) and item:FindFirstChild("LootUI", true) and not (fails[item] and fails[item] >= 3) then
 						if part then
 							table.insert(targets, { item = item, part = part, dist = (part.Position - hrp.Position).Magnitude })
@@ -2052,21 +2007,25 @@ local function setAutoCollect(state)
 						restoreCamera()
 						Notify("本轮收集完成，等待新物资出现")
 					end
-					teleportToElevator()
+					local char = LocalPlayer.Character
+					local hrp = char and char:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						hrp.CFrame = CFrame.new(-310.8, 323.8, 411.3)
+					end
 					if autoDiveAfterCollectEnabled then
-						local char = LocalPlayer.Character
-						local hrp = char and char:FindFirstChild("HumanoidRootPart")
-						if hrp then
+						local char2 = LocalPlayer.Character
+						local hrp2 = char2 and char2:FindFirstChild("HumanoidRootPart")
+						if hrp2 then
 							for _, item in pairs(WorldLoots:GetChildren()) do
 								local part = item:FindFirstChildWhichIsA("BasePart", true)
-								if part and (part.Position - hrp.Position).Magnitude <= 10 then
+								if part and (part.Position - hrp2.Position).Magnitude <= 10 then
 									remoteInteractItem(item)
 									pressE()
 								end
 							end
 							for _, item in pairs(InteractiveItems:GetChildren()) do
 								local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
-								if part and (part.Position - hrp.Position).Magnitude <= 10 then
+								if part and (part.Position - hrp2.Position).Magnitude <= 10 then
 									remoteInteractItem(item)
 									pressE()
 								end
@@ -2195,16 +2154,19 @@ end, DoubleClick=false })
 MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
 	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
 end})
-MainRight:AddToggle("AutoDrop",{ Text="回电梯自动放下物品", Default=false, Callback=function(v)
-	autoDropEnabled = v
-	Notify("回电梯自动放下物品: "..(v and "开启" or "关闭"))
-end})
-MainRight:AddToggle("CollectThenDive",{ Text="收集完后回电梯并深入", Default=false, Callback=function(v)
-	collectThenDiveEnabled = v Notify("收集完后回电梯并深入: "..(v and "开启" or "关闭"))
-end})
 MainRight:AddToggle("AutoEgg",{ Text="自动收集鳄鱼蛋", Default=false, Callback=function(v)
 	setAutoCollectEgg(v) Notify("自动收集鳄鱼蛋: "..(v and "开启" or "关闭"))
 end})
+
+local CollectGroup = Tabs.Main:AddRightGroupbox("收集")
+CollectGroup:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
+	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
+end})
+CollectGroup:AddToggle("AutoDiveAfterCollect",{ Text="收集完自动深入", Default=false, Callback=function(v)
+	autoDiveAfterCollectEnabled = v
+	Notify("收集完自动深入: "..(v and "开启" or "关闭"))
+end})
+
 MainRight:AddToggle("InfiniteStamina",{ Text="无限体力", Default=false, Callback=function(v)
 	setInfiniteStamina(v) Notify("无限体力: "..(v and "开启" or "关闭"))
 end})
