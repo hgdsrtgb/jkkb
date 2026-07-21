@@ -187,7 +187,7 @@ local function quickFlashCleanup()
 end
 task.spawn(function()
     while true do
-        task.wait(espUpdateInterval)
+        task.wait(espEnabled and espUpdateInterval or 0.5)
         if espEnabled then
             for player, billboard in pairs(espBillboards) do
                 if not (player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent) then
@@ -197,21 +197,31 @@ task.spawn(function()
         end
     end
 end)
-RunService.RenderStepped:Connect(function()
-    if not espEnabled then return end
-    local myChar = LocalPlayer.Character
-    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
-    if not myPos then return end
-    for player, billboard in pairs(espBillboards) do
-        if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
-            local distLabel = billboard:FindFirstChild("DistLabel")
-            if distLabel then
-                local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
-                distLabel.Text = string.format("%.0fm", dist)
+espDistConn = nil
+lastEspDistUpdate = 0
+function startEspDistLoop()
+    if espDistConn then return end
+    espDistConn = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if now - lastEspDistUpdate < 0.1 then return end
+        lastEspDistUpdate = now
+        local myChar = LocalPlayer.Character
+        local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart") and myChar.HumanoidRootPart.Position
+        if not myPos then return end
+        for player, billboard in pairs(espBillboards) do
+            if player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and billboard and billboard.Parent then
+                local distLabel = billboard:FindFirstChild("DistLabel")
+                if distLabel then
+                    local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+                    distLabel.Text = string.format("%.0fm", dist)
+                end
             end
         end
-    end
-end)
+    end)
+end
+function stopEspDistLoop()
+    if espDistConn then espDistConn:Disconnect() espDistConn = nil end
+end
 local InfiniteJumpEnabled = false
 local NightVisionEnabled = false
 local AutoTranslateEnabled = false
@@ -241,6 +251,68 @@ local selfFlyConn = nil
 local selfFlyBV = nil
 local selfFlyBG = nil
 local selfFlyKeys = {}
+local isRefreshingDropdowns = false
+local lastDropdownRefresh = 0
+
+local autoInteractEnabled = false
+local autoInteractRange = 20
+local autoInteractThread = nil
+
+
+local function remoteInteractItem(item)
+	if (item:IsA("Model") or item:IsA("Tool")) and item:HasTag("Interactable") and item:GetAttribute("en") then
+		pcall(function()
+			TEvent.FireRemote("Interactable", item)
+			TEvent.FireBindable("Interactable", item)
+		end)
+	end
+end
+
+local function getLootsInRange(range)
+	local results = {}
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return results end
+	for _, item in pairs(WorldLoots:GetChildren()) do
+		if item:IsA("Model") or item:IsA("Tool") then
+			local part = item:FindFirstChildWhichIsA("BasePart", true)
+			if part and (part.Position - hrp.Position).Magnitude <= range then
+				table.insert(results, item)
+			end
+		end
+	end
+	return results
+end
+
+local function setAutoInteract(state)
+	autoInteractEnabled = state
+	if autoInteractThread then
+		task.cancel(autoInteractThread)
+		autoInteractThread = nil
+	end
+	if state then
+		autoInteractThread = task.spawn(function()
+			while autoInteractEnabled do
+				for _, item in ipairs(getLootsInRange(autoInteractRange)) do
+					remoteInteractItem(item)
+				end
+				local char = LocalPlayer.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					for _, item in pairs(InteractiveItems:GetChildren()) do
+						if item:IsA("Model") or item:IsA("Tool") then
+							local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
+							if part and (part.Position - hrp.Position).Magnitude <= autoInteractRange then
+								remoteInteractItem(item)
+							end
+						end
+					end
+				end
+				task.wait(0.15)
+			end
+		end)
+	end
+end
 
 local function disablePlayerCollision(player)
     if player == LocalPlayer then return end
@@ -326,10 +398,6 @@ local function startAntiFling()
                                 part.CanCollide = false
                             end
                         end
-                    end)
-                end
-            end
-        end
         local char = LocalPlayer.Character
         if char then
             local root = char:FindFirstChild("HumanoidRootPart")
@@ -337,6 +405,10 @@ local function startAntiFling()
                 if root.AssemblyLinearVelocity.Magnitude > 100 then
                     root.AssemblyLinearVelocity = Vector3.zero
                 end
+                    end)
+                end
+            end
+        end
                 if root.AssemblyAngularVelocity.Magnitude > 20 then
                     root.AssemblyAngularVelocity = Vector3.zero
                 end
@@ -685,7 +757,7 @@ local function startAutoTranslate()
                     if gui:IsA("ScreenGui") then scanAndTranslate(gui, 5) end
                 end
             end)
-            task.wait(0.1)
+            task.wait(0.5)
         end
     end)
 end
@@ -1104,7 +1176,7 @@ local function startHarass()
     harassConnection = RunService.Heartbeat:Connect(function(dt)
         if not harassEnabled or not harassTarget or not harassTarget.Character then return end
         local now = tick()
-        if now - lastUpdate < 0.02 then return end
+        if now - lastUpdate < 0.05 then return end
         lastUpdate = now
         local mc = LocalPlayer.Character
         if not mc or not mc:FindFirstChild("HumanoidRootPart") then return end
@@ -1132,6 +1204,7 @@ local function stopHarass()
     WindUI:Notify({ Title = "操人", Content = "已停止操人", Duration = 2 })
 end
 local smoothFollowConnection = nil
+local smoothFollowLastUpdate = 0
 local smoothFollowTarget = nil
 local function stopSmoothFollow()
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
@@ -1151,6 +1224,9 @@ local function startSmoothFollow(targetPlayer)
     smoothFollowTarget = targetPlayer
     smoothFollowLastTargetPos = nil
     smoothFollowConnection = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if now - smoothFollowLastUpdate < 0.1 then return end
+        smoothFollowLastUpdate = now
         if not smoothFollowTarget or not smoothFollowTarget:IsDescendantOf(Players) or not smoothFollowTarget.Character or not smoothFollowTarget.Character:FindFirstChild("HumanoidRootPart") then
             stopSmoothFollow()
             WindUI:Notify({ Title = "平滑跟随", Content = "目标已消失，跟随停止", Duration = 3 })
@@ -1358,7 +1434,7 @@ local Window = WindUI:CreateWindow({
     Folder = "恐脚本",
     Size = UDim2.fromOffset(800, 450),
     Transparent = true,
-    Background = "video:https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/video_260721_001956.mp4",
+    Background = "video:https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Video_1784578800225_974.mp4",
     Theme = "Dark",
     User = {
         Enabled = false,
@@ -1530,8 +1606,10 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "透视", Content = state and "已打开" or "已关闭", Duration = 3 })
         if state then
             for _, p in ipairs(Players:GetPlayers()) do setupPlayerESP(p) end
+            startEspDistLoop()
         else
             for _, p in ipairs(Players:GetPlayers()) do cleanupESP(p) end
+            stopEspDistLoop()
         end
     end
 })
@@ -1816,12 +1894,14 @@ Tabs.MainTab:Toggle({
         if Stepped then pcall(function() Stepped:Disconnect() end) end
         Stepped = game:GetService("RunService").Stepped:Connect(function()
             if Clipon then
-                for _, child in pairs(workspace:GetChildren()) do
-                    if child.Name == Players.LocalPlayer.Name then
-                        for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                            if part:IsA("BasePart") then
-                                part.CanCollide = false
-                            end
+            local char = LocalPlayer.Character
+            if char then
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
                         end
                     end
                 end
@@ -1961,6 +2041,7 @@ flingDropdown = Tabs.MainTab:Dropdown({
     Title = "选定甩飞玩家",
     Values = {},
     Callback = function(name)
+        if isRefreshingDropdowns then return end
         for _, p in ipairs(Players:GetPlayers()) do
             if p.Name == name and p ~= LocalPlayer then
                 currentFlingTarget = p
@@ -2013,6 +2094,7 @@ Tabs.MainTab:Toggle({
 local activeImpersonateClone = nil
 local selectedImpersonateName = ""
 local impersonateHeartbeat = nil
+local lastImpersonateUpdate = 0
 local impersonateRealChar = nil
 local function resetImpersonate()
     if impersonateHeartbeat then
@@ -2114,6 +2196,9 @@ local function startImpersonate(targetName)
         realHum2.PlatformStand = true
     end
     impersonateHeartbeat = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if now - lastImpersonateUpdate < 0.05 then return end
+        lastImpersonateUpdate = now
         if clone and clone.Parent and cloneRoot and impersonateRealChar and impersonateRealChar:FindFirstChild("HumanoidRootPart") then
             local realRoot = impersonateRealChar.HumanoidRootPart
             realRoot.CFrame = cloneRoot.CFrame
@@ -2199,10 +2284,15 @@ local ImpersonateDropdown = Tabs.MainTab:Dropdown({
     Multi = false,
     Options = {},
     Callback = function(value)
+        if isRefreshingDropdowns then return end
         selectedImpersonateName = value
     end,
 })
 local function refreshAllDropdowns()
+    local now = tick()
+    if now - lastDropdownRefresh < 1 then return end
+    lastDropdownRefresh = now
+    isRefreshingDropdowns = true
     local names = {}
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
@@ -2213,7 +2303,8 @@ local function refreshAllDropdowns()
     if followDropdown then followDropdown:Refresh(names) end
     if harassDropdown then harassDropdown:Refresh(names) end
     if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
-    
+    task.wait()
+    isRefreshingDropdowns = false
 end
 Players.PlayerAdded:Connect(refreshAllDropdowns)
 Players.PlayerRemoving:Connect(refreshAllDropdowns)
@@ -2238,6 +2329,29 @@ Tabs.MainTab:Button({
     Callback = function()
         resetImpersonate()
         WindUI:Notify({Title = "提示", Content = "已取消伪装", Type = "info"})
+Tabs.MainTab:Toggle({
+    Title = "自动交互",
+    Value = false,
+    Callback = function(state)
+        setAutoInteract(state)
+        WindUI:Notify({ Title = "自动交互", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+Tabs.MainTab:Slider({
+    Title = "自动交互范围 (当前: 20)",
+    Value = {
+        Min = 0,
+        Max = 200,
+        Default = 20,
+    },
+    Callback = function(value)
+        pendingSliderValues["autointeractrange"] = value
+    end
+})
+sliderReleaseActions["autointeractrange"] = function(v)
+    autoInteractRange = v
+    WindUI:Notify({ Title = "自动交互范围", Content = "已设置为：" .. v, Duration = 2 })
+end
     end,
 })
 refreshAllDropdowns()
@@ -2280,6 +2394,7 @@ followDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定跟随玩家",
     Values = {},
     Callback = function(name)
+        if isRefreshingDropdowns then return end
         for _, p in ipairs(Players:GetPlayers()) do
             if p.Name == name and p ~= LocalPlayer then
                 currentFollowTarget = p
@@ -2370,6 +2485,7 @@ harassDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定操人目标",
     Values = {},
     Callback = function(name)
+        if isRefreshingDropdowns then return end
         for _, p in ipairs(Players:GetPlayers()) do
             if p.Name == name and p ~= LocalPlayer then
                 currentHarassTarget = p
@@ -2734,16 +2850,57 @@ Tabs.GamesTab:Paragraph({
     Thumbnail = "rbxassetid://113517588654522",
     ThumbnailSize = 220,
 })
-Window:OnOpen(function()
+kbBgVideo = nil
+task.spawn(function()
+    for i = 1, 40 do
+        task.wait(0.5)
+        local containers = {CoreGui, LocalPlayer:FindFirstChild("PlayerGui")}
+        for _, container in ipairs(containers) do
+            if container then
+                for _, gui in ipairs(container:GetChildren()) do
+                    if gui:IsA("ScreenGui") then
+                        local v = gui:FindFirstChildWhichIsA("VideoFrame", true)
+                        if v then kbBgVideo = v break end
+                    end
+                end
+            end
+            if kbBgVideo then break end
+        end
+        if kbBgVideo then break end
+    end
+end)
+function kbSetVideoPlaying(playing)
+    if not kbBgVideo then return end
     pcall(function()
-        local v = Window.UIElements.Main.Background:FindFirstChildOfClass("VideoFrame")
-        if v then v:Play() end
+        if playing then
+            if not kbBgVideo.IsPlaying then kbBgVideo:Play() end
+        else
+            if kbBgVideo.IsPlaying then kbBgVideo:Pause() end
+        end
     end)
+end
+function kbIsVideoActuallyVisible()
+    if not kbBgVideo then return false end
+    local node = kbBgVideo
+    while node and node ~= game do
+        if node:IsA("GuiObject") and not node.Visible then return false end
+        if node:IsA("ScreenGui") and not node.Enabled then return false end
+        node = node.Parent
+    end
+    return true
+end
+Window:OnOpen(function()
+    kbSetVideoPlaying(true)
 end)
 Window:OnClose(function()
-    pcall(function()
-        local v = Window.UIElements.Main.Background:FindFirstChildOfClass("VideoFrame")
-        if v then v:Pause() end
-    end)
+    kbSetVideoPlaying(false)
     print("界面已关闭。")
+end)
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if kbBgVideo then
+            kbSetVideoPlaying(kbIsVideoActuallyVisible())
+        end
+    end
 end)
