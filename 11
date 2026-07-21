@@ -1469,56 +1469,7 @@ local function teleportToElevator()
 	end
 end
 
-local autoInteractEnabled = false
-local autoInteractRange = 20
-local autoInteractThread = nil
 
-local function firePromptsOnce(maxRange)
-	local char = LocalPlayer.Character
-	if not char then return end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-	local runtime = Workspace:FindFirstChild("Runtime")
-	local scanRoot = runtime and runtime:FindFirstChild("LootPoints") or Workspace
-	for _, obj in ipairs(scanRoot:GetDescendants()) do
-		if obj:IsA("ProximityPrompt") then
-			local inRange = true
-			if maxRange then
-				local part = obj.Parent
-				if part and part:IsA("BasePart") then
-					inRange = (part.Position - hrp.Position).Magnitude <= maxRange
-				else
-					inRange = false
-				end
-			end
-			if inRange then
-				pcall(function() fireproximityprompt(obj) end)
-			end
-		end
-	end
-end
-
-local function setAutoInteract(state)
-	autoInteractEnabled = state
-	if state then
-		if autoInteractThread then task.cancel(autoInteractThread) end
-		autoInteractThread = task.spawn(function()
-			while autoInteractEnabled do
-				firePromptsOnce(autoInteractRange)
-				task.wait(0.2)
-			end
-		end)
-	else
-		if autoInteractThread then
-			task.cancel(autoInteractThread)
-			autoInteractThread = nil
-		end
-	end
-end
-
-local function interactWholeMapOnce()
-	firePromptsOnce(nil)
-end
 
 local function gatherLootToElevator()
 	local char = LocalPlayer.Character
@@ -1819,6 +1770,119 @@ end
 
 local Notify = function(msg) Library:Notify(msg,3) end
 
+local autoInteractEnabled = false
+local autoInteractRange = 20
+local autoInteractThread = nil
+local autoCollectEnabled = false
+local autoCollectThread = nil
+
+local function pressE()
+	pcall(function()
+		if keypress and keyrelease then
+			keypress(0x45)
+			task.wait(0.05)
+			keyrelease(0x45)
+		else
+			local VirtualInputManager = game:GetService("VirtualInputManager")
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+			task.wait(0.05)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+		end
+	end)
+end
+
+local function hasInteractableInRange(range)
+	local char = LocalPlayer.Character
+	if not char then return false end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return false end
+	local runtime = Workspace:FindFirstChild("Runtime")
+	local scanRoot = runtime and runtime:FindFirstChild("LootPoints") or Workspace
+	for _, obj in ipairs(scanRoot:GetDescendants()) do
+		if obj:IsA("ProximityPrompt") and obj.Enabled then
+			local parent = obj.Parent
+			local pos
+			if parent and parent:IsA("BasePart") then
+				pos = parent.Position
+			elseif parent and parent:IsA("Attachment") then
+				pos = parent.WorldPosition
+			end
+			if pos and (pos - hrp.Position).Magnitude <= range then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function setAutoInteract(state)
+	autoInteractEnabled = state
+	if autoInteractThread then
+		task.cancel(autoInteractThread)
+		autoInteractThread = nil
+	end
+	if state then
+		autoInteractThread = task.spawn(function()
+			while autoInteractEnabled do
+				if hasInteractableInRange(autoInteractRange) then
+					pressE()
+				end
+				task.wait(0.1)
+			end
+		end)
+	end
+end
+
+local function setAutoCollect(state)
+	autoCollectEnabled = state
+	if autoCollectThread then
+		task.cancel(autoCollectThread)
+		autoCollectThread = nil
+	end
+	if state then
+		autoCollectThread = task.spawn(function()
+			local fails = {}
+			while autoCollectEnabled do
+				local char = LocalPlayer.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if not hrp then
+					task.wait(0.5)
+					continue
+				end
+				local targets = {}
+				for _, item in pairs(WorldLoots:GetChildren()) do
+					if (item:IsA("Model") or item:IsA("Tool")) and item:FindFirstChild("LootUI", true) and not (fails[item] and fails[item] >= 3) then
+						local part = item:FindFirstChildWhichIsA("BasePart", true)
+						if part then
+							table.insert(targets, { item = item, part = part, dist = (part.Position - hrp.Position).Magnitude })
+						end
+					end
+				end
+				if #targets == 0 then
+					Notify("自动收集完成")
+					autoCollectThread = nil
+					pcall(function() Library.Toggles.AutoCollect:SetValue(false) end)
+					break
+				end
+				table.sort(targets, function(a, b) return a.dist < b.dist end)
+				local target = targets[1]
+				hrp.CFrame = target.part.CFrame + Vector3.new(0, 2, 0)
+				local startTime = os.clock()
+				while os.clock() - startTime < 1.2 and autoCollectEnabled do
+					if not target.item.Parent or not target.item:FindFirstChild("LootUI", true) then break end
+					pressE()
+					task.wait(0.15)
+				end
+				if target.item.Parent and target.item:FindFirstChild("LootUI", true) then
+					fails[target.item] = (fails[target.item] or 0) + 1
+				end
+				task.wait(0.1)
+			end
+			autoCollectEnabled = false
+		end)
+	end
+end
+
 StarterGui:SetCore("SendNotification",{
 	Title = "亡命速递脚本",
 	Text = "恐拜大帝 持续更新\nQQ：3999698324",
@@ -1940,9 +2004,9 @@ end})
 MainRight:AddSlider("AutoInteractRange",{ Text="自动交互范围", Default=20, Min=5, Max=200, Rounding=0, Suffix=" studs", Callback=function(v)
 	autoInteractRange = v
 end})
-MainRight:AddButton({ Text="全图交互一次", Func=function()
-	interactWholeMapOnce() Notify("已全图交互一次")
-end, DoubleClick=false })
+MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
+	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
+end})
 MainRight:AddToggle("InfiniteStamina",{ Text="无限体力", Default=false, Callback=function(v)
 	setInfiniteStamina(v) Notify("无限体力: "..(v and "开启" or "关闭"))
 end})
