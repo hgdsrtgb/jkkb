@@ -10,6 +10,13 @@ local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 
+local autoDropEnabled = false
+local wasInElevator = false
+local hasDroppedThisVisit = false
+local openedContainers = {}
+local anySellEnabled = false
+local anySellCharConn = nil
+
 local TEvent = require(ReplicatedStorage.Shared.Core.TEvent)
 local InteractiveItems = workspace.GameSystem.InteractiveItem
 local Value = require(ReplicatedStorage.Shared.Core.Value)
@@ -1935,52 +1942,86 @@ local function interactWholeMapOnce()
 	end
 end
 
-local autoDropEnabled = false
-local wasInElevator = false
-local hasDroppedThisVisit = false
-local openedContainers = {}
 
 local function isInElevator()
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    local elevator = findNearestElevator(hrp.Position)
-    if not elevator then return false end
-    return (hrp.Position - elevator.Position).Magnitude <= 12
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return false end
+	local elevator = findNearestElevator(hrp.Position)
+	if not elevator then return false end
+	return (hrp.Position - elevator.Position).Magnitude <= 12
 end
 
 local function pressG()
-    pcall(function()
-        if keypress and keyrelease then
-            keypress(0x47)
-            task.wait(0.05)
-            keyrelease(0x47)
-        else
-            local VirtualInputManager = game:GetService("VirtualInputManager")
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
-            task.wait(0.05)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
-        end
-    end)
+	pcall(function()
+		if keypress and keyrelease then
+			keypress(0x47)
+			task.wait(0.05)
+			keyrelease(0x47)
+		else
+			local VirtualInputManager = game:GetService("VirtualInputManager")
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+			task.wait(0.05)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+		end
+	end)
 end
 
 local function dropAllItems()
-    for i = 1, 8 do
-        pressG()
-        task.wait(0.15)
-    end
+	for i = 1, 15 do
+		pressG()
+		task.wait(0.1)
+	end
 end
 
 local function openNewContainers()
-    for _, item in pairs(InteractiveItems:GetChildren()) do
-        if not openedContainers[item] then
-            remoteInteractItem(item)
-            openedContainers[item] = true
-        end
-    end
-    for item, _ in pairs(openedContainers) do
-        if not item.Parent then openedContainers[item] = nil end
-    end
+	for _, item in pairs(InteractiveItems:GetChildren()) do
+		if not openedContainers[item] then
+			remoteInteractItem(item)
+			openedContainers[item] = true
+		end
+	end
+	for item, _ in pairs(openedContainers) do
+		if not item.Parent then openedContainers[item] = nil end
+	end
+end
+
+local function setAnySell(state)
+	anySellEnabled = state
+	if state then
+		pcall(function()
+			if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+				TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+			end
+		end)
+		if anySellCharConn then anySellCharConn:Disconnect() end
+		anySellCharConn = LocalPlayer.CharacterAdded:Connect(function()
+			task.wait(0.5)
+			if anySellEnabled then
+				pcall(function()
+					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+					end
+				end)
+			end
+		end)
+		task.spawn(function()
+			while anySellEnabled do
+				task.wait(3)
+				if not anySellEnabled then break end
+				pcall(function()
+					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+					end
+				end)
+			end
+		end)
+	else
+		if anySellCharConn then
+			anySellCharConn:Disconnect()
+			anySellCharConn = nil
+		end
+	end
 end
 local function setAutoCollect(state)
 	autoCollectEnabled = state
@@ -1995,6 +2036,7 @@ local function setAutoCollect(state)
 		openedContainers = {}
 	end
 	if state then
+		setAnySell(true)
 		for _, item in pairs(InteractiveItems:GetChildren()) do
 			if not openedContainers[item] then
 				remoteInteractItem(item)
@@ -2013,14 +2055,18 @@ local function setAutoCollect(state)
 					continue
 				end
 				local inElevator = isInElevator()
-				if inElevator and not wasInElevator and autoDropEnabled and not hasDroppedThisVisit then
-					dropAllItems()
-					hasDroppedThisVisit = true
-				end
-				if not inElevator then
+				if inElevator then
+					if not wasInElevator and autoDropEnabled and not hasDroppedThisVisit then
+						dropAllItems()
+						hasDroppedThisVisit = true
+					end
+					wasInElevator = true
+					task.wait(0.5)
+					continue
+				else
+					wasInElevator = false
 					hasDroppedThisVisit = false
 				end
-				wasInElevator = inElevator
 				openNewContainers()
 				local targets = {}
 				for _, item in pairs(WorldLoots:GetChildren()) do
@@ -2110,45 +2156,8 @@ MainLeft:AddToggle("Freeze",{ Text="冻结怪物", Default=false, Callback=funct
 	toggleFreeze(v) Notify("冻结怪物: "..(v and "开启" or "关闭"))
 end})
 MainLeft:AddToggle("AnySell",{ Text="随处出售", Default=false, Callback=function(v)
-	anySellEnabled = v
-	if v then
-		pcall(function()
-			if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-				TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-			end
-		end)
-		
-		if anySellCharConn then anySellCharConn:Disconnect() end
-		anySellCharConn = LocalPlayer.CharacterAdded:Connect(function()
-			task.wait(0.5)
-			if anySellEnabled then
-				pcall(function()
-					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-					end
-				end)
-			end
-		end)
-		
-		task.spawn(function()
-			while anySellEnabled do
-				task.wait(3)
-				if not anySellEnabled then break end
-				pcall(function()
-					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-					end
-				end)
-			end
-		end)
-		Notify("随处出售已开启（自动保持）")
-	else
-		if anySellCharConn then
-			anySellCharConn:Disconnect()
-			anySellCharConn = nil
-		end
-		Notify("随处出售已关闭")
-	end
+	setAnySell(v)
+	Notify("随处出售: "..(v and "开启" or "关闭"))
 end})
 MainLeft:AddToggle("Invincible",{ Text="无敌", Default=false, Callback=function(v)
 	invincibleEnabled = v
