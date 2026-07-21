@@ -1775,8 +1775,6 @@ local autoInteractRange = 20
 local autoInteractThread = nil
 local autoCollectEnabled = false
 local autoCollectThread = nil
-local foodLootEnabled = false
-local foodLootThread = nil
 local autoEggEnabled = false
 local autoEggThread = nil
 local collectThenDiveEnabled = false
@@ -1863,64 +1861,6 @@ local function setAutoInteract(state)
 	end
 end
 
-local foodKeywords = {"food","eat","meal","bread","meat","apple","banana","berry","cake","pizza","burger","sandwich","drink","water","cola","soda","snack","candy","chocolate","rice","noodle","soup","egg","milk","cheese","cookie","donut","fruit","vegetable","carrot","potato","corn","chicken","fish","ham","sausage","食物","食品","吃的","面包","肉","蛋","饭","面条","饮料","苹果","蛋糕","糖果","牛奶","鱼","鸡"}
-
-local function isFoodItem(item)
-	local lootUI = item:FindFirstChild("LootUI", true)
-	if not lootUI then return false end
-	local frame = lootUI:FindFirstChild("Frame")
-	local nameLbl = frame and frame:FindFirstChild("ItemName")
-	if not nameLbl then return false end
-	local lower = tostring(nameLbl.Text):lower()
-	for _, kw in ipairs(foodKeywords) do
-		if lower:find(kw, 1, true) then return true end
-	end
-	return false
-end
-
-local function getAimedFoodItem()
-	local cam = Workspace.CurrentCamera
-	local char = LocalPlayer.Character
-	if not cam or not char then return nil end
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = {char}
-	local result = Workspace:Raycast(cam.CFrame.Position, cam.CFrame.LookVector * 60, params)
-	if not result or not result.Instance then return nil end
-	local node = result.Instance
-	while node and node ~= Workspace do
-		if node.Parent == WorldLoots and (node:IsA("Model") or node:IsA("Tool")) then
-			if isFoodItem(node) then return node end
-			return nil
-		end
-		node = node.Parent
-	end
-	return nil
-end
-
-local function setFoodLoot(state)
-	foodLootEnabled = state
-	if foodLootThread then
-		task.cancel(foodLootThread)
-		foodLootThread = nil
-	end
-	if state then
-		foodLootThread = task.spawn(function()
-			while foodLootEnabled do
-				if getAimedFoodItem() then
-					pressE()
-				end
-				for _, item in ipairs(getLootsInRange(20)) do
-					if isFoodItem(item) then
-						remoteInteractItem(item)
-					end
-				end
-				task.wait(0.12)
-			end
-		end)
-	end
-end
-
 local function isEggCollected(eggName)
 	if not PlayerLoots then return false end
 	return PlayerLoots:FindFirstChild(eggName, true) ~= nil
@@ -1986,6 +1926,15 @@ local function returnToElevatorAndDive()
 	end
 end
 
+local function interactWholeMapOnce()
+	for _, item in pairs(WorldLoots:GetChildren()) do
+		remoteInteractItem(item)
+	end
+	for _, item in pairs(InteractiveItems:GetChildren()) do
+		remoteInteractItem(item)
+	end
+end
+
 local function setAutoCollect(state)
 	autoCollectEnabled = state
 	if autoCollectThread then
@@ -1998,6 +1947,8 @@ local function setAutoCollect(state)
 	if state then
 		autoCollectThread = task.spawn(function()
 			local fails = {}
+			local roundDone = false
+			local lastDiveTime = 0
 			while autoCollectEnabled do
 				local char = LocalPlayer.Character
 				local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -2015,15 +1966,19 @@ local function setAutoCollect(state)
 					end
 				end
 				if #targets == 0 then
-					restoreCamera()
-					Notify("自动收集完成")
-					autoCollectThread = nil
-					pcall(function() Library.Toggles.AutoCollect:SetValue(false) end)
-					if collectThenDiveEnabled then
+					if not roundDone then
+						roundDone = true
+						restoreCamera()
+						Notify("本轮收集完成，等待新物资出现")
+					end
+					if collectThenDiveEnabled and os.clock() - lastDiveTime > 8 then
+						lastDiveTime = os.clock()
 						task.spawn(returnToElevatorAndDive)
 					end
-					break
+					task.wait(1)
+					continue
 				end
+				roundDone = false
 				table.sort(targets, function(a, b) return a.dist < b.dist end)
 				local target = targets[1]
 				hrp.CFrame = target.part.CFrame + Vector3.new(0, 2, 0)
@@ -2164,15 +2119,15 @@ end, DoubleClick=false })
 MainRight:AddToggle("RemoteOpen",{ Text="远程打开所有容器 (持续)", Default=false, Callback=function(v)
 	SetAutoOpen(v) Notify("远程打开容器: "..(v and "开启" or "关闭"))
 end})
-MainRight:AddToggle("FoodLoot",{ Text="自动拾取和放下食物", Default=false, Callback=function(v)
-	setFoodLoot(v) Notify("自动拾取和放下食物: "..(v and "开启" or "关闭"))
-end})
 MainRight:AddToggle("AutoInteract",{ Text="自动交互", Default=false, Callback=function(v)
 	setAutoInteract(v) Notify("自动交互: "..(v and "开启" or "关闭"))
 end})
 MainRight:AddSlider("AutoInteractRange",{ Text="自动交互范围", Default=20, Min=5, Max=200, Rounding=0, Suffix=" studs", Callback=function(v)
 	autoInteractRange = v
 end})
+MainRight:AddButton({ Text="全图交互一次", Func=function()
+	interactWholeMapOnce() Notify("已对全图交互一次")
+end, DoubleClick=false })
 MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
 	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
 end})
