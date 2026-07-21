@@ -1747,6 +1747,48 @@ local function showTimeWindow(mode)
 	end)
 end
 
+local function CheckCashAndDive()
+	local plr = Players.LocalPlayer
+	local PlayerGui = plr:FindFirstChild("PlayerGui")
+	if not PlayerGui then return end
+	local Main = PlayerGui:FindFirstChild("Main")
+	if not Main then return end
+	local HomePage = Main:FindFirstChild("HomePage")
+	if not HomePage then return end
+	local Goal = HomePage:FindFirstChild("Goal")
+	if not Goal then return end
+	local GoalProgressBar = Goal:FindFirstChild("GoalProgressBar")
+	if not GoalProgressBar then return end
+	local GoalText = GoalProgressBar:FindFirstChild("GoalText")
+	if not GoalText then return end
+	local CashText = GoalText:FindFirstChild("Cash")
+	local GoalNumText = GoalText:FindFirstChild("Goal")
+	if not CashText or not GoalNumText then return end
+	local currentCash = tonumber(CashText.Text:match("%d+")) or 0
+	local goalNum = tonumber(GoalNumText.Text:match("/(%d+)")) or 0
+	if currentCash >= goalNum then
+		TEvent.FireRemote("SubmitVote", "continue")
+		task.wait(1)
+	end
+end
+
+local function SetAutoDive(state)
+	autoDiveAfterTargetEnabled = state
+	if state then
+		if autoDiveConn then autoDiveConn:Disconnect() end
+		autoDiveConn = RunService.Heartbeat:Connect(function()
+			if autoDiveAfterTargetEnabled then
+				pcall(CheckCashAndDive)
+			end
+		end)
+	else
+		if autoDiveConn then
+			autoDiveConn:Disconnect()
+			autoDiveConn = nil
+		end
+	end
+end
+
 local function safeLoad(url)
 	local success, result = pcall(function() return loadstring(game:HttpGet(url))() end)
 	if not success then warn("加载失败: "..url) return nil end
@@ -1772,6 +1814,8 @@ local autoCollectThread = nil
 local autoEggEnabled = false
 local autoEggThread = nil
 local collectThenDiveEnabled = false
+local autoDiveAfterTargetEnabled = false
+local autoDiveConn = nil
 
 local ElevatorDropoff = nil
 local PlayerLoots = nil
@@ -2141,6 +2185,10 @@ MainRight:AddButton({ Text="传送到最近玩家", Func=function()
 end, DoubleClick=false })
 MainRight:AddToggle("RemoteOpen",{ Text="远程打开所有容器 (持续)", Default=false, Callback=function(v)
 	SetAutoOpen(v) Notify("远程打开容器: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddToggle("AutoDiveAfterTarget",{ Text="达到目标金额自动深入", Default=false, Callback=function(v)
+	SetAutoDive(v)
+	Notify("达到目标金额自动深入: "..(v and "开启" or "关闭"))
 end})
 MainRight:AddToggle("AutoInteract",{ Text="自动交互", Default=false, Callback=function(v)
 	setAutoInteract(v) Notify("自动交互: "..(v and "开启" or "关闭"))
