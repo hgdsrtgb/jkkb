@@ -2052,9 +2052,29 @@ local function setAutoCollect(state)
 						restoreCamera()
 						Notify("本轮收集完成，等待新物资出现")
 					end
-					if collectThenDiveEnabled and os.clock() - lastDiveTime > 8 then
-						lastDiveTime = os.clock()
-						task.spawn(returnToElevatorAndDive)
+					teleportToElevator()
+					if autoDiveAfterCollectEnabled then
+						local char = LocalPlayer.Character
+						local hrp = char and char:FindFirstChild("HumanoidRootPart")
+						if hrp then
+							for _, item in pairs(WorldLoots:GetChildren()) do
+								local part = item:FindFirstChildWhichIsA("BasePart", true)
+								if part and (part.Position - hrp.Position).Magnitude <= 10 then
+									remoteInteractItem(item)
+									pressE()
+								end
+							end
+							for _, item in pairs(InteractiveItems:GetChildren()) do
+								local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
+								if part and (part.Position - hrp.Position).Magnitude <= 10 then
+									remoteInteractItem(item)
+									pressE()
+								end
+							end
+							task.wait(0.3)
+							pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
+							Notify("已自动深入")
+						end
 					end
 					task.wait(1)
 					continue
@@ -2172,6 +2192,16 @@ end})
 MainRight:AddButton({ Text="全图交互一次", Func=function()
 	interactWholeMapOnce() Notify("已对全图交互一次")
 end, DoubleClick=false })
+MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
+	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddToggle("AutoDrop",{ Text="回电梯自动放下物品", Default=false, Callback=function(v)
+	autoDropEnabled = v
+	Notify("回电梯自动放下物品: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddToggle("CollectThenDive",{ Text="收集完后回电梯并深入", Default=false, Callback=function(v)
+	collectThenDiveEnabled = v Notify("收集完后回电梯并深入: "..(v and "开启" or "关闭"))
+end})
 MainRight:AddToggle("AutoEgg",{ Text="自动收集鳄鱼蛋", Default=false, Callback=function(v)
 	setAutoCollectEgg(v) Notify("自动收集鳄鱼蛋: "..(v and "开启" or "关闭"))
 end})
@@ -2195,18 +2225,6 @@ MainRight:AddToggle("NightVision",{ Text="夜视", Default=false, Callback=funct
 	if v then enableNightVision() Notify("夜视已开启") else disableNightVision() Notify("夜视已关闭") end
 end})
 MainRight:AddToggle("NoClip",{ Text="穿墙", Default=false, Callback=function(v) setNoClip(v) end})
-
-local CollectGroup = Tabs.Main:AddLeftGroupbox("收集")
-CollectGroup:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
-	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
-end})
-CollectGroup:AddToggle("AutoDrop",{ Text="回电梯自动放下物品", Default=false, Callback=function(v)
-	autoDropEnabled = v
-	Notify("回电梯自动放下物品: "..(v and "开启" or "关闭"))
-end})
-CollectGroup:AddToggle("CollectThenDive",{ Text="收集完后回电梯并深入", Default=false, Callback=function(v)
-	collectThenDiveEnabled = v Notify("收集完后回电梯并深入: "..(v and "开启" or "关闭"))
-end})
 
 local ESPGroup = Tabs.ESP:AddLeftGroupbox("透视设置")
 ESPGroup:AddToggle("ItemESP",{ Text="透视物资 (价格变色)", Default=false, Callback=function(v)
