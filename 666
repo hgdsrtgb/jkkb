@@ -31,6 +31,26 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
         end
     end
 end)
+
+local function setAutoInteract(state)
+    autoInteractEnabled = state
+    if autoInteractThread then
+        task.cancel(autoInteractThread)
+        autoInteractThread = nil
+    end
+    if state then
+        autoInteractThread = task.spawn(function()
+            while autoInteractEnabled do
+                pcall(function()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.05)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                end)
+                task.wait(0.15)
+            end
+        end)
+    end
+end
 WindUI:Notify({
     Title = "恐脚本--通用",
     Content = "作者：恐拜大帝\nQQ：3999698324\n感谢ROB支持",
@@ -251,59 +271,12 @@ local selfFlyConn = nil
 local selfFlyBV = nil
 local selfFlyBG = nil
 local selfFlyKeys = {}
-local isRefreshingDropdowns = false
-local lastDropdownRefresh = 0
-
 local autoInteractEnabled = false
 local autoInteractRange = 20
 local autoInteractThread = nil
+local isRefreshingDropdowns = false
+local lastDropdownRefresh = 0
 
-
-local function getProximityPromptsInRange(range)
-	local results = {}
-	local char = LocalPlayer.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return results end
-	for _, obj in pairs(workspace:GetDescendants()) do
-		if obj:IsA("ProximityPrompt") then
-			local parent = obj.Parent
-			if parent then
-				local part = nil
-				if parent:IsA("BasePart") then
-					part = parent
-				elseif parent:IsA("Model") then
-					part = parent.PrimaryPart or parent:FindFirstChildWhichIsA("BasePart", true)
-				end
-				if part and (part.Position - hrp.Position).Magnitude <= range then
-					table.insert(results, obj)
-				end
-			end
-		end
-	end
-	return results
-end
-
-local function setAutoInteract(state)
-	autoInteractEnabled = state
-	if autoInteractThread then
-		task.cancel(autoInteractThread)
-		autoInteractThread = nil
-	end
-	if state then
-		autoInteractThread = task.spawn(function()
-			while autoInteractEnabled do
-				for _, prompt in ipairs(getProximityPromptsInRange(autoInteractRange)) do
-					pcall(function()
-						prompt:InputHoldBegin()
-						task.wait(0.05)
-						prompt:InputHoldEnd()
-					end)
-				end
-				task.wait(0.15)
-			end
-		end)
-	end
-end
 local function disablePlayerCollision(player)
     if player == LocalPlayer then return end
     local char = player.Character
@@ -391,16 +364,16 @@ local function startAntiFling()
                     end)
                 end
             end
-            local char = LocalPlayer.Character
-            if char then
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if root then
-                    if root.AssemblyLinearVelocity.Magnitude > 100 then
-                        root.AssemblyLinearVelocity = Vector3.zero
-                    end
-                    if root.AssemblyAngularVelocity.Magnitude > 20 then
-                        root.AssemblyAngularVelocity = Vector3.zero
-                    end
+        end
+        local char = LocalPlayer.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                if root.AssemblyLinearVelocity.Magnitude > 100 then
+                    root.AssemblyLinearVelocity = Vector3.zero
+                end
+                if root.AssemblyAngularVelocity.Magnitude > 20 then
+                    root.AssemblyAngularVelocity = Vector3.zero
                 end
             end
         end
@@ -747,7 +720,7 @@ local function startAutoTranslate()
                     if gui:IsA("ScreenGui") then scanAndTranslate(gui, 5) end
                 end
             end)
-            task.wait(0.5)
+            task.wait(0.1)
         end
     end)
 end
@@ -1166,7 +1139,7 @@ local function startHarass()
     harassConnection = RunService.Heartbeat:Connect(function(dt)
         if not harassEnabled or not harassTarget or not harassTarget.Character then return end
         local now = tick()
-        if now - lastUpdate < 0.05 then return end
+        if now - lastUpdate < 0.02 then return end
         lastUpdate = now
         local mc = LocalPlayer.Character
         if not mc or not mc:FindFirstChild("HumanoidRootPart") then return end
@@ -1194,7 +1167,6 @@ local function stopHarass()
     WindUI:Notify({ Title = "操人", Content = "已停止操人", Duration = 2 })
 end
 local smoothFollowConnection = nil
-local smoothFollowLastUpdate = 0
 local smoothFollowTarget = nil
 local function stopSmoothFollow()
     if smoothFollowConnection then smoothFollowConnection:Disconnect() end
@@ -1214,9 +1186,6 @@ local function startSmoothFollow(targetPlayer)
     smoothFollowTarget = targetPlayer
     smoothFollowLastTargetPos = nil
     smoothFollowConnection = RunService.Heartbeat:Connect(function()
-        local now = tick()
-        if now - smoothFollowLastUpdate < 0.1 then return end
-        smoothFollowLastUpdate = now
         if not smoothFollowTarget or not smoothFollowTarget:IsDescendantOf(Players) or not smoothFollowTarget.Character or not smoothFollowTarget.Character:FindFirstChild("HumanoidRootPart") then
             stopSmoothFollow()
             WindUI:Notify({ Title = "平滑跟随", Content = "目标已消失，跟随停止", Duration = 3 })
@@ -1884,11 +1853,12 @@ Tabs.MainTab:Toggle({
         if Stepped then pcall(function() Stepped:Disconnect() end) end
         Stepped = game:GetService("RunService").Stepped:Connect(function()
             if Clipon then
-                local char = LocalPlayer.Character
-                if char then
-                    for _, part in pairs(char:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = false
+                for _, child in pairs(workspace:GetChildren()) do
+                    if child.Name == Players.LocalPlayer.Name then
+                        for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
+                            end
                         end
                     end
                 end
@@ -1898,8 +1868,7 @@ Tabs.MainTab:Toggle({
         end)
         WindUI:Notify({ Title = "穿墙", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
-})
-local speedToggle = false
+})local speedToggle = false
 local speedValue = 16
 Tabs.MainTab:Toggle({
     Title = "修改移速",
@@ -2082,7 +2051,6 @@ Tabs.MainTab:Toggle({
 local activeImpersonateClone = nil
 local selectedImpersonateName = ""
 local impersonateHeartbeat = nil
-local lastImpersonateUpdate = 0
 local impersonateRealChar = nil
 local function resetImpersonate()
     if impersonateHeartbeat then
@@ -2184,9 +2152,6 @@ local function startImpersonate(targetName)
         realHum2.PlatformStand = true
     end
     impersonateHeartbeat = RunService.Heartbeat:Connect(function()
-        local now = tick()
-        if now - lastImpersonateUpdate < 0.05 then return end
-        lastImpersonateUpdate = now
         if clone and clone.Parent and cloneRoot and impersonateRealChar and impersonateRealChar:FindFirstChild("HumanoidRootPart") then
             local realRoot = impersonateRealChar.HumanoidRootPart
             realRoot.CFrame = cloneRoot.CFrame
@@ -2294,6 +2259,13 @@ local function refreshAllDropdowns()
     task.wait()
     isRefreshingDropdowns = false
 end
+    end
+    if flingDropdown then flingDropdown:Refresh(names) end
+    if followDropdown then followDropdown:Refresh(names) end
+    if harassDropdown then harassDropdown:Refresh(names) end
+    if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
+    
+end
 Players.PlayerAdded:Connect(refreshAllDropdowns)
 Players.PlayerRemoving:Connect(refreshAllDropdowns)
 Tabs.MainTab:Button({
@@ -2317,6 +2289,8 @@ Tabs.MainTab:Button({
     Callback = function()
         resetImpersonate()
         WindUI:Notify({Title = "提示", Content = "已取消伪装", Type = "info"})
+    end,
+})
 Tabs.MainTab:Toggle({
     Title = "自动交互",
     Value = false,
@@ -2340,8 +2314,6 @@ sliderReleaseActions["autointeractrange"] = function(v)
     autoInteractRange = v
     WindUI:Notify({ Title = "自动交互范围", Content = "已设置为：" .. v, Duration = 2 })
 end
-    end,
-})
 refreshAllDropdowns()
 Tabs.SecondaryTab:Button({
     Title = "自动翻译",
