@@ -10,9 +10,9 @@ local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 
-local autoDropEnabled = false
-local anySellEnabled = false
-local anySellCharConn = nil
+local autoDiveAfterCollectEnabled = false
+local autoDiveOnTargetEnabled = false
+local autoDiveOnTargetConn = nil
 
 local TEvent = require(ReplicatedStorage.Shared.Core.TEvent)
 local InteractiveItems = workspace.GameSystem.InteractiveItem
@@ -1471,10 +1471,6 @@ local function teleportToElevator()
 			hrp.CFrame = CFrame.new(elevator.Position + Vector3.new(0, 2, 0))
 		end
 	end
-	if autoDropEnabled then
-		task.wait(0.3)
-		dropAllItems()
-	end
 end
 
 
@@ -1927,10 +1923,6 @@ local function returnToElevatorAndDive()
 			teleportToElevator()
 		end
 	end
-	if autoDropEnabled then
-		task.wait(0.3)
-		dropAllItems()
-	end
 	task.wait(0.5)
 	for _ = 1, 3 do
 		pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
@@ -1947,67 +1939,27 @@ local function interactWholeMapOnce()
 	end
 end
 
-local function pressG()
-	pcall(function()
-		if keypress and keyrelease then
-			keypress(0x47)
-			task.wait(0.05)
-			keyrelease(0x47)
-		else
-			local VirtualInputManager = game:GetService("VirtualInputManager")
-			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
-			task.wait(0.05)
-			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
-		end
-	end)
-end
-
-local function dropAllItems()
-	for i = 1, 15 do
-		pressG()
-		task.wait(0.1)
-	end
-end
-
-local function isInElevatorZone(pos)
-	return pos.X >= -323.1 and pos.X <= -297.2 and pos.Z >= 396.9 and pos.Z <= 413.8
-end
-
-local function setAnySell(state)
-	anySellEnabled = state
-	if state then
-		pcall(function()
-			if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-				TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-			end
-		end)
-		if anySellCharConn then anySellCharConn:Disconnect() end
-		anySellCharConn = LocalPlayer.CharacterAdded:Connect(function()
-			task.wait(0.5)
-			if anySellEnabled then
-				pcall(function()
-					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-					end
-				end)
-			end
-		end)
-		task.spawn(function()
-			while anySellEnabled do
-				task.wait(3)
-				if not anySellEnabled then break end
-				pcall(function()
-					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-					end
-				end)
-			end
-		end)
-	else
-		if anySellCharConn then
-			anySellCharConn:Disconnect()
-			anySellCharConn = nil
-		end
+local function CheckCashAndNextFloor()
+	local plr = Players.LocalPlayer
+	local PlayerGui = plr:FindFirstChild("PlayerGui")
+	if not PlayerGui then return end
+	local Main = PlayerGui:FindFirstChild("Main")
+	if not Main then return end
+	local HomePage = Main:FindFirstChild("HomePage")
+	if not HomePage then return end
+	local Goal = HomePage:FindFirstChild("Goal")
+	if not Goal then return end
+	local GoalProgressBar = Goal:FindFirstChild("GoalProgressBar")
+	if not GoalProgressBar then return end
+	local GoalText = GoalProgressBar:FindFirstChild("GoalText")
+	if not GoalText then return end
+	local CashText = GoalText:FindFirstChild("Cash")
+	local GoalNumText = GoalText:FindFirstChild("Goal")
+	if not CashText or not GoalNumText then return end
+	local currentCash = tonumber(CashText.Text:match("%d+")) or 0
+	local goalNum = tonumber(GoalNumText.Text:match("/(%d+)")) or 0
+	if currentCash >= goalNum then
+		pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
 	end
 end
 
@@ -2021,10 +1973,6 @@ local function setAutoCollect(state)
 		restoreCamera()
 	end
 	if state then
-		setAnySell(true)
-		for _, item in pairs(InteractiveItems:GetChildren()) do
-			remoteInteractItem(item)
-		end
 		autoCollectThread = task.spawn(function()
 			local fails = {}
 			local roundDone = false
@@ -2038,9 +1986,8 @@ local function setAutoCollect(state)
 				end
 				local targets = {}
 				for _, item in pairs(WorldLoots:GetChildren()) do
-					local part = item:FindFirstChildWhichIsA("BasePart", true)
-					if part and isInElevatorZone(part.Position) then continue end
 					if (item:IsA("Model") or item:IsA("Tool")) and item:FindFirstChild("LootUI", true) and not (fails[item] and fails[item] >= 3) then
+						local part = item:FindFirstChildWhichIsA("BasePart", true)
 						if part then
 							table.insert(targets, { item = item, part = part, dist = (part.Position - hrp.Position).Magnitude })
 						end
@@ -2125,8 +2072,45 @@ MainLeft:AddToggle("Freeze",{ Text="冻结怪物", Default=false, Callback=funct
 	toggleFreeze(v) Notify("冻结怪物: "..(v and "开启" or "关闭"))
 end})
 MainLeft:AddToggle("AnySell",{ Text="随处出售", Default=false, Callback=function(v)
-	setAnySell(v)
-	Notify("随处出售: "..(v and "开启" or "关闭"))
+	anySellEnabled = v
+	if v then
+		pcall(function()
+			if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+				TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+			end
+		end)
+		
+		if anySellCharConn then anySellCharConn:Disconnect() end
+		anySellCharConn = LocalPlayer.CharacterAdded:Connect(function()
+			task.wait(0.5)
+			if anySellEnabled then
+				pcall(function()
+					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+					end
+				end)
+			end
+		end)
+		
+		task.spawn(function()
+			while anySellEnabled do
+				task.wait(3)
+				if not anySellEnabled then break end
+				pcall(function()
+					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+					end
+				end)
+			end
+		end)
+		Notify("随处出售已开启（自动保持）")
+	else
+		if anySellCharConn then
+			anySellCharConn:Disconnect()
+			anySellCharConn = nil
+		end
+		Notify("随处出售已关闭")
+	end
 end})
 MainLeft:AddToggle("Invincible",{ Text="无敌", Default=false, Callback=function(v)
 	invincibleEnabled = v
@@ -2175,9 +2159,27 @@ end, DoubleClick=false })
 MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
 	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
 end})
-MainRight:AddToggle("AutoDrop",{ Text="回电梯自动放下物品", Default=false, Callback=function(v)
-	autoDropEnabled = v
-	Notify("回电梯自动放下物品: "..(v and "开启" or "关闭"))
+MainRight:AddToggle("AutoDiveAfterCollect",{ Text="收集完自动深入", Default=false, Callback=function(v)
+	autoDiveAfterCollectEnabled = v
+	Notify("收集完自动深入: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddToggle("AutoDiveOnTarget",{ Text="自动深入(达到目标定额之后直接深入)", Default=false, Callback=function(v)
+	autoDiveOnTargetEnabled = v
+	if v then
+		if autoDiveOnTargetConn then autoDiveOnTargetConn:Disconnect() end
+		autoDiveOnTargetConn = RunService.Heartbeat:Connect(function()
+			if autoDiveOnTargetEnabled then
+				pcall(CheckCashAndNextFloor)
+			end
+		end)
+		Notify("自动深入已开启")
+	else
+		if autoDiveOnTargetConn then
+			autoDiveOnTargetConn:Disconnect()
+			autoDiveOnTargetConn = nil
+		end
+		Notify("自动深入已关闭")
+	end
 end})
 MainRight:AddToggle("CollectThenDive",{ Text="收集完后回电梯并深入", Default=false, Callback=function(v)
 	collectThenDiveEnabled = v Notify("收集完后回电梯并深入: "..(v and "开启" or "关闭"))
