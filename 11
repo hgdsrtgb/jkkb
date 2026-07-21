@@ -1770,7 +1770,6 @@ end
 
 local Notify = function(msg) Library:Notify(msg,3) end
 
-local autoDropEnabled = false
 local autoInteractEnabled = false
 local autoInteractRange = 20
 local autoInteractThread = nil
@@ -1798,20 +1797,8 @@ local function pressE()
 			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 		end
 	end)
-local function pressG()
-	pcall(function()
-		if keypress and keyrelease then
-			keypress(0x47)
-			task.wait(0.05)
-			keyrelease(0x47)
-		else
-			local VirtualInputManager = game:GetService("VirtualInputManager")
-			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
-			task.wait(0.05)
-			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
-		end
-	end)
 end
+
 local function restoreCamera()
 	pcall(function()
 		local cam = Workspace.CurrentCamera
@@ -1932,13 +1919,6 @@ local function returnToElevatorAndDive()
 			teleportToElevator()
 		end
 	end
-	if autoDropEnabled then
-		task.wait(0.5)
-		for i = 1, 15 do
-			pressG()
-			task.wait(0.1)
-		end
-	end
 	task.wait(0.5)
 	for _ = 1, 3 do
 		pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
@@ -1955,6 +1935,53 @@ local function interactWholeMapOnce()
 	end
 end
 
+local autoDropEnabled = false
+local wasInElevator = false
+local hasDroppedThisVisit = false
+local openedContainers = {}
+
+local function isInElevator()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local elevator = findNearestElevator(hrp.Position)
+    if not elevator then return false end
+    return (hrp.Position - elevator.Position).Magnitude <= 12
+end
+
+local function pressG()
+    pcall(function()
+        if keypress and keyrelease then
+            keypress(0x47)
+            task.wait(0.05)
+            keyrelease(0x47)
+        else
+            local VirtualInputManager = game:GetService("VirtualInputManager")
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+        end
+    end)
+end
+
+local function dropAllItems()
+    for i = 1, 8 do
+        pressG()
+        task.wait(0.15)
+    end
+end
+
+local function openNewContainers()
+    for _, item in pairs(InteractiveItems:GetChildren()) do
+        if not openedContainers[item] then
+            remoteInteractItem(item)
+            openedContainers[item] = true
+        end
+    end
+    for item, _ in pairs(openedContainers) do
+        if not item.Parent then openedContainers[item] = nil end
+    end
+end
 local function setAutoCollect(state)
 	autoCollectEnabled = state
 	if autoCollectThread then
@@ -1963,9 +1990,17 @@ local function setAutoCollect(state)
 	end
 	if not state then
 		restoreCamera()
+		wasInElevator = false
+		hasDroppedThisVisit = false
+		openedContainers = {}
 	end
 	if state then
-		interactWholeMapOnce()
+		for _, item in pairs(InteractiveItems:GetChildren()) do
+			if not openedContainers[item] then
+				remoteInteractItem(item)
+				openedContainers[item] = true
+			end
+		end
 		autoCollectThread = task.spawn(function()
 			local fails = {}
 			local roundDone = false
@@ -1977,6 +2012,16 @@ local function setAutoCollect(state)
 					task.wait(0.5)
 					continue
 				end
+				local inElevator = isInElevator()
+				if inElevator and not wasInElevator and autoDropEnabled and not hasDroppedThisVisit then
+					dropAllItems()
+					hasDroppedThisVisit = true
+				end
+				if not inElevator then
+					hasDroppedThisVisit = false
+				end
+				wasInElevator = inElevator
+				openNewContainers()
 				local targets = {}
 				for _, item in pairs(WorldLoots:GetChildren()) do
 					if (item:IsA("Model") or item:IsA("Tool")) and item:FindFirstChild("LootUI", true) and not (fails[item] and fails[item] >= 3) then
@@ -2152,11 +2197,16 @@ end, DoubleClick=false })
 MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
 	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
 end})
+MainRight:AddToggle("AutoDrop",{ Text="回到电梯自动放下物品", Default=false, Callback=function(v)
+	autoDropEnabled = v
+	if not v then
+		wasInElevator = false
+		hasDroppedThisVisit = false
+	end
+	Notify("回到电梯自动放下物品: "..(v and "开启" or "关闭"))
+end})
 MainRight:AddToggle("CollectThenDive",{ Text="收集完后回电梯并深入", Default=false, Callback=function(v)
 	collectThenDiveEnabled = v Notify("收集完后回电梯并深入: "..(v and "开启" or "关闭"))
-end})
-MainRight:AddToggle("AutoDrop",{ Text="回电梯后放下所有物品", Default=false, Callback=function(v)
-	autoDropEnabled = v Notify("回电梯后放下所有物品: "..(v and "开启" or "关闭"))
 end})
 MainRight:AddToggle("AutoEgg",{ Text="自动收集鳄鱼蛋", Default=false, Callback=function(v)
 	setAutoCollectEgg(v) Notify("自动收集鳄鱼蛋: "..(v and "开启" or "关闭"))
