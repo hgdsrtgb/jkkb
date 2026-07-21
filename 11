@@ -11,9 +11,7 @@ local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 
 local autoDropEnabled = false
-local wasInElevator = false
-local hasDroppedThisVisit = false
-local openedContainers = {}
+local droppedItems = {}
 local anySellEnabled = false
 local anySellCharConn = nil
 
@@ -1474,6 +1472,12 @@ local function teleportToElevator()
 			hrp.CFrame = CFrame.new(elevator.Position + Vector3.new(0, 2, 0))
 		end
 	end
+	if autoDropEnabled then
+		task.wait(0.3)
+		dropAllItems()
+		task.wait(0.3)
+		markNearbyItemsAsDropped()
+	end
 end
 
 
@@ -1926,6 +1930,12 @@ local function returnToElevatorAndDive()
 			teleportToElevator()
 		end
 	end
+	if autoDropEnabled then
+		task.wait(0.3)
+		dropAllItems()
+		task.wait(0.3)
+		markNearbyItemsAsDropped()
+	end
 	task.wait(0.5)
 	for _ = 1, 3 do
 		pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
@@ -1942,15 +1952,6 @@ local function interactWholeMapOnce()
 	end
 end
 
-
-local function isInElevator()
-	local char = LocalPlayer.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return false end
-	local elevator = findNearestElevator(hrp.Position)
-	if not elevator then return false end
-	return (hrp.Position - elevator.Position).Magnitude <= 12
-end
 
 local function pressG()
 	pcall(function()
@@ -1974,15 +1975,15 @@ local function dropAllItems()
 	end
 end
 
-local function openNewContainers()
-	for _, item in pairs(InteractiveItems:GetChildren()) do
-		if not openedContainers[item] then
-			remoteInteractItem(item)
-			openedContainers[item] = true
+local function markNearbyItemsAsDropped()
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	for _, item in pairs(WorldLoots:GetChildren()) do
+		local part = item:FindFirstChildWhichIsA("BasePart", true)
+		if part and (part.Position - hrp.Position).Magnitude <= 15 then
+			droppedItems[item] = true
 		end
-	end
-	for item, _ in pairs(openedContainers) do
-		if not item.Parent then openedContainers[item] = nil end
 	end
 end
 
@@ -2031,18 +2032,10 @@ local function setAutoCollect(state)
 	end
 	if not state then
 		restoreCamera()
-		wasInElevator = false
-		hasDroppedThisVisit = false
-		openedContainers = {}
+		droppedItems = {}
 	end
 	if state then
 		setAnySell(true)
-		for _, item in pairs(InteractiveItems:GetChildren()) do
-			if not openedContainers[item] then
-				remoteInteractItem(item)
-				openedContainers[item] = true
-			end
-		end
 		autoCollectThread = task.spawn(function()
 			local fails = {}
 			local roundDone = false
@@ -2054,22 +2047,9 @@ local function setAutoCollect(state)
 					task.wait(0.5)
 					continue
 				end
-				local inElevator = isInElevator()
-				if inElevator then
-					if not wasInElevator and autoDropEnabled and not hasDroppedThisVisit then
-						dropAllItems()
-						hasDroppedThisVisit = true
-					end
-					wasInElevator = true
-					task.wait(0.5)
-					continue
-				else
-					wasInElevator = false
-					hasDroppedThisVisit = false
-				end
-				openNewContainers()
 				local targets = {}
 				for _, item in pairs(WorldLoots:GetChildren()) do
+					if droppedItems[item] then continue end
 					if (item:IsA("Model") or item:IsA("Tool")) and item:FindFirstChild("LootUI", true) and not (fails[item] and fails[item] >= 3) then
 						local part = item:FindFirstChildWhichIsA("BasePart", true)
 						if part then
@@ -2206,13 +2186,10 @@ end, DoubleClick=false })
 MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
 	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
 end})
-MainRight:AddToggle("AutoDrop",{ Text="回到电梯自动放下物品", Default=false, Callback=function(v)
+MainRight:AddToggle("AutoDrop",{ Text="回电梯自动放下物品", Default=false, Callback=function(v)
 	autoDropEnabled = v
-	if not v then
-		wasInElevator = false
-		hasDroppedThisVisit = false
-	end
-	Notify("回到电梯自动放下物品: "..(v and "开启" or "关闭"))
+	if not v then droppedItems = {} end
+	Notify("回电梯自动放下物品: "..(v and "开启" or "关闭"))
 end})
 MainRight:AddToggle("CollectThenDive",{ Text="收集完后回电梯并深入", Default=false, Callback=function(v)
 	collectThenDiveEnabled = v Notify("收集完后回电梯并深入: "..(v and "开启" or "关闭"))
