@@ -10,6 +10,9 @@ local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 
+local autoDropEnabled = false
+local anySellEnabled = false
+local anySellCharConn = nil
 local autoDiveAfterCollectEnabled = false
 local autoDiveOnTargetEnabled = false
 local autoDiveOnTargetConn = nil
@@ -1471,6 +1474,10 @@ local function teleportToElevator()
 			hrp.CFrame = CFrame.new(elevator.Position + Vector3.new(0, 2, 0))
 		end
 	end
+	if autoDropEnabled then
+		task.wait(0.3)
+		dropAllItems()
+	end
 end
 
 
@@ -1923,6 +1930,10 @@ local function returnToElevatorAndDive()
 			teleportToElevator()
 		end
 	end
+	if autoDropEnabled then
+		task.wait(0.3)
+		dropAllItems()
+	end
 	task.wait(0.5)
 	for _ = 1, 3 do
 		pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
@@ -1936,6 +1947,70 @@ local function interactWholeMapOnce()
 	end
 	for _, item in pairs(InteractiveItems:GetChildren()) do
 		remoteInteractItem(item)
+	end
+end
+
+local function pressG()
+	pcall(function()
+		if keypress and keyrelease then
+			keypress(0x47)
+			task.wait(0.05)
+			keyrelease(0x47)
+		else
+			local VirtualInputManager = game:GetService("VirtualInputManager")
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+			task.wait(0.05)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+		end
+	end)
+end
+
+local function dropAllItems()
+	for i = 1, 15 do
+		pressG()
+		task.wait(0.1)
+	end
+end
+
+local function isInElevatorZone(pos)
+	return pos.X >= -323.1 and pos.X <= -297.2 and pos.Z >= 396.9 and pos.Z <= 413.8
+end
+
+local function setAnySell(state)
+	anySellEnabled = state
+	if state then
+		pcall(function()
+			if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+				TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+			end
+		end)
+		if anySellCharConn then anySellCharConn:Disconnect() end
+		anySellCharConn = LocalPlayer.CharacterAdded:Connect(function()
+			task.wait(0.5)
+			if anySellEnabled then
+				pcall(function()
+					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+					end
+				end)
+			end
+		end)
+		task.spawn(function()
+			while anySellEnabled do
+				task.wait(3)
+				if not anySellEnabled then break end
+				pcall(function()
+					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+					end
+				end)
+			end
+		end)
+	else
+		if anySellCharConn then
+			anySellCharConn:Disconnect()
+			anySellCharConn = nil
+		end
 	end
 end
 
@@ -1973,6 +2048,10 @@ local function setAutoCollect(state)
 		restoreCamera()
 	end
 	if state then
+		setAnySell(true)
+		for _, item in pairs(InteractiveItems:GetChildren()) do
+			remoteInteractItem(item)
+		end
 		autoCollectThread = task.spawn(function()
 			local fails = {}
 			local roundDone = false
@@ -1986,8 +2065,9 @@ local function setAutoCollect(state)
 				end
 				local targets = {}
 				for _, item in pairs(WorldLoots:GetChildren()) do
+					local part = item:FindFirstChildWhichIsA("BasePart", true)
+					if part and isInElevatorZone(part.Position) then continue end
 					if (item:IsA("Model") or item:IsA("Tool")) and item:FindFirstChild("LootUI", true) and not (fails[item] and fails[item] >= 3) then
-						local part = item:FindFirstChildWhichIsA("BasePart", true)
 						if part then
 							table.insert(targets, { item = item, part = part, dist = (part.Position - hrp.Position).Magnitude })
 						end
@@ -2049,6 +2129,7 @@ local Window = Library:CreateWindow({
 local Tabs = {
 	Notification = Window:AddTab("通知","info"),
 	Main = Window:AddTab("主要功能","star"),
+	AutoCollect = Window:AddTab("自动收集","package"),
 	ESP = Window:AddTab("透视","eye"),
 	Settings = Window:AddTab("设置","settings"),
 }
@@ -2057,61 +2138,7 @@ local NotifyGroup = Tabs.Notification:AddLeftGroupbox("作者通知")
 NotifyGroup:AddLabel("恐拜大帝 持续更新此脚本")
 NotifyGroup:AddLabel("QQ：3999698324", true)
 
-local MainLeft = Tabs.Main:AddLeftGroupbox("核心功能")
-MainLeft:AddButton({ Text="召唤飞行脚本", Func=function()
-	local success, err = pcall(loadFlightScript)
-	if success then Notify("飞行脚本已加载") else Notify("飞行脚本加载失败: "..tostring(err)) end
-end, DoubleClick=false })
-MainLeft:AddToggle("AutoTranslate",{ Text="自动翻译界面", Default=false, Callback=function(v)
-	if v then startAutoTranslate() Notify("自动翻译已开启") else stopAutoTranslate() Notify("自动翻译已关闭") end
-end})
-MainLeft:AddToggle("MonsterTrap",{ Text="困杀怪物（喝茶模式）", Default=false, Callback=function(v)
-	if v then startMonsterTrap() Notify("困杀怪物已开启：出生点循环去世") else stopMonsterTrap() Notify("困杀怪物已关闭") end
-end})
-MainLeft:AddToggle("Freeze",{ Text="冻结怪物", Default=false, Callback=function(v)
-	toggleFreeze(v) Notify("冻结怪物: "..(v and "开启" or "关闭"))
-end})
-MainLeft:AddToggle("AnySell",{ Text="随处出售", Default=false, Callback=function(v)
-	anySellEnabled = v
-	if v then
-		pcall(function()
-			if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-				TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-			end
-		end)
-		
-		if anySellCharConn then anySellCharConn:Disconnect() end
-		anySellCharConn = LocalPlayer.CharacterAdded:Connect(function()
-			task.wait(0.5)
-			if anySellEnabled then
-				pcall(function()
-					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-					end
-				end)
-			end
-		end)
-		
-		task.spawn(function()
-			while anySellEnabled do
-				task.wait(3)
-				if not anySellEnabled then break end
-				pcall(function()
-					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
-					end
-				end)
-			end
-		end)
-		Notify("随处出售已开启（自动保持）")
-	else
-		if anySellCharConn then
-			anySellCharConn:Disconnect()
-			anySellCharConn = nil
-		end
-		Notify("随处出售已关闭")
-	end
-end})
+local MainLeft = Tabs.Main:AddLeftGroupbox("生存辅助")
 MainLeft:AddToggle("Invincible",{ Text="无敌", Default=false, Callback=function(v)
 	invincibleEnabled = v
 	if v then
@@ -2127,12 +2154,38 @@ MainLeft:AddToggle("Invincible",{ Text="无敌", Default=false, Callback=functio
 		Notify("无敌已关闭")
 	end
 end})
-MainLeft:AddButton({ Text="一键开启所有容器", Func=function()
-	ForceOpenAllContainersOnce() Notify("已尝试开启所有容器")
+MainLeft:AddToggle("InfiniteStamina",{ Text="无限体力", Default=false, Callback=function(v)
+	setInfiniteStamina(v) Notify("无限体力: "..(v and "开启" or "关闭"))
+end})
+MainLeft:AddSlider("WalkSpeed",{ Text="移动速度 (防回拉)", Default=16, Min=16, Max=100, Rounding=0, Suffix=" studs", Callback=function(v)
+	desiredWalkSpeed = v
+	local char = LocalPlayer.Character
+	if char then local hum = char:FindFirstChild("Humanoid") if hum then hum.WalkSpeed = v end end
+	Notify("移动速度已设为 "..v)
+end})
+MainLeft:AddToggle("NoClip",{ Text="穿墙", Default=false, Callback=function(v) setNoClip(v) end})
+
+MainLeft:AddToggle("NightVision",{ Text="夜视", Default=false, Callback=function(v)
+	if v then enableNightVision() Notify("夜视已开启") else disableNightVision() Notify("夜视已关闭") end
+end})
+
+local MainLeft = Tabs.Main:AddLeftGroupbox("战斗控制")
+MainLeft:AddToggle("MonsterTrap",{ Text="困杀怪物（喝茶模式）", Default=false, Callback=function(v)
+	if v then startMonsterTrap() Notify("困杀怪物已开启：出生点循环去世") else stopMonsterTrap() Notify("困杀怪物已关闭") end
+end})
+MainLeft:AddToggle("Freeze",{ Text="冻结怪物", Default=false, Callback=function(v)
+	toggleFreeze(v) Notify("冻结怪物: "..(v and "开启" or "关闭"))
+end})
+
+local MainLeft = Tabs.Main:AddLeftGroupbox("移动传送")
+MainLeft:AddButton({ Text="召唤飞行脚本", Func=function()
+	local success, err = pcall(loadFlightScript)
+	if success then Notify("飞行脚本已加载") else Notify("飞行脚本加载失败: "..tostring(err)) end
 end, DoubleClick=false })
-MainLeft:AddButton({ Text="物资聚集到电梯", Func=function()
-	gatherLootToElevator() Notify("物资已聚集到电梯")
-end, DoubleClick=false })
+MainLeft:AddToggle("JumpToggle",{ Text="显示跳跃按钮", Default=false, Callback=function(v)
+	jumpEnabled = v
+	if v then if not jumpFloatGui then createJumpFloat() end Notify("跳跃按钮已显示") else destroyJumpFloat() Notify("跳跃按钮已隐藏") end
+end})
 MainLeft:AddButton({ Text="一键传送回电梯", Func=function()
 	teleportToElevator() Notify("已传送回电梯")
 end, DoubleClick=false })
@@ -2140,30 +2193,72 @@ MainLeft:AddButton({ Text="传送到最近物资", Func=function()
 	teleportToNearestLoot() Notify("已传送至最近物资")
 end, DoubleClick=false })
 
-local MainRight = Tabs.Main:AddRightGroupbox("辅助与传送")
-MainRight:AddButton({ Text="传送到最近玩家", Func=function()
+MainLeft:AddButton({ Text="传送到最近玩家", Func=function()
 	teleportToNearestPlayer() Notify("已传送至最近玩家")
+end, DoubleClick=false })
+MainLeft:AddButton({ Text="物资聚集到电梯", Func=function()
+	gatherLootToElevator() Notify("物资已聚集到电梯")
+end, DoubleClick=false })
+
+local MainRight = Tabs.Main:AddRightGroupbox("出售与容器")
+MainRight:AddToggle("AnySell",{ Text="随处出售", Default=false, Callback=function(v)
+	setAnySell(v)
+	Notify("随处出售: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddButton({ Text="一键开启所有容器", Func=function()
+	ForceOpenAllContainersOnce() Notify("已尝试开启所有容器")
 end, DoubleClick=false })
 MainRight:AddToggle("RemoteOpen",{ Text="远程打开所有容器 (持续)", Default=false, Callback=function(v)
 	SetAutoOpen(v) Notify("远程打开容器: "..(v and "开启" or "关闭"))
 end})
+MainRight:AddButton({ Text="全图交互一次", Func=function()
+	interactWholeMapOnce() Notify("已对全图交互一次")
+end, DoubleClick=false })
 MainRight:AddToggle("AutoInteract",{ Text="自动交互", Default=false, Callback=function(v)
 	setAutoInteract(v) Notify("自动交互: "..(v and "开启" or "关闭"))
 end})
 MainRight:AddSlider("AutoInteractRange",{ Text="自动交互范围", Default=20, Min=5, Max=200, Rounding=0, Suffix=" studs", Callback=function(v)
 	autoInteractRange = v
 end})
-MainRight:AddButton({ Text="全图交互一次", Func=function()
-	interactWholeMapOnce() Notify("已对全图交互一次")
-end, DoubleClick=false })
-MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
+
+local MainRight = Tabs.Main:AddRightGroupbox("界面辅助")
+MainRight:AddToggle("AutoTranslate",{ Text="自动翻译界面", Default=false, Callback=function(v)
+	if v then startAutoTranslate() Notify("自动翻译已开启") else stopAutoTranslate() Notify("自动翻译已关闭") end
+end})
+MainRight:AddButton({ Text="显示现在时间", Func=function() showTimeWindow("now") end, DoubleClick=false })
+MainRight:AddButton({ Text="显示已用时长", Func=function() showTimeWindow("used") end, DoubleClick=false })
+MainRight:AddButton({ Text="我全都要", Func=function() showTimeWindow("both") end, DoubleClick=false })
+
+local MainRight = Tabs.Main:AddRightGroupbox("其他自动")
+MainRight:AddToggle("AutoEgg",{ Text="自动收集鳄鱼蛋", Default=false, Callback=function(v)
+	setAutoCollectEgg(v) Notify("自动收集鳄鱼蛋: "..(v and "开启" or "关闭"))
+end})
+
+local AutoLeft = Tabs.AutoCollect:AddLeftGroupbox("自动收集")
+AutoLeft:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
 	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
 end})
-MainRight:AddToggle("AutoDiveAfterCollect",{ Text="收集完自动深入", Default=false, Callback=function(v)
+AutoLeft:AddToggle("AutoDiveAfterCollect",{ Text="收集完自动深入", Default=false, Callback=function(v)
 	autoDiveAfterCollectEnabled = v
 	Notify("收集完自动深入: "..(v and "开启" or "关闭"))
 end})
-MainRight:AddToggle("AutoDiveOnTarget",{ Text="自动深入(达到目标定额之后直接深入)", Default=false, Callback=function(v)
+
+local AutoRight = Tabs.AutoCollect:AddRightGroupbox("自动放下")
+AutoRight:AddToggle("AutoDrop",{ Text="回电梯自动放下物品", Default=false, Callback=function(v)
+	autoDropEnabled = v
+	Notify("回电梯自动放下物品: "..(v and "开启" or "关闭"))
+end})
+
+local SettingsGroup = Tabs.Settings:AddLeftGroupbox("全局设置")
+SettingsGroup:AddButton({ Text="卸载脚本", Func=function() Library:Unload() end, DoubleClick=false })
+
+if ThemeManager then
+	ThemeManager:SetLibrary(Library)
+	ThemeManager:SetFolder("DeadlyDelivery")
+	ThemeManager:ApplyToTab(Tabs.Settings)
+end
+local DiveGroup = Tabs.Settings:AddLeftGroupbox("自动深入")
+DiveGroup:AddToggle("AutoDiveOnTarget",{ Text="自动深入(达到目标定额之后直接深入)", Default=false, Callback=function(v)
 	autoDiveOnTargetEnabled = v
 	if v then
 		if autoDiveOnTargetConn then autoDiveOnTargetConn:Disconnect() end
@@ -2181,70 +2276,7 @@ MainRight:AddToggle("AutoDiveOnTarget",{ Text="自动深入(达到目标定额�
 		Notify("自动深入已关闭")
 	end
 end})
-MainRight:AddToggle("CollectThenDive",{ Text="收集完后回电梯并深入", Default=false, Callback=function(v)
-	collectThenDiveEnabled = v Notify("收集完后回电梯并深入: "..(v and "开启" or "关闭"))
-end})
-MainRight:AddToggle("AutoEgg",{ Text="自动收集鳄鱼蛋", Default=false, Callback=function(v)
-	setAutoCollectEgg(v) Notify("自动收集鳄鱼蛋: "..(v and "开启" or "关闭"))
-end})
-MainRight:AddToggle("InfiniteStamina",{ Text="无限体力", Default=false, Callback=function(v)
-	setInfiniteStamina(v) Notify("无限体力: "..(v and "开启" or "关闭"))
-end})
-MainRight:AddSlider("WalkSpeed",{ Text="移动速度 (防回拉)", Default=16, Min=16, Max=100, Rounding=0, Suffix=" studs", Callback=function(v)
-	desiredWalkSpeed = v
-	local char = LocalPlayer.Character
-	if char then local hum = char:FindFirstChild("Humanoid") if hum then hum.WalkSpeed = v end end
-	Notify("移动速度已设为 "..v)
-end})
-MainRight:AddButton({ Text="显示现在时间", Func=function() showTimeWindow("now") end, DoubleClick=false })
-MainRight:AddButton({ Text="显示已用时长", Func=function() showTimeWindow("used") end, DoubleClick=false })
-MainRight:AddButton({ Text="我全都要", Func=function() showTimeWindow("both") end, DoubleClick=false })
-MainRight:AddToggle("JumpToggle",{ Text="显示跳跃按钮", Default=false, Callback=function(v)
-	jumpEnabled = v
-	if v then if not jumpFloatGui then createJumpFloat() end Notify("跳跃按钮已显示") else destroyJumpFloat() Notify("跳跃按钮已隐藏") end
-end})
-MainRight:AddToggle("NightVision",{ Text="夜视", Default=false, Callback=function(v)
-	if v then enableNightVision() Notify("夜视已开启") else disableNightVision() Notify("夜视已关闭") end
-end})
-MainRight:AddToggle("NoClip",{ Text="穿墙", Default=false, Callback=function(v) setNoClip(v) end})
 
-local ESPGroup = Tabs.ESP:AddLeftGroupbox("透视设置")
-ESPGroup:AddToggle("ItemESP",{ Text="透视物资 (价格变色)", Default=false, Callback=function(v)
-	setItemEsp(v)
-	if v then Notify("物资透视已开启") else Notify("物资透视已关闭") end
-end})
-ESPGroup:AddToggle("ContainerESP",{ Text="透视容器 (黄色)", Default=false, Callback=function(v)
-	setContainerEsp(v)
-	if v then Notify("容器透视已开启") else Notify("容器透视已关闭") end
-end})
-ESPGroup:AddToggle("MonsterESP",{ Text="透视怪物 (红色)", Default=false, Callback=function(v)
-	setMonsterEsp(v)
-	if v then Notify("怪物透视已开启") else Notify("怪物透视已关闭") end
-end})
-ESPGroup:AddToggle("NPCESP",{ Text="透视NPC (绿色)", Default=false, Callback=function(v)
-	setNpcEsp(v)
-	if v then Notify("NPC透视已开启") else Notify("NPC透视已关闭") end
-end})
-ESPGroup:AddToggle("TeammateESP",{ Text="透视队友 (白色)", Default=false, Callback=function(v)
-	teammateESPEnabled = v
-	if v then drawTeammateESP() Notify("队友透视已开启") else clearTeammateESP() Notify("队友透视已关闭") end
-end})
-ESPGroup:AddToggle("ElevatorESP",{ Text="透视电梯 (绿色)", Default=false, Callback=function(v)
-	elevatorESPEnabled = v
-	if v then drawElevatorESP() Notify("电梯透视已开启") else clearElevatorESP() Notify("电梯透视已关闭") end
-end})
-ESPGroup:AddSlider("MinPrice",{ Text="物资最低价格过滤", Default=0, Min=0, Max=5000, Rounding=1, Suffix="$", Callback=function(v)
-	itemConfig.MinPrice = v
-end})
-
-local SettingsGroup = Tabs.Settings:AddLeftGroupbox("全局设置")
-SettingsGroup:AddButton({ Text="卸载脚本", Func=function() Library:Unload() end, DoubleClick=false })
-
-if ThemeManager then
-	ThemeManager:SetLibrary(Library)
-	ThemeManager:SetFolder("DeadlyDelivery")
-	ThemeManager:ApplyToTab(Tabs.Settings)
-end
 if SaveManager then
 	SaveManager:SetLibrary(Library)
 	SaveManager:IgnoreThemeSettings()
