@@ -56,6 +56,8 @@ NoticeGroup:AddLabel("创作者：恐拜大帝")
 local CombatEnabled = false
 local targetCount = 1
 local WalkSpeedValue = 16
+local killRange = 20
+local killDelay = 0.3
 
 local RandomFollowEnabled = false
 local currentTarget = nil
@@ -122,6 +124,28 @@ MainGroup:AddToggle("KillAura", {
     end,
 })
 
+MainGroup:AddSlider("KillRange", {
+    Text = "杀戮距离",
+    Default = 20,
+    Min = 5,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        killRange = Value
+    end,
+})
+
+MainGroup:AddSlider("KillDelay", {
+    Text = "杀戮触发速度",
+    Default = 0.3,
+    Min = 0.1,
+    Max = 2,
+    Rounding = 1,
+    Callback = function(Value)
+        killDelay = Value
+    end,
+})
+
 MainGroup:AddToggle("RandomFollow", {
     Text = "传送全部人",
     Default = false,
@@ -132,20 +156,6 @@ MainGroup:AddToggle("RandomFollow", {
         end
     end,
 })
-
-MainGroup:AddButton("删除教学楼大门", function()
-    local school = workspace:FindFirstChild("\229\173\166\230\160\161")
-    local building = school and school:FindFirstChild("\230\149\153\229\173\166\230\165\188")
-    local door = building and building:FindFirstChild("\230\149\153\229\173\166\230\165\188\229\164\167\233\151\168")
-    if door then door:Destroy() end
-end)
-
-MainGroup:AddButton("删除二号小门", function()
-    local school = workspace:FindFirstChild("\229\173\166\230\160\161")
-    local exitGate = school and school:FindFirstChild("\229\135\186\229\133\165\229\143\163\229\164\167\233\151\168")
-    local smallGate = exitGate and exitGate:FindFirstChild("\228\186\140\229\143\183\229\176\143\233\151\168")
-    if smallGate then smallGate:Destroy() end
-end)
 
 local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理")
 UnloadGroup:AddButton("卸载脚本", function()
@@ -167,7 +177,7 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(0.3)
+        task.wait(killDelay)
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum and hum.WalkSpeed ~= WalkSpeedValue then
@@ -186,7 +196,12 @@ task.spawn(function()
                 end
             end
 
-            local targets = getNearestPlayers(targetCount)
+            local targets = {}
+            for _, t in ipairs(getNearestPlayers(10)) do
+                if t.dist <= killRange and #targets < targetCount then
+                    table.insert(targets, t)
+                end
+            end
             local nilParts = getAllNilInstances("Part", "Part")
             if #targets > 0 then
                 local character = LocalPlayer.Character
