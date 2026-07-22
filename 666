@@ -317,7 +317,7 @@ local function startAntiFling()
         if now - lastAntiFlingCheck >= 0.5 then
             lastAntiFlingCheck = now
             for _, p in ipairs(Players:GetPlayers()) do
-                if p.Character then
+                if p ~= LocalPlayer and p.Character then
                     pcall(function()
                         for _, part in ipairs(p.Character:GetDescendants()) do
                             if part:IsA("BasePart") and part.CanCollide then
@@ -824,8 +824,10 @@ local function powerfulFling(targetPlayer)
     Workspace.FallenPartsDestroyHeight = getgenv().FPDH
     WindUI:Notify({ Title = "甩飞完成", Content = "已完成对 " .. targetPlayer.Name .. " 的甩飞", Duration = 3 })
 end
+local speedAntiPullValue = 16
 local function startSpeedAntiPull(speed)
-    if speedAntiPull then speedAntiPull:Disconnect() end
+    speedAntiPullValue = speed
+    if speedAntiPull then return end
     local lastCheck = 0
     speedAntiPull = RunService.Heartbeat:Connect(function()
         local now = tick()
@@ -833,7 +835,7 @@ local function startSpeedAntiPull(speed)
         lastCheck = now
         local hum = getHumanoid()
         if hum then
-            if hum.WalkSpeed ~= speed then hum.WalkSpeed = speed end
+            if hum.WalkSpeed ~= speedAntiPullValue then hum.WalkSpeed = speedAntiPullValue end
         end
     end)
 end
@@ -1124,44 +1126,6 @@ local function stopHarass()
     if UIButtons.harassBtn then UIButtons.harassBtn.Text = "操人" end
     if UIButtons.harassNearestBtn then UIButtons.harassNearestBtn.Text = "操最近的人" end
     WindUI:Notify({ Title = "操人", Content = "已停止操人", Duration = 2 })
-end
-local smoothFollowConnection = nil
-local smoothFollowTarget = nil
-local function stopSmoothFollow()
-    if smoothFollowConnection then smoothFollowConnection:Disconnect() end
-    smoothFollowConnection = nil
-    smoothFollowTarget = nil
-    smoothFollowLastTargetPos = nil
-    if UIButtons.smoothFollowSelectBtn then UIButtons.smoothFollowSelectBtn.Text = "平滑跟随选定人" end
-    if UIButtons.smoothFollowNearestBtn then UIButtons.smoothFollowNearestBtn.Text = "平滑跟随最近的人" end
-    WindUI:Notify({ Title = "平滑跟随", Content = "已停止平滑跟随", Duration = 3 })
-end
-
-
-local smoothFollowLastTargetPos = nil
-
-local function startSmoothFollow(targetPlayer)
-    if smoothFollowConnection then smoothFollowConnection:Disconnect() end
-    smoothFollowTarget = targetPlayer
-    smoothFollowLastTargetPos = nil
-    smoothFollowConnection = RunService.Heartbeat:Connect(function()
-        if not smoothFollowTarget or not smoothFollowTarget:IsDescendantOf(Players) or not smoothFollowTarget.Character or not smoothFollowTarget.Character:FindFirstChild("HumanoidRootPart") then
-            stopSmoothFollow()
-            WindUI:Notify({ Title = "平滑跟随", Content = "目标已消失，跟随停止", Duration = 3 })
-            return
-        end
-        local myChar = LocalPlayer.Character
-        if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
-        local myRoot = myChar.HumanoidRootPart
-        local targetRoot = smoothFollowTarget.Character.HumanoidRootPart
-        local targetPos = targetRoot.Position
-        if smoothFollowLastTargetPos and (targetPos - smoothFollowLastTargetPos).Magnitude < 0.1 then
-            return
-        end
-        smoothFollowLastTargetPos = targetPos
-        myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, smoothFollowDistance)
-    end)
-    WindUI:Notify({ Title = "平滑跟随", Content = "开始平滑跟随 " .. targetPlayer.Name, Duration = 3 })
 end
 local function createJumpFloat()
     if jumpFloatGui then jumpFloatGui:Destroy() end
@@ -1626,53 +1590,6 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "无限跳", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-local eyeEnabled = false
-local eyeConns = {}
-local function eyeApplyPart(d)
-    if d:IsA("BasePart") then
-        d.LocalTransparencyModifier = 1
-    end
-end
-local function eyeWatch(char)
-    for _, d in ipairs(char:GetDescendants()) do
-        eyeApplyPart(d)
-    end
-    table.insert(eyeConns, char.DescendantAdded:Connect(eyeApplyPart))
-end
-local function eyeClear()
-    for _, c in ipairs(eyeConns) do
-        c:Disconnect()
-    end
-    eyeConns = {}
-    local char = LocalPlayer.Character
-    if char then
-        for _, d in ipairs(char:GetDescendants()) do
-            if d:IsA("BasePart") then
-                d.LocalTransparencyModifier = 0
-            end
-        end
-    end
-end
-LocalPlayer.CharacterAdded:Connect(function(char)
-    if eyeEnabled then
-        task.wait(0.5)
-        eyeWatch(char)
-    end
-end)
-Tabs.MiscTab:Toggle({
-    Title = "隐身（别人看不到）",
-    Value = false,
-    Callback = function(state)
-        eyeEnabled = state
-        if state then
-            local char = LocalPlayer.Character
-            if char then eyeWatch(char) end
-        else
-            eyeClear()
-        end
-        WindUI:Notify({ Title = "隐身", Content = state and "已开启，其他人将无法看到你的影像" or "已关闭", Duration = 3 })
-    end
-})
 Tabs.MainTab:Button({
     Title = "建造方块",
     Callback = function()
@@ -2090,17 +2007,24 @@ local ImpersonateDropdown = Tabs.MainTab:Dropdown({
         selectedImpersonateName = value
     end,
 })
+local refreshScheduled = false
 local function refreshAllDropdowns()
-    local names = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(names, p.Name)
+    if refreshScheduled then return end
+    refreshScheduled = true
+    task.delay(0.5, function()
+        refreshScheduled = false
+        local names = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                table.insert(names, p.Name)
+            end
         end
-    end
-    if flingDropdown then flingDropdown:Refresh(names) end
-    if followDropdown then followDropdown:Refresh(names) end
-    if harassDropdown then harassDropdown:Refresh(names) end
-    if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
+        if flingDropdown then flingDropdown:Refresh(names) end
+        if followDropdown then followDropdown:Refresh(names) end
+        if harassDropdown then harassDropdown:Refresh(names) end
+        if tpDropdown then tpDropdown:Refresh(names) end
+        if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
+    end)
 end
 Players.PlayerAdded:Connect(refreshAllDropdowns)
 Players.PlayerRemoving:Connect(refreshAllDropdowns)
@@ -2159,6 +2083,31 @@ Tabs.SecondaryTab:Button({
             WindUI:Notify({ Title = "传送", Content = "已传送到 " .. nearest.Name, Duration = 3 })
         else
             WindUI:Notify({ Title = "传送", Content = "未找到其他玩家", Duration = 3 })
+        end
+    end
+})
+local currentTpTarget = nil
+tpDropdown = Tabs.SecondaryTab:Dropdown({
+    Title = "选定传送玩家",
+    Values = {},
+    Callback = function(name)
+        if currentTpTarget and currentTpTarget.Name == name then return end
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name == name and p ~= LocalPlayer then
+                currentTpTarget = p
+                break
+            end
+        end
+    end
+})
+Tabs.SecondaryTab:Button({
+    Title = "确定传送到此人",
+    Callback = function()
+        if currentTpTarget and currentTpTarget.Parent and currentTpTarget.Character and currentTpTarget.Character:FindFirstChild("HumanoidRootPart") then
+            teleportToPlayer(currentTpTarget)
+            WindUI:Notify({ Title = "传送", Content = "已传送到 " .. currentTpTarget.Name, Duration = 3 })
+        else
+            WindUI:Notify({ Title = "传送", Content = "请先选择玩家", Duration = 3 })
         end
     end
 })
@@ -2236,66 +2185,6 @@ Tabs.SecondaryTab:Button({
         loadstring(game:HttpGet("https://pastebin.com/raw/zXk4Rq2r"))()
     end
 })
-local currentSmoothTarget = nil
-smoothDropdown = Tabs.SecondaryTab:Dropdown({
-    Title = "选定平滑跟随玩家",
-    Values = {},
-    Callback = function(name)
-        if currentSmoothTarget and currentSmoothTarget.Name == name then return end
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p.Name == name and p ~= LocalPlayer then
-                currentSmoothTarget = p
-                break
-            end
-        end
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "确定执行平滑跟随",
-    Callback = function()
-        if currentSmoothTarget and currentSmoothTarget.Parent then
-            WindUI:Notify({ Title = "平滑跟随", Content = "已选定 " .. currentSmoothTarget.Name .. "，开始平滑跟随", Duration = 3 })
-            startSmoothFollow(currentSmoothTarget)
-        else
-            WindUI:Notify({ Title = "平滑跟随", Content = "请先选择玩家", Duration = 3 })
-        end
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "停止平滑跟随",
-    Callback = function()
-        stopSmoothFollow()
-        currentSmoothTarget = nil
-    end
-})
-
-Tabs.SecondaryTab:Slider({
-    Title = "平滑跟随距离 (当前: 3)",
-    Value = {
-        Min = 1,
-        Max = 50,
-        Default = 3,
-    },
-    Callback = function(value)
-        smoothFollowDistance = value
-        WindUI:Notify({ Title = "平滑跟随距离", Content = "已设置为：" .. value, Duration = 2 })
-    end
-})
-Tabs.SecondaryTab:Button({
-    Title = "平滑跟随最近的人",
-    Callback = function()
-        if smoothFollowConnection then
-            stopSmoothFollow()
-        else
-            local nearest = getNearestPlayer()
-            if nearest then
-                startSmoothFollow(nearest)
-            else
-                WindUI:Notify({ Title = "平滑跟随", Content = "未找到其他玩家", Duration = 3 })
-            end
-        end
-    end
-})
 Tabs.SecondaryTab:Button({
     Title = "撸管",
     Callback = function()
@@ -2324,6 +2213,7 @@ harassDropdown = Tabs.SecondaryTab:Dropdown({
         end
     end
 })
+refreshAllDropdowns()
 Tabs.SecondaryTab:Button({
     Title = "确定执行操人",
     Callback = function()
