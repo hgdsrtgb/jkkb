@@ -3,10 +3,10 @@ local Options = Library.Options local Toggles = Library.Toggles local Players = 
 
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
 
 local espEnabled = false
 local espData = {}
-local knownFruits = {}
 local weightSources = {}
 local scanFruits
 local clearAll
@@ -63,6 +63,17 @@ local function isEnglish(text)
     return (englishCount / totalCount) > 0.5
 end
 
+local function toggleValue(key, default)
+    local ok, v = pcall(function() return Toggles[key].Value end)
+    if ok and v ~= nil then return v end
+    return default
+end
+
+local function nameOn() return toggleValue("PlantESP_Name", true) end
+local function weightOn() return toggleValue("PlantESP_Weight", true) end
+local function distOn() return toggleValue("PlantESP_Dist", false) end
+local function fillOn() return toggleValue("PlantESP_Fill", false) end
+
 local function getMinKG()
     local ok, v = pcall(function() return Options.PlantESP_MinKG.Value end)
     if ok and type(v) == "number" then return v end
@@ -75,13 +86,72 @@ local function passFilter(fruit)
     return w >= getMinKG()
 end
 
+local function composeLabel(data)
+    local parts = {}
+    if nameOn() and data.name then
+        table.insert(parts, data.name)
+    end
+    if weightOn() and data.weight then
+        table.insert(parts, string.format("%.2fkg", data.weight))
+    end
+    if distOn() and data.dist then
+        table.insert(parts, string.format("%.0f米", data.dist))
+    end
+    return table.concat(parts, "\n")
+end
+
+local function refreshLabel(data)
+    if not data.label or not data.label.Parent then return end
+    local text = composeLabel(data)
+    if text ~= data.lastText then
+        data.lastText = text
+        data.label.Text = text
+    end
+    if data.billboard and data.billboard.Parent then
+        data.billboard.Enabled = (text ~= "")
+    end
+end
+
+local function refreshESP()
+    if espEnabled then
+        clearAll()
+        scanFruits()
+    end
+end
+
+local filterPending = false
+local function scheduleFilterRefresh()
+    if filterPending then return end
+    filterPending = true
+    task.delay(0.4, function()
+        filterPending = false
+        refreshESP()
+    end)
+end
+
 local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息") NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本') NoticeGroup:AddLabel('创作者：恐拜大帝') local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理") UnloadGroup:AddButton("卸载脚本", function() Library:Unload() end)
 
 local PlantGroup = Tabs.Main:AddLeftGroupbox("植物透视")
 PlantGroup:AddToggle("PlantESP", {
     Text = "植物透视",
     Default = false,
-    Tooltip = "显示植物名字和千克数",
+    Tooltip = "轮廓透视总开关",
+})
+PlantGroup:AddToggle("PlantESP_Name", {
+    Text = "透视名字",
+    Default = true,
+})
+PlantGroup:AddToggle("PlantESP_Weight", {
+    Text = "透视重量",
+    Default = true,
+})
+PlantGroup:AddToggle("PlantESP_Dist", {
+    Text = "透视与自己的距离",
+    Default = false,
+})
+PlantGroup:AddToggle("PlantESP_Fill", {
+    Text = "透视内填充物",
+    Default = false,
 })
 PlantGroup:AddSlider("PlantESP_MinKG", {
     Text = "最低千克",
@@ -116,6 +186,7 @@ if Options.PlantESP_MinKG then
                 Options.PlantESP_MinKG_Input:SetValue(tostring(v))
             end
         end)
+        scheduleFilterRefresh()
     end)
 end
 if Toggles.PlantESP then
@@ -129,6 +200,30 @@ if Toggles.PlantESP then
             else
                 clearAll()
                 Library:Notify({ Title = "植物透视", Description = "已关闭", Time = 3, })
+            end
+        end)
+    end)
+end
+for _, key in ipairs({"PlantESP_Name", "PlantESP_Weight", "PlantESP_Dist"}) do
+    if Toggles[key] then
+        Toggles[key]:OnChanged(function()
+            pcall(function()
+                for fruit, data in pairs(espData) do
+                    refreshLabel(data)
+                end
+            end)
+        end)
+    end
+end
+if Toggles.PlantESP_Fill then
+    Toggles.PlantESP_Fill:OnChanged(function()
+        pcall(function()
+            local transparency = 1
+            if fillOn() then transparency = 0.65 end
+            for fruit, data in pairs(espData) do
+                if data.highlight and data.highlight.Parent then
+                    data.highlight.FillTransparency = transparency
+                end
             end
         end)
     end)
@@ -262,11 +357,16 @@ local function addESP(fruit)
         local hp = fruit:FindFirstChild("HarvestPart")
         if not hp then return end
         local name = getPlantName(fruit)
+        local weight = getWeight(fruit)
 
         local hl = Instance.new("Highlight")
         hl.FillColor = goldColor
         hl.OutlineColor = goldColor
-        hl.FillTransparency = 1
+        if fillOn() then
+            hl.FillTransparency = 0.65
+        else
+            hl.FillTransparency = 1
+        end
         hl.OutlineTransparency = 0
         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         hl.Adornee = fruit
@@ -274,7 +374,7 @@ local function addESP(fruit)
 
         local bb = Instance.new("BillboardGui")
         bb.Name = "PlantESP"
-        bb.Size = UDim2.new(0, 160, 0, 50)
+        bb.Size = UDim2.new(0, 160, 0, 60)
         bb.StudsOffset = Vector3.new(0, 3, 0)
         bb.AlwaysOnTop = true
         bb.Parent = hp
@@ -289,16 +389,14 @@ local function addESP(fruit)
         label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
         label.Parent = bb
 
-        espData[fruit] = {highlight = hl, billboard = bb, label = label, name = name, lastText = ""}
+        espData[fruit] = {highlight = hl, billboard = bb, label = label, name = name, weight = weight, dist = nil, lastText = ""}
+        refreshLabel(espData[fruit])
     end)
 end
 
 clearAll = function()
     for fruit, _ in pairs(espData) do
         removeESP(fruit)
-    end
-    for fruit, _ in pairs(knownFruits) do
-        knownFruits[fruit] = nil
     end
     for fruit, _ in pairs(weightSources) do
         weightSources[fruit] = nil
@@ -320,7 +418,6 @@ scanFruits = function()
                                 if fruitsFolder then
                                     for _, fruit in ipairs(fruitsFolder:GetChildren()) do
                                         if isFruit(fruit) then
-                                            knownFruits[fruit] = true
                                             count = count + 1
                                             if passFilter(fruit) then
                                                 addESP(fruit)
@@ -338,29 +435,9 @@ scanFruits = function()
     return count
 end
 
-Workspace.DescendantAdded:Connect(function(inst)
-    if espEnabled and inst:IsA("Model") and inst.Parent and inst.Parent.Name == "Fruits" then
-        task.defer(function()
-            pcall(function()
-                if espEnabled and inst.Parent and isFruit(inst) then
-                    knownFruits[inst] = true
-                end
-            end)
-        end)
-    end
-end)
-
-Workspace.DescendantRemoving:Connect(function(inst)
-    if knownFruits[inst] then
-        knownFruits[inst] = nil
-        weightSources[inst] = nil
-        removeESP(inst)
-    end
-end)
-
 task.spawn(function()
     while true do
-        if espEnabled then
+        if espEnabled and nameOn() then
             local target = nil
             for fruit, data in pairs(espData) do
                 if data.name and isEnglish(data.name) and translatedTexts[data.name] == nil then
@@ -375,6 +452,7 @@ task.spawn(function()
                     local translated = translateText(oldName)
                     if translated and translated ~= oldName and espData[target] and espData[target].name == oldName then
                         espData[target].name = translated
+                        refreshLabel(espData[target])
                     end
                 end
             end
@@ -385,40 +463,23 @@ end)
 
 task.spawn(function()
     while true do
-        if espEnabled then
+        if espEnabled and distOn() then
             pcall(function()
-                for fruit, _ in pairs(knownFruits) do
-                    pcall(function()
-                        if not fruit.Parent then
-                            knownFruits[fruit] = nil
-                            weightSources[fruit] = nil
-                            removeESP(fruit)
-                        elseif passFilter(fruit) then
-                            addESP(fruit)
-                            local data = espData[fruit]
-                            if data and data.label and data.label.Parent then
-                                if data.name == "未知植物" then
-                                    data.name = getPlantName(fruit)
-                                end
-                                local w = getWeight(fruit)
-                                local newText
-                                if w then
-                                    newText = data.name .. "\n" .. string.format("%.2fkg", w)
-                                else
-                                    newText = data.name
-                                end
-                                if newText ~= data.lastText then
-                                    data.lastText = newText
-                                    data.label.Text = newText
-                                end
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    for fruit, data in pairs(espData) do
+                        pcall(function()
+                            local hp = fruit:FindFirstChild("HarvestPart")
+                            if hp then
+                                data.dist = (root.Position - hp.Position).Magnitude
+                                refreshLabel(data)
                             end
-                        else
-                            removeESP(fruit)
-                        end
-                    end)
+                        end)
+                    end
                 end
             end)
         end
-        task.wait(1)
+        task.wait(0.5)
     end
 end)
