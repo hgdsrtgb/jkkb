@@ -4289,6 +4289,241 @@ end
 
 local Notify = function(msg) Library:Notify(msg,3) end
 
+local autoInteractEnabled = false
+local autoInteractRange = 20
+local autoInteractSpeed = 0.15
+local autoInteractThread = nil
+local autoCollectEnabled = false
+local autoCollectThread = nil
+local autoDiveAfterCollectEnabled = false
+
+local ElevatorDropoff = nil
+local PlayerLoots = nil
+pcall(function() ElevatorDropoff = Workspace.GameSystem.Loots.ElevatorCollect.SoundPlay end)
+pcall(function() PlayerLoots = Workspace.GameSystem.Loots.Player end)
+
+local function pressE()
+	pcall(function()
+		if keypress and keyrelease then
+			keypress(0x45)
+			task.wait(0.05)
+			keyrelease(0x45)
+		else
+			local VirtualInputManager = game:GetService("VirtualInputManager")
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+			task.wait(0.05)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+		end
+	end)
+end
+
+local function restoreCamera()
+	pcall(function()
+		local cam = Workspace.CurrentCamera
+		if cam then cam.CameraType = Enum.CameraType.Custom end
+	end)
+end
+
+local function switchToMobileMode()
+	pcall(function()
+		local VirtualInputManager = game:GetService("VirtualInputManager")
+		VirtualInputManager:SendTouchEvent(1, Enum.TouchState.Began, Vector2.new(100, 100))
+		task.wait(0.05)
+		VirtualInputManager:SendTouchEvent(1, Enum.TouchState.Ended, Vector2.new(100, 100))
+	end)
+end
+
+local function remoteInteractItem(item)
+	if (item:IsA("Model") or item:IsA("Tool")) and item:HasTag("Interactable") and item:GetAttribute("en") then
+		pcall(function()
+			TEvent.FireRemote("Interactable", item)
+			TEvent.FireBindable("Interactable", item)
+		end)
+	end
+end
+
+local function getLootsInRange(range)
+	local results = {}
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return results end
+	for _, item in pairs(WorldLoots:GetChildren()) do
+		if item:IsA("Model") or item:IsA("Tool") then
+			local part = item:FindFirstChildWhichIsA("BasePart", true)
+			if part and (part.Position - hrp.Position).Magnitude <= range then
+				table.insert(results, item)
+			end
+		end
+	end
+	return results
+end
+
+local function setAutoInteract(state)
+	autoInteractEnabled = state
+	if autoInteractThread then
+		task.cancel(autoInteractThread)
+		autoInteractThread = nil
+	end
+	if state then
+		autoInteractThread = task.spawn(function()
+			while autoInteractEnabled do
+				for _, item in ipairs(getLootsInRange(autoInteractRange)) do
+					remoteInteractItem(item)
+				end
+				local char = LocalPlayer.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					for _, item in pairs(InteractiveItems:GetChildren()) do
+						if item:IsA("Model") or item:IsA("Tool") then
+							local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
+							if part and (part.Position - hrp.Position).Magnitude <= autoInteractRange then
+								remoteInteractItem(item)
+							end
+						end
+					end
+				end
+				task.wait(autoInteractSpeed)
+			end
+		end)
+	end
+end
+
+local function setAnySell(state)
+	anySellEnabled = state
+	if state then
+		pcall(function()
+			if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+				TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+			end
+		end)
+		if anySellCharConn then anySellCharConn:Disconnect() end
+		anySellCharConn = LocalPlayer.CharacterAdded:Connect(function()
+			task.wait(0.5)
+			if anySellEnabled then
+				pcall(function()
+					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+					end
+				end)
+			end
+		end)
+		task.spawn(function()
+			while anySellEnabled do
+				task.wait(3)
+				if not anySellEnabled then break end
+				pcall(function()
+					if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+						TEvent.FireRemote("PlayerInElevator", true, LocalPlayer.Character.PrimaryPart.CFrame.Position, TEvent.UnixTimeMillis())
+					end
+				end)
+			end
+		end)
+	else
+		if anySellCharConn then
+			anySellCharConn:Disconnect()
+			anySellCharConn = nil
+		end
+	end
+end
+
+local function setAutoCollect(state)
+	autoCollectEnabled = state
+	if autoCollectThread then
+		task.cancel(autoCollectThread)
+		autoCollectThread = nil
+	end
+	if not state then
+		restoreCamera()
+		switchToMobileMode()
+	end
+	if state then
+		setAnySell(true)
+		for _, item in pairs(InteractiveItems:GetChildren()) do
+			remoteInteractItem(item)
+		end
+		autoCollectThread = task.spawn(function()
+			local fails = {}
+			local roundDone = false
+			local lastDiveTime = 0
+			while autoCollectEnabled do
+				local char = LocalPlayer.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if not hrp then
+					task.wait(0.5)
+					continue
+				end
+				local targets = {}
+				for _, item in pairs(WorldLoots:GetChildren()) do
+					local part = item:FindFirstChildWhichIsA("BasePart", true)
+					if (item:IsA("Model") or item:IsA("Tool")) and item:FindFirstChild("LootUI", true) and not (fails[item] and fails[item] >= 3) then
+						if part then
+							table.insert(targets, { item = item, part = part, dist = (part.Position - hrp.Position).Magnitude })
+						end
+					end
+				end
+				if #targets == 0 then
+					if not roundDone then
+						roundDone = true
+						restoreCamera()
+						Notify("本轮收集完成，等待新物资出现")
+					end
+					local char = LocalPlayer.Character
+					local hrp = char and char:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						hrp.CFrame = CFrame.new(-310.8, 323.8, 411.3)
+					end
+					if autoDiveAfterCollectEnabled then
+						local char2 = LocalPlayer.Character
+						local hrp2 = char2 and char2:FindFirstChild("HumanoidRootPart")
+						if hrp2 then
+							for _, item in pairs(WorldLoots:GetChildren()) do
+								local part = item:FindFirstChildWhichIsA("BasePart", true)
+								if part and (part.Position - hrp2.Position).Magnitude <= 10 then
+									remoteInteractItem(item)
+									pressE()
+								end
+							end
+							for _, item in pairs(InteractiveItems:GetChildren()) do
+								local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
+								if part and (part.Position - hrp2.Position).Magnitude <= 10 then
+									remoteInteractItem(item)
+									pressE()
+								end
+							end
+							task.wait(0.3)
+							pcall(function() TEvent.FireRemote("SubmitVote", "continue") end)
+							Notify("已自动深入")
+						end
+					end
+					task.wait(1)
+					continue
+				end
+				roundDone = false
+				table.sort(targets, function(a, b) return a.dist < b.dist end)
+				local target = targets[1]
+				hrp.CFrame = target.part.CFrame + Vector3.new(0, 2, 0)
+				local cam = Workspace.CurrentCamera
+				pcall(function() cam.CameraType = Enum.CameraType.Scriptable end)
+				local startTime = os.clock()
+				while os.clock() - startTime < 1.2 and autoCollectEnabled do
+					if not target.item.Parent or not target.item:FindFirstChild("LootUI", true) then break end
+					pcall(function()
+						cam.CFrame = CFrame.lookAt(hrp.Position + Vector3.new(0, 8, 0), hrp.Position)
+					end)
+					remoteInteractItem(target.item)
+					pressE()
+					task.wait(0.15)
+				end
+				if target.item.Parent and target.item:FindFirstChild("LootUI", true) then
+					fails[target.item] = (fails[target.item] or 0) + 1
+				end
+				task.wait(0.1)
+			end
+			autoCollectEnabled = false
+		end)
+	end
+end
+
 StarterGui:SetCore("SendNotification",{
 	Title = "亡命速递脚本",
 	Text = "恐拜大帝 持续更新\nQQ：3999698324",
@@ -4397,12 +4632,194 @@ MainLeft:AddButton({ Text="传送到最近物资", Func=function()
 	teleportToNearestLoot() Notify("已传送至最近物资")
 end, DoubleClick=false })
 
+local Services = {
+	RunService = game:GetService("RunService"),
+	Players = game:GetService("Players"),
+	Workspace = game:GetService("Workspace")
+}
+
+local PushMonsterToggle = false
+
+task.spawn(function()
+	while true do
+		if PushMonsterToggle then
+			pcall(function()
+				local character = Services.Players.LocalPlayer.Character
+				if not character then return end
+				local root = character:FindFirstChild("HumanoidRootPart")
+				if not root then return end
+				local monsters = Services.Workspace.GameSystem.Monsters
+				for _, monster in pairs(monsters:GetChildren()) do
+					if not monster:IsA("Model") then continue end
+					local monsterRoot = monster.PrimaryPart or monster:FindFirstChild("HumanoidRootPart", true) or monster:FindFirstChild("Checker", true) or monster:FindFirstChild("Hitbox", true) or monster:FindFirstChildOfClass("BasePart", true)
+					if monsterRoot then
+						local diff = monsterRoot.Position - root.Position
+						if diff.Magnitude < 20 then
+							local force = diff.Unit * 2000 + Vector3.new(0, 500, 0)
+							monsterRoot:ApplyImpulse(force)
+						end
+					end
+				end
+			end)
+		end
+		task.wait(0.1)
+	end
+end)
+
+local function PullAllItems()
+	local character = Services.Players.LocalPlayer.Character
+	if not character then return end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	local WorldLoots = Services.Workspace.GameSystem.Loots.World
+	for _, item in pairs(WorldLoots:GetChildren()) do
+		if not (item:IsA("Tool") or item:IsA("Model")) then continue end
+		local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
+		if part then
+			part.CFrame = CFrame.new(root.Position + Vector3.new(math.random(-5, 5), 2, math.random(-5, 5)))
+		end
+	end
+end
+
+local function KillAllMonsters()
+	for _, monster in pairs(Services.Workspace.GameSystem.Monsters:GetChildren()) do
+		pcall(function()
+			if monster:IsA("Model") then
+				local hum = monster:FindFirstChildOfClass("Humanoid")
+				if hum then
+					hum.Health = 0
+				end
+			end
+		end)
+	end
+end
+
+local function TeleportMonstersToElevator()
+	local elevatorModel = Services.Workspace:FindFirstChild("电梯")
+	if not elevatorModel then return end
+	local targetPart = elevatorModel:FindFirstChildWhichIsA("BasePart")
+	if not targetPart then return end
+	for _, monster in pairs(Services.Workspace.GameSystem.Monsters:GetChildren()) do
+		pcall(function()
+			local root = monster.PrimaryPart or monster:FindFirstChild("HumanoidRootPart", true) or monster:FindFirstChild("Checker", true) or monster:FindFirstChild("Hitbox", true) or monster:FindFirstChildOfClass("BasePart", true)
+			if root then
+				root.CFrame = CFrame.new(targetPart.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3)))
+			end
+		end)
+	end
+end
+
+_G.AntiAFK = false
+
+task.spawn(function()
+	while true do
+		if _G.AntiAFK then
+			pcall(function()
+				local vim = game:GetService("VirtualUser")
+				vim:CaptureController()
+				vim:ClickButton2(Vector2.new())
+			end)
+		end
+		task.wait(300)
+	end
+end)
+
+local AutoNextFloorEnabled = false
+local AutoNextFloorConn = nil
+
+local function CheckCashAndNextFloor()
+	local plr = Services.Players.LocalPlayer
+	local PlayerGui = plr:FindFirstChild("PlayerGui")
+	if not PlayerGui then return end
+	local Main = PlayerGui:FindFirstChild("Main")
+	if not Main then return end
+	local HomePage = Main:FindFirstChild("HomePage")
+	if not HomePage then return end
+	local Goal = HomePage:FindFirstChild("Goal")
+	if not Goal then return end
+	local GoalProgressBar = Goal:FindFirstChild("GoalProgressBar")
+	if not GoalProgressBar then return end
+	local GoalText = GoalProgressBar:FindFirstChild("GoalText")
+	if not GoalText then return end
+	local CashText = GoalText:FindFirstChild("Cash")
+	local GoalNumText = GoalText:FindFirstChild("Goal")
+	if not CashText or not GoalNumText then return end
+	local currentCash = tonumber(CashText.Text:match("%d+")) or 0
+	local goalNum = tonumber(GoalNumText.Text:match("/(%d+)")) or 0
+	if currentCash >= goalNum then
+		TEvent.FireRemote("SubmitVote", "continue")
+		task.wait(1)
+	end
+end
+
+AutoNextFloorConn = Services.RunService.Heartbeat:Connect(function()
+	if AutoNextFloorEnabled then
+		pcall(CheckCashAndNextFloor)
+	end
+end)
+
+local function SetFullBright(state)
+	local Lighting = game:GetService("Lighting")
+	if state then
+		local Atmosphere = Lighting:FindFirstChild("Atmosphere")
+		if Atmosphere then Atmosphere.Density = 0 end
+		Lighting.GlobalShadows = false
+		Lighting.ClockTime = 12
+		Lighting.Brightness = 4
+		Lighting.FogEnd = 100000
+		Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+	else
+		local Atmosphere = Lighting:FindFirstChild("Atmosphere")
+		if Atmosphere then Atmosphere.Density = 0.3 end
+		Lighting.GlobalShadows = true
+		Lighting.ClockTime = 14
+		Lighting.Brightness = 2
+		Lighting.FogEnd = 5000
+		Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
+	end
+end
+
+local OtherGroup = Tabs.Main:AddLeftGroupbox("其他")
+OtherGroup:AddToggle("PushMonster",{ Text="推开怪物", Default=false, Callback=function(v)
+	PushMonsterToggle = v Notify("推开怪物: "..(v and "开启" or "关闭"))
+end})
+OtherGroup:AddButton({ Text="所有物品拉过来", Func=function()
+	PullAllItems() Notify("已把所有物品拉到身边")
+end, DoubleClick=false })
+OtherGroup:AddButton({ Text="杀死所有怪物", Func=function()
+	KillAllMonsters() Notify("已杀死所有怪物")
+end, DoubleClick=false })
+OtherGroup:AddButton({ Text="怪物传送到电梯", Func=function()
+	TeleportMonstersToElevator() Notify("已把怪物传送到电梯")
+end, DoubleClick=false })
+OtherGroup:AddToggle("AntiAFK",{ Text="反挂机（防踢）", Default=false, Callback=function(v)
+	_G.AntiAFK = v Notify("反挂机: "..(v and "开启" or "关闭"))
+end})
+OtherGroup:AddToggle("AutoNextFloor",{ Text="自动下一层", Default=false, Callback=function(v)
+	AutoNextFloorEnabled = v Notify("自动下一层: "..(v and "开启" or "关闭"))
+end})
+OtherGroup:AddToggle("FullBright",{ Text="全亮", Default=false, Callback=function(v)
+	SetFullBright(v) Notify("全亮: "..(v and "开启" or "关闭"))
+end})
+
 local MainRight = Tabs.Main:AddRightGroupbox("辅助与传送")
 MainRight:AddButton({ Text="传送到最近玩家", Func=function()
 	teleportToNearestPlayer() Notify("已传送至最近玩家")
 end, DoubleClick=false })
 MainRight:AddToggle("RemoteOpen",{ Text="远程打开所有容器 (持续)", Default=false, Callback=function(v)
 	SetAutoOpen(v) Notify("远程打开容器: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddToggle("AutoInteract",{ Text="自动交互", Default=false, Callback=function(v)
+	setAutoInteract(v) Notify("自动交互: "..(v and "开启" or "关闭"))
+end})
+MainRight:AddSlider("AutoInteractRange",{ Text="自动交互距离", Default=20, Min=5, Max=200, Rounding=0, Suffix=" studs", Callback=function(v)
+	autoInteractRange = v
+end})
+MainRight:AddSlider("AutoInteractSpeed",{ Text="自动交互速度", Default=0.15, Min=0.05, Max=1, Rounding=2, Suffix=" 秒", Callback=function(v)
+	autoInteractSpeed = v
+end})
+MainRight:AddToggle("AutoCollect",{ Text="自动收集", Default=false, Callback=function(v)
+	setAutoCollect(v) Notify("自动收集: "..(v and "开启" or "关闭"))
 end})
 MainRight:AddToggle("InfiniteStamina",{ Text="无限体力", Default=false, Callback=function(v)
 	setInfiniteStamina(v) Notify("无限体力: "..(v and "开启" or "关闭"))
