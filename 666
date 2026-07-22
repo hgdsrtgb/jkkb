@@ -1850,10 +1850,10 @@ flingDropdown = Tabs.MainTab:Dropdown({
     Title = "选定甩飞玩家",
     Values = {},
     Callback = function(name)
+        if currentFlingTarget and currentFlingTarget.Name == name then return end
         for _, p in ipairs(Players:GetPlayers()) do
             if p.Name == name and p ~= LocalPlayer then
                 currentFlingTarget = p
-                flingDropdown:SetTitle("已选定: " .. p.Name)
                 break
             end
         end
@@ -1863,10 +1863,9 @@ Tabs.MainTab:Button({
     Title = "确定执行甩飞",
     Callback = function()
         if currentFlingTarget and currentFlingTarget.Parent then
-            WindUI:Notify({ Title = "甩飞", Content = "正在甩飞 " .. currentFlingTarget.Name, Duration = 3 })
+            WindUI:Notify({ Title = "甩飞", Content = "已选定 " .. currentFlingTarget.Name .. "，开始甩飞", Duration = 3 })
             task.spawn(function() powerfulFling(currentFlingTarget) end)
             currentFlingTarget = nil
-            flingDropdown:SetTitle("选定甩飞玩家")
         else
             WindUI:Notify({ Title = "甩飞", Content = "请先选择玩家", Duration = 3 })
         end
@@ -2168,11 +2167,10 @@ followDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定跟随玩家",
     Values = {},
     Callback = function(name)
+        if currentFollowTarget and currentFollowTarget.Name == name then return end
         for _, p in ipairs(Players:GetPlayers()) do
             if p.Name == name and p ~= LocalPlayer then
                 currentFollowTarget = p
-                followDropdown:SetTitle("已选定: " .. p.Name)
-                WindUI:Notify({ Title = "跟随", Content = "已选定 " .. p.Name .. "，点击确定开始跟随", Duration = 3 })
                 break
             end
         end
@@ -2182,6 +2180,7 @@ Tabs.SecondaryTab:Button({
     Title = "确定执行跟随",
     Callback = function()
         if currentFollowTarget and currentFollowTarget.Parent then
+            WindUI:Notify({ Title = "跟随", Content = "已选定 " .. currentFollowTarget.Name .. "，开始跟随", Duration = 3 })
             startFollow(currentFollowTarget)
         else
             WindUI:Notify({ Title = "跟随", Content = "请先选择玩家", Duration = 3 })
@@ -2242,11 +2241,10 @@ smoothDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定平滑跟随玩家",
     Values = {},
     Callback = function(name)
+        if currentSmoothTarget and currentSmoothTarget.Name == name then return end
         for _, p in ipairs(Players:GetPlayers()) do
             if p.Name == name and p ~= LocalPlayer then
                 currentSmoothTarget = p
-                smoothDropdown:SetTitle("已选定: " .. p.Name)
-                WindUI:Notify({ Title = "平滑跟随", Content = "已选定 " .. p.Name .. "，点击确定开始平滑跟随", Duration = 3 })
                 break
             end
         end
@@ -2256,6 +2254,7 @@ Tabs.SecondaryTab:Button({
     Title = "确定执行平滑跟随",
     Callback = function()
         if currentSmoothTarget and currentSmoothTarget.Parent then
+            WindUI:Notify({ Title = "平滑跟随", Content = "已选定 " .. currentSmoothTarget.Name .. "，开始平滑跟随", Duration = 3 })
             startSmoothFollow(currentSmoothTarget)
         else
             WindUI:Notify({ Title = "平滑跟随", Content = "请先选择玩家", Duration = 3 })
@@ -2267,7 +2266,6 @@ Tabs.SecondaryTab:Button({
     Callback = function()
         stopSmoothFollow()
         currentSmoothTarget = nil
-        smoothDropdown:SetTitle("选定平滑跟随玩家")
     end
 })
 
@@ -2317,11 +2315,10 @@ harassDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定操人目标",
     Values = {},
     Callback = function(name)
+        if currentHarassTarget and currentHarassTarget.Name == name then return end
         for _, p in ipairs(Players:GetPlayers()) do
             if p.Name == name and p ~= LocalPlayer then
                 currentHarassTarget = p
-                harassDropdown:SetTitle("已选定: " .. p.Name)
-                WindUI:Notify({ Title = "操人", Content = "已选定 " .. p.Name .. "，点击确定开始操人", Duration = 3 })
                 break
             end
         end
@@ -2331,10 +2328,10 @@ Tabs.SecondaryTab:Button({
     Title = "确定执行操人",
     Callback = function()
         if currentHarassTarget and currentHarassTarget.Parent then
+            WindUI:Notify({ Title = "操人", Content = "已选定 " .. currentHarassTarget.Name .. "，开始操人", Duration = 3 })
             harassTarget = currentHarassTarget
             harassEnabled = true
             startHarass()
-            WindUI:Notify({ Title = "操人", Content = "开始疯狂操 " .. currentHarassTarget.Name .. "！", Duration = 3 })
         else
             WindUI:Notify({ Title = "操人", Content = "请先选择玩家", Duration = 3 })
         end
@@ -2345,7 +2342,6 @@ Tabs.SecondaryTab:Button({
     Callback = function()
         stopHarass()
         currentHarassTarget = nil
-        harassDropdown:SetTitle("选定操人目标")
     end
 })
 Tabs.SecondaryTab:Button({
