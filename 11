@@ -1,0 +1,237 @@
+local function safeLoad(url) local success, result = pcall(function() return loadstring(game:HttpGet(url))() end) if not success then warn("加载失败: " .. url) return nil end return result end local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui") local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui") local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui") if not Library then game:GetService("StarterGui"):SetCore("SendNotification", { Title = "错误", Text = "UI 库加载失败，请检查网络或脚本资源", Duration = 5, }) return end
+local Options = Library.Options local Toggles = Library.Toggles local Players = game:GetService("Players") local ReplicatedStorage = game:GetService("ReplicatedStorage") local player = Players.LocalPlayer local Window = Library:CreateWindow({ Title = "脚本ui库", Footer = "恐拜大帝 制作", Icon = 131153193945220, NotifySide = "Right", ShowCustomCursor = true, }) Library:Notify({ Title = "脚本ui库", Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功", Time = 5, }) local Tabs = { Notice = Window:AddTab("通知", "info"), Main = Window:AddTab("主要", "info"), Settings = Window:AddTab("设置", "settings"), }
+
+local Workspace = game:GetService("Workspace")
+
+local espEnabled = false
+local espData = {}
+local scanFruits
+local clearAll
+
+local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息") NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本') NoticeGroup:AddLabel('创作者：恐拜大帝') local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理") UnloadGroup:AddButton("卸载脚本", function() Library:Unload() end)
+
+local PlantGroup = Tabs.Main:AddLeftGroupbox("植物透视")
+PlantGroup:AddToggle("PlantESP", {
+    Text = "植物透视",
+    Default = false,
+    Tooltip = "显示植物名字和千克数",
+})
+if Toggles.PlantESP then
+    Toggles.PlantESP:OnChanged(function()
+        pcall(function()
+            local Value = Toggles.PlantESP.Value
+            espEnabled = Value
+            if espEnabled then
+                local count = scanFruits()
+                Library:Notify({ Title = "植物透视", Description = "已开启，找到 " .. count .. " 个果实", Time = 3, })
+            else
+                clearAll()
+                Library:Notify({ Title = "植物透视", Description = "已关闭", Time = 3, })
+            end
+        end)
+    end)
+end
+
+if ThemeManager then ThemeManager:SetLibrary(Library) ThemeManager:SetFolder("MyScriptTheme") ThemeManager:ApplyToTab(Tabs.Settings) end if SaveManager then SaveManager:SetLibrary(Library) SaveManager:IgnoreThemeSettings() SaveManager:SetFolder("MyScriptConfig") SaveManager:BuildConfigSection(Tabs.Settings) end
+
+local function getWeight(fruit)
+    local ok, result = pcall(function()
+        local w = fruit:FindFirstChild("Weight")
+        if w and w:IsA("NumberValue") then
+            return w.Value
+        end
+        local attr = fruit:GetAttribute("Weight")
+        if type(attr) == "number" then
+            return attr
+        end
+        return nil
+    end)
+    if ok then return result end
+    return nil
+end
+
+local function isFruit(inst)
+    local ok, result = pcall(function()
+        if not inst:IsA("Model") then return false end
+        local parent = inst.Parent
+        if not parent or parent.Name ~= "Fruits" then return false end
+        local h = inst:FindFirstChild("HarvestPart")
+        return h ~= nil and h:IsA("BasePart")
+    end)
+    if ok then return result end
+    return false
+end
+
+local function getPlantName(fruit)
+    local ok, result = pcall(function()
+        local fruitsFolder = fruit.Parent
+        local plant = fruitsFolder and fruitsFolder.Parent
+        if plant then
+            local dg = plant:FindFirstChild("DebugGui")
+            if dg then
+                local tl = dg:FindFirstChildWhichIsA("TextLabel", true)
+                if tl and tl.Text ~= "" then
+                    return tl.Text
+                end
+            end
+            local plantName = plant:GetAttribute("Name") or plant:GetAttribute("PlantName") or plant:GetAttribute("Seed_Name")
+            if type(plantName) == "string" and plantName ~= "" then
+                return plantName
+            end
+        end
+        local hp = fruit:FindFirstChild("HarvestPart")
+        if hp then
+            local pp = hp:FindFirstChild("HarvestPrompt")
+            if pp and pp:IsA("ProximityPrompt") and pp.ObjectText ~= "" then
+                return pp.ObjectText
+            end
+            local lbl = hp:FindFirstChild("HarvestPromptLabel")
+            if lbl then
+                local nameLabel = lbl:FindFirstChild("Name", true)
+                if nameLabel and nameLabel:IsA("TextLabel") and nameLabel.Text ~= "" then
+                    return nameLabel.Text
+                end
+            end
+        end
+        return nil
+    end)
+    if ok and result then return result end
+    return "未知植物"
+end
+
+local function removeESP(fruit)
+    local data = espData[fruit]
+    if data then
+        pcall(function()
+            if data.highlight and data.highlight.Parent then data.highlight:Destroy() end
+            if data.billboard and data.billboard.Parent then data.billboard:Destroy() end
+        end)
+        espData[fruit] = nil
+    end
+end
+
+local function addESP(fruit)
+    if espData[fruit] then return end
+    pcall(function()
+        local hp = fruit:FindFirstChild("HarvestPart")
+        if not hp then return end
+        local name = getPlantName(fruit)
+
+        local hl = Instance.new("Highlight")
+        hl.FillColor = Color3.fromRGB(255, 255, 0)
+        hl.OutlineColor = Color3.fromRGB(255, 255, 0)
+        hl.FillTransparency = 0.65
+        hl.OutlineTransparency = 0
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Adornee = fruit
+        hl.Parent = fruit
+
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "PlantESP"
+        bb.Size = UDim2.new(0, 160, 0, 50)
+        bb.StudsOffset = Vector3.new(0, 3, 0)
+        bb.AlwaysOnTop = true
+        bb.Parent = hp
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = Color3.fromRGB(255, 255, 0)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 15
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        label.Parent = bb
+
+        espData[fruit] = {highlight = hl, billboard = bb, label = label, name = name}
+    end)
+end
+
+clearAll = function()
+    for fruit, _ in pairs(espData) do
+        removeESP(fruit)
+    end
+end
+
+scanFruits = function()
+    local count = 0
+    pcall(function()
+        local gardens = Workspace:FindFirstChild("Gardens")
+        if gardens then
+            for _, plot in ipairs(gardens:GetChildren()) do
+                pcall(function()
+                    local plants = plot:FindFirstChild("Plants")
+                    if plants then
+                        for _, plant in ipairs(plants:GetChildren()) do
+                            pcall(function()
+                                local fruitsFolder = plant:FindFirstChild("Fruits")
+                                if fruitsFolder then
+                                    for _, fruit in ipairs(fruitsFolder:GetChildren()) do
+                                        if isFruit(fruit) then
+                                            addESP(fruit)
+                                            count = count + 1
+                                        end
+                                    end
+                                end
+                            end)
+                        end
+                    end
+                end)
+            end
+        end
+    end)
+    if count == 0 then
+        pcall(function()
+            for _, desc in ipairs(Workspace:GetDescendants()) do
+                if isFruit(desc) then
+                    addESP(desc)
+                    count = count + 1
+                end
+            end
+        end)
+    end
+    return count
+end
+
+Workspace.DescendantAdded:Connect(function(inst)
+    if espEnabled and inst:IsA("Model") then
+        task.defer(function()
+            pcall(function()
+                if espEnabled and inst.Parent and isFruit(inst) then
+                    addESP(inst)
+                end
+            end)
+        end)
+    end
+end)
+
+Workspace.DescendantRemoving:Connect(function(inst)
+    if espData[inst] then
+        removeESP(inst)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if espEnabled then
+            pcall(function()
+                for fruit, data in pairs(espData) do
+                    pcall(function()
+                        if fruit.Parent and data.label and data.label.Parent then
+                            if data.name == "未知植物" then
+                                data.name = getPlantName(fruit)
+                            end
+                            local w = getWeight(fruit)
+                            if w then
+                                data.label.Text = data.name .. "\n" .. string.format("%.2fkg", w)
+                            else
+                                data.label.Text = data.name
+                            end
+                        end
+                    end)
+                end
+            end)
+        end
+        task.wait(1)
+    end
+end)
