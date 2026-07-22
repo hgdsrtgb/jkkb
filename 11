@@ -91,6 +91,33 @@ PlantGroup:AddSlider("PlantESP_MinKG", {
     Rounding = 1,
     Suffix = "kg",
 })
+PlantGroup:AddInput("PlantESP_MinKG_Input", {
+    Text = "精确最低千克",
+    Default = "0",
+    Placeholder = "输入0到1000的数字",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        pcall(function()
+            local num = tonumber(Value)
+            if num then
+                if num < 0 then num = 0 end
+                if num > 1000 then num = 1000 end
+                Options.PlantESP_MinKG:SetValue(num)
+            end
+        end)
+    end,
+})
+if Options.PlantESP_MinKG then
+    Options.PlantESP_MinKG:OnChanged(function()
+        pcall(function()
+            local v = Options.PlantESP_MinKG.Value
+            if Options.PlantESP_MinKG_Input and tostring(v) ~= Options.PlantESP_MinKG_Input.Value then
+                Options.PlantESP_MinKG_Input:SetValue(tostring(v))
+            end
+        end)
+    end)
+end
 if Toggles.PlantESP then
     Toggles.PlantESP:OnChanged(function()
         pcall(function()
@@ -239,7 +266,7 @@ local function addESP(fruit)
         local hl = Instance.new("Highlight")
         hl.FillColor = goldColor
         hl.OutlineColor = goldColor
-        hl.FillTransparency = 0.65
+        hl.FillTransparency = 1
         hl.OutlineTransparency = 0
         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         hl.Adornee = fruit
@@ -262,7 +289,7 @@ local function addESP(fruit)
         label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
         label.Parent = bb
 
-        espData[fruit] = {highlight = hl, billboard = bb, label = label, name = name}
+        espData[fruit] = {highlight = hl, billboard = bb, label = label, name = name, lastText = ""}
     end)
 end
 
@@ -312,7 +339,7 @@ scanFruits = function()
 end
 
 Workspace.DescendantAdded:Connect(function(inst)
-    if espEnabled and inst:IsA("Model") then
+    if espEnabled and inst:IsA("Model") and inst.Parent and inst.Parent.Name == "Fruits" then
         task.defer(function()
             pcall(function()
                 if espEnabled and inst.Parent and isFruit(inst) then
@@ -374,10 +401,15 @@ task.spawn(function()
                                     data.name = getPlantName(fruit)
                                 end
                                 local w = getWeight(fruit)
+                                local newText
                                 if w then
-                                    data.label.Text = data.name .. "\n" .. string.format("%.2fkg", w)
+                                    newText = data.name .. "\n" .. string.format("%.2fkg", w)
                                 else
-                                    data.label.Text = data.name
+                                    newText = data.name
+                                end
+                                if newText ~= data.lastText then
+                                    data.lastText = newText
+                                    data.label.Text = newText
                                 end
                             end
                         else
