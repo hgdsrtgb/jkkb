@@ -167,15 +167,12 @@ local function setupPlayerESP(player)
         createESP(player)
     end
 end
-for _, player in ipairs(Players:GetPlayers()) do
-    task.spawn(function()
-        setupPlayerESP(player)
-    end)
-end
 Players.PlayerAdded:Connect(function(player)
-    task.spawn(function()
-        setupPlayerESP(player)
-    end)
+    if espEnabled then
+        task.spawn(function()
+            setupPlayerESP(player)
+        end)
+    end
     if AntiFlingEnabled then
         task.spawn(function()
             setupAntiFlingForPlayer(player)
@@ -354,16 +351,6 @@ local function stopAntiFling()
     antiFlingCharAddedConns = {}
     enableAllPlayersCollision()
 end
-for _, p in ipairs(Players:GetPlayers()) do
-    if AntiFlingEnabled then
-        setupAntiFlingForPlayer(p)
-    end
-end
-Players.PlayerAdded:Connect(function(player)
-    if AntiFlingEnabled then
-        setupAntiFlingForPlayer(player)
-    end
-end)
 Players.PlayerRemoving:Connect(function(player)
     cleanupAntiFlingForPlayer(player)
 end)
@@ -1943,43 +1930,7 @@ local function startImpersonate(targetName)
     end)
     WindUI:Notify({Title = "成功", Content = "已伪装成: " .. targetName .. "（仅自己可见）", Type = "success"})
 end
-local respawnEnabled = false
 local respawnPos = nil
-local deathPos = nil
-local function setupRespawnListener(char)
-    local humanoid = char:WaitForChild("Humanoid", 5)
-    if not humanoid then return end
-    humanoid.Died:Connect(function()
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            deathPos = hrp.Position
-        end
-    end)
-end
-if player.Character then
-    setupRespawnListener(player.Character)
-end
-player.CharacterAdded:Connect(function(char)
-    setupRespawnListener(char)
-    if respawnEnabled and deathPos then
-        task.defer(function()
-            local hrp = char:WaitForChild("HumanoidRootPart", 3)
-            if hrp then
-                task.wait(0.1)
-                char:PivotTo(CFrame.new(deathPos))
-                hrp.CFrame = CFrame.new(deathPos)
-            end
-        end)
-    end
-end)
-Tabs.MainTab:Toggle({
-    Title = "原地复活",
-    Value = false,
-    Callback = function(state)
-        respawnEnabled = state
-        WindUI:Notify({ Title = "原地复活", Content = state and "已开启" or "已关闭", Duration = 3 })
-    end
-})
 Tabs.MainTab:Button({
     Title = "设置重生点",
     Callback = function()
@@ -2026,8 +1977,6 @@ local function refreshAllDropdowns()
         if ImpersonateDropdown then ImpersonateDropdown:Refresh(names) end
     end)
 end
-Players.PlayerAdded:Connect(refreshAllDropdowns)
-Players.PlayerRemoving:Connect(refreshAllDropdowns)
 Tabs.MainTab:Button({
     Title = "刷新玩家列表",
     Callback = function()
