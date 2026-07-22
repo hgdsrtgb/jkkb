@@ -26,11 +26,112 @@ local Options = Library.Options
 local Toggles = Library.Toggles
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
+local function destination()
+    local dest = nil
+    for i,v in pairs(workspace.DeliveryDestinations:GetDescendants()) do
+        if v.Name == "SelectionBox" and v.Visible == true and v.Transparency ~= 1 then
+            dest = v.Parent
+        end
+    end
+    return dest
+end
+
+local function getplayer(plr)
+    local player = nil
+    for i,v in pairs(Players:GetPlayers()) do
+        if string.find(v.Name,plr) or string.find(v.DisplayName,plr) then
+            player = v.Name
+            break
+        end
+    end
+    return player
+end
+
+local function shiftfind()
+    local shift = nil
+    local uifind = nil
+    local busdriver = getfenv().drivertype or "Rural Bus Driver"
+    for i,v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+        if v.ClassName == "TextLabel" and v.Text == "Start Shift" or v.ClassName == "ImageButton" and v.Name == busdriver then
+            shift = v.Parent
+        end
+    end
+    if shift ~= nil then
+        for i,v in pairs(LocalPlayer.PlayerGui:GetChildren()) do
+            if shift:IsDescendantOf(v) then
+                uifind = v
+            end
+        end
+    end
+    return uifind
+end
+
+local function dealership()
+    local deal = nil
+    local uifind = nil
+    for i,v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+        if v.ClassName == "TextLabel" and v.Text == "Stuttgart Lastkraft" or v.ClassName == "TextLabel" and v.Text == "Stuttgart Omnibus" then
+            deal = v
+        end
+    end
+    if deal ~= nil then
+        for i,v in pairs(LocalPlayer.PlayerGui:GetChildren()) do
+            if deal:IsDescendantOf(v) then
+                uifind = v
+            end
+        end
+    end
+    return uifind
+end
+
+local function partfind()
+    local part = nil
+    for i,v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+        if v.ClassName == "BillboardGui" and v.Adornee ~= nil then
+            part = v.Adornee
+        end
+    end
+    return part
+end
+
+local function findxpui()
+    local xpui = nil
+    local test = nil
+    for i,v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+        if v.ClassName == "TextLabel" and string.find(v.Text,"XP") and v.Parent.ClassName == "ImageButton" and tonumber(v.Text:split(" ")[1]) then
+            test = v
+            break
+        end
+    end
+    if test ~= nil then
+        for i,v in pairs(LocalPlayer.PlayerGui:GetChildren()) do
+            if test:IsDescendantOf(v) then
+                xpui = v
+            end
+        end
+    end
+    return xpui
+end
+
+local function vehicleTeleport(cf)
+    workspace.Vehicles:FindFirstChild(LocalPlayer.Name).PrimaryPart = workspace.Vehicles:FindFirstChild(LocalPlayer.Name).Body.Mass
+    local time = tick()
+    repeat task.wait()
+        if LocalPlayer.Character.Humanoid.SeatPart == nil then
+            workspace.Vehicles:FindFirstChild(LocalPlayer.Name).DriveSeat:Sit(LocalPlayer.Character.Humanoid)
+            time = tick()
+            wait(1)
+            time = tick()
+        elseif LocalPlayer.Character.Humanoid.SeatPart ~= nil then
+            workspace.Vehicles:FindFirstChild(LocalPlayer.Name):PivotTo(cf)
+        end
+    until tick()-time > 2
+end
+
 local Window = Library:CreateWindow({
-    Title = "恶魔学",
+    Title = "紧急汉堡",
     Footer = "恐拜大帝 制作",
     Icon = 131153193945220,
     NotifySide = "Right",
@@ -38,19 +139,18 @@ local Window = Library:CreateWindow({
 })
 
 Library:Notify({
-    Title = "恶魔学",
+    Title = "紧急汉堡",
     Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功",
     Time = 5,
 })
 
 local Tabs = {
     Notice = Window:AddTab("通知", "info"),
-    Ghost = Window:AddTab("鬼魂功能", "info"),
-    Player = Window:AddTab("玩家功能", "info"),
-    Item = Window:AddTab("物品功能", "info"),
-    Room = Window:AddTab("房间功能", "info"),
-    Visual = Window:AddTab("视觉功能", "info"),
-    Troll = Window:AddTab("恶搞功能", "info"),
+    System = Window:AddTab("系统", "info"),
+    AutoWork = Window:AddTab("自动工作", "info"),
+    Player = Window:AddTab("玩家设置", "info"),
+    Aimbot = Window:AddTab("自动瞄准", "info"),
+    Teleport = Window:AddTab("传送", "info"),
     Settings = Window:AddTab("设置", "settings"),
 }
 
@@ -58,584 +158,600 @@ local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息")
 NoticeGroup:AddLabel("恐拜大帝将持续更新此脚本")
 NoticeGroup:AddLabel("创作者：恐拜大帝")
 
-local stuff = {
-    SeeGhost = false,
-    prints = nil,
-    ghostSeePlayerDistance = 15,
-    ghostSeePlayerEnabled = false,
-    sayInchat = false,
-    sayInchat2 = false,
-    playerChatted = {},
-    warningHunt = nil
-}
+local SystemGroup = Tabs.System:AddLeftGroupbox("系统")
+SystemGroup:AddLabel("两个都开")
 
-local GhostGroup = Tabs.Ghost:AddLeftGroupbox("鬼魂功能")
-
-GhostGroup:AddToggle("SeeGhost", {
-    Text = "显示鬼魂",
-    Default = false,
-    Callback = function(Value)
-        stuff.SeeGhost = Value
-        task.spawn(function()
-            while stuff.SeeGhost do
-                task.wait()
-                if workspace:WaitForChild("Ghost"):GetAttribute("VisualModel") == "Biter" and LocalPlayer:GetAttribute("TrypophobiaSafe") == true then
-                    workspace:WaitForChild("Ghost"):WaitForChild("HumanoidRootPart"):WaitForChild("Cat"):WaitForChild("ImageLabel").ImageTransparency = 0.25
-                else
-                    local transparency = workspace:WaitForChild("Ghost"):GetAttribute("Transparency") or 0.25
-                    transparency = transparency <= 0.25 and transparency or 0.25
-
-                    for _, d in pairs(workspace:WaitForChild("Ghost").VisibleParts:GetDescendants()) do
-                        if d:IsA("BasePart") then
-                            d.Transparency = transparency
-                        elseif d:IsA("ParticleEmitter") or d:IsA("Light") then
-                            d.Enabled = true
-                        end
-                    end
-                end
-            end
-
-            for _, d in pairs(workspace:WaitForChild("Ghost").VisibleParts:GetDescendants()) do
-                if d:IsA("BasePart") then
-                    d.Transparency = 1
-                elseif d:IsA("ParticleEmitter") or d:IsA("Light") then
-                    d.Enabled = false
-                end
-            end
-        end)
-    end,
-})
-
-GhostGroup:AddToggle("GhostPrints", {
-    Text = "显示鬼魂手印",
-    Default = false,
-    Callback = function(Value)
-        if stuff.prints then
-            stuff.prints:Disconnect()
-            stuff.prints = nil
-        end
-
-        if Value then
-            for _, d in pairs(workspace.Handprints:GetChildren()) do
-                d:FindFirstChildOfClass("Decal").Transparency = 0
-            end
-
-            stuff.prints = workspace.Handprints.ChildAdded:Connect(function(handprint)
-                handprint:FindFirstChildOfClass("Decal").Transparency = 0
-            end)
-        else
-            for _, d in pairs(workspace.Handprints:GetChildren()) do
-                d:FindFirstChildOfClass("Decal").Transparency = 1
+SystemGroup:AddButton("饶过检测", function()
+    local function funcnil()
+        local func = nil
+        for i,v in pairs(getgc(true)) do
+            if type(v) == "function" and getfenv(v).script == Players.LocalPlayer.PlayerScripts.Code.controllers.antiCheatController and tostring(getinfo(v).name) ~= nil and tostring(getinfo(v).name) ~= "" then
+                func = v
             end
         end
-    end,
-})
-
-GhostGroup:AddButton("获取鬼魂信息", function()
-    local Ghost = workspace:WaitForChild("Ghost")
-    local info = {
-        age = tostring(Ghost:GetAttribute("Age")),
-        favroom = Ghost:GetAttribute("FavoriteRoom"),
-        crntroom = Ghost:GetAttribute("CurrentRoom"),
-        gender = Ghost:GetAttribute("Gender"),
-        mdlName = Ghost:GetAttribute("VisualModel")
-    }
-
-    if stuff.sayInchat then
-        ReplicatedStorage:WaitForChild("Events"):WaitForChild("AskSpiritBoxFromUI"):FireServer(
-            "鬼魂是一个"..string.lower(info.gender)..", 年龄 "..info.age.." 它最喜欢的房间是 "..string.lower(info.favroom)
-        )
-    else
-        Library:Notify({
-            Title = "鬼魂信息",
-            Description = info.gender.." | 年龄 "..info.age.."\n鬼魂房间 | "..info.favroom,
-            Time = 5
-        })
+        return func
     end
-end)
 
-GhostGroup:AddButton("获取鬼魂当前房间", function()
-    local crntroom = workspace:WaitForChild("Ghost"):GetAttribute("CurrentRoom")
-
-    if stuff.sayInchat then
-        ReplicatedStorage:WaitForChild("Events"):WaitForChild("AskSpiritBoxFromUI"):FireServer(
-            "鬼魂在"..string.lower(crntroom)
-        )
-    else
-        Library:Notify({
-            Title = "鬼魂信息",
-            Description = crntroom,
-            Time = 5
-        })
-    end
-end)
-
-GhostGroup:AddToggle("SayInChat", {
-    Text = "在聊天中显示鬼魂信息",
-    Default = false,
-    Callback = function(Value)
-        stuff.sayInchat = Value
-    end,
-})
-
-GhostGroup:AddToggle("GhostApproach", {
-    Text = "鬼魂接近通知(仅在狩猎时有效)",
-    Default = false,
-    Callback = function(Value)
-        stuff.ghostSeePlayerEnabled = Value
-
-        task.spawn(function()
-            while stuff.ghostSeePlayerEnabled do
-                task.wait(1)
-                local distanceGhost = (workspace:WaitForChild("Ghost"):WaitForChild("HumanoidRootPart").Position -
-                    LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-
-                if distanceGhost <= stuff.ghostSeePlayerDistance and distanceGhost >= 5 and
-                    workspace:WaitForChild("Ghost"):GetAttribute("Hunting") then
-
-                    Library:Notify({
-                        Title = "鬼魂警告",
-                        Description = "鬼魂距离你"..tostring(math.floor(distanceGhost)).."单位",
-                        Time = 3.5
-                    })
-                end
+    repeat task.wait()
+        for i,v in pairs(getgc(true)) do
+            if type(v) == "function" and getfenv(v).script == Players.LocalPlayer.PlayerScripts.Code.controllers.antiCheatController then
+                warn(getinfo(v).name)
+                hookfunction(v,function()
+                    return
+                end)
             end
-        end)
-    end,
-})
+        end
+        wait(1)
+        print(funcnil())
+    until funcnil() == nil
+    wait(2)
+    warn("反检测已禁用")
+end)
 
-GhostGroup:AddToggle("HuntWarning", {
-    Text = "鬼魂狩猎事件通知",
+SystemGroup:AddToggle("AntiAFK", {
+    Text = "防挂机",
     Default = false,
     Callback = function(Value)
         if Value then
-            stuff.warningHunt = workspace:WaitForChild("Ghost"):GetAttributeChangedSignal("Hunting"):Connect(function()
-                if workspace:WaitForChild("Ghost"):GetAttribute("Hunting") == true then
-                    Library:Notify({
-                        Title = "狩猎警告",
-                        Description = "鬼魂开始狩猎!",
-                        Time = 5
-                    })
-                else
-                    Library:Notify({
-                        Title = "狩猎警告",
-                        Description = "鬼魂结束狩猎!",
-                        Time = 5
-                    })
-                end
+            warn("防挂机运行中")
+            LocalPlayer.Idled:connect(function()
+                warn("触发防挂机")
+                game:GetService("VirtualUser"):CaptureController()
+                game:GetService("VirtualUser"):ClickButton2(Vector2.new())
             end)
-        elseif stuff.warningHunt then
-            stuff.warningHunt:Disconnect()
-            stuff.warningHunt = nil
         end
     end,
 })
 
-GhostGroup:AddButton("触发所有盐堆", function()
-    local SaltPiles = workspace.SaltPiles:GetChildren()
-    local NormalPiles = {}
+local AutoWorkGroup = Tabs.AutoWork:AddLeftGroupbox("自动工作")
 
-    for _, d in pairs(SaltPiles) do
-        if d.Name == "SaltLine" then
-            table.insert(NormalPiles, d)
-        end
-    end
-
-    if #NormalPiles > 0 then
-        for _, d in pairs(NormalPiles) do
-            task.spawn(function()
-                firetouchinterest(workspace.Ghost.Torso, d:WaitForChild("GhostTracker"), 0)
-                firetouchinterest(workspace.Ghost.Torso, d:WaitForChild("GhostTracker"), 1)
-            end)
-        end
-    else
-        Library:Notify({
-            Title = "盐堆触发",
-            Description = "没有盐堆!",
-            Time = 3.5
-        })
-    end
-end)
-
-GhostGroup:AddButton("检查是否为无头骑士", function()
-    local isHeadless = workspace:WaitForChild("Ghost"):GetAttribute("Headless")
-
-    Library:Notify({
-        Title = "无头骑士检查",
-        Description = isHeadless and "鬼魂是无头骑士!" or "鬼魂不是无头骑士",
-        Time = 3.5
-    })
-end)
-
-GhostGroup:AddButton("检查鬼魂球体", function()
-    Library:Notify({
-        Title = "鬼魂球体检查",
-        Description = workspace:FindFirstChild("GhostOrb") and "有鬼魂球体" or "没有鬼魂球体",
-        Time = 3.5
-    })
-end)
-
-GhostGroup:AddButton("检查手印", function()
-    Library:Notify({
-        Title = "手印检查",
-        Description = #workspace.Handprints:GetChildren() > 0 and "有手印" or "没有手印",
-        Time = 3.5
-    })
-end)
-
-GhostGroup:AddButton("检查激光可见性", function()
-    local ghostLaserVisible = workspace:WaitForChild("Ghost"):GetAttribute("LaserVisible") and
-        workspace:WaitForChild("Ghost"):GetAttribute("Transparency") < 1
-
-    Library:Notify({
-        Title = "激光可见性检查",
-        Description = ghostLaserVisible and "鬼魂对激光可见!" or
-            "鬼魂对激光不可见\n这可能是错误，请确保将激光投影仪放在鬼魂喜欢的房间",
-        Time = ghostLaserVisible and 3.5 or 7.5
-    })
-end)
-
-local PlayerGroup = Tabs.Player:AddLeftGroupbox("玩家功能")
-
-PlayerGroup:AddToggle("ChatNotify", {
-    Text = "通知聊天消息",
+AutoWorkGroup:AddToggle("BusDriver", {
+    Text = "自动公交车司机",
     Default = false,
     Callback = function(Value)
+        getfenv().busman = Value
         if Value then
-            for _, d in pairs(Players:GetChildren()) do
-                if d ~= LocalPlayer then
-                    stuff.playerChatted[d.Name] = d.Chatted:Connect(function(msg)
-                        local topName = d.Name
-
-                        if workspace:WaitForChild("Ragdolls"):FindFirstChild(d.Name) then
-                            topName = topName.. " (死亡)"
-                        end
-
-                        Library:Notify({
-                            Title = topName.." 说:",
-                            Description = msg,
-                            Time = 10
-                        })
-
-                        if stuff.sayInchat2 then
-                            ReplicatedStorage:WaitForChild("Events"):WaitForChild("AskSpiritBoxFromUI"):FireServer(
-                                topName.." 说: ".. msg
-                            )
+            spawn(function()
+                while getfenv().busman do
+                    task.wait()
+                    pcall(function()
+                        local plr = LocalPlayer
+                        local car = workspace.Vehicles:FindFirstChild(plr.Name)
+                        if workspace.Vehicles:FindFirstChild(plr.Name) and string.find(tostring(car:GetAttribute("Model")),"Bus Driver") and partfind() ~= nil and LocalPlayer.Character.Humanoid.SeatPart == nil then
+                            car.DriveSeat:Sit(LocalPlayer.Character.Humanoid)
                         end
                     end)
                 end
-            end
-        else
-            for _, d in pairs(stuff.playerChatted) do
-                d:Disconnect()
-            end
-            stuff.playerChatted = {}
-        end
-    end,
-})
+            end)
 
-PlayerGroup:AddToggle("SayInChat2", {
-    Text = "在聊天中通知消息",
-    Default = false,
-    Callback = function(Value)
-        stuff.sayInchat2 = Value
-    end,
-})
-
-local ItemGroup = Tabs.Item:AddLeftGroupbox("物品功能")
-
-ItemGroup:AddButton("使用激光扫描仪", function()
-    local function ridarScan()
-        local v1 = game:GetService("ReplicatedStorage")
-        local v2 = game:GetService("UserInputService")
-        local u3 = game:GetService("RunService")
-        local u4 = Players.LocalPlayer
-        local v5 = u4:WaitForChild("PlayerScripts")
-        local u8 = v5:WaitForChild("Events")
-        local u9 = workspace:FindFirstChild("LIDAR_V2") or Instance.new("Folder")
-        local u10 = workspace.CurrentCamera
-        local u11 = nil
-        local u12 = false
-
-        u9.Name = "LIDAR_V2"
-        u9.Parent = workspace
-
-        local function GenerateScreenPoints(p13, p14, p15)
-            local v16 = p14 * p15
-            local v17 = v16 * p13
-            local v18 = math.ceil(v17)
-            local v19 = v16 / v18
-            local v20 = math.sqrt(v19)
-            local v21 = p15 / v20
-            local v22 = math.floor(v21)
-            local v23 = p14 / v20
-            local v24 = math.floor(v23)
-            local v25 = {}
-            for v26 = 0, v22 - 1 do
-                for v27 = 0, v24 - 1 do
-                    if v18 <= #v25 then
-                        break
-                    end
-                    local v28 = math.random
-                    local v29 = v27 * v20
-                    local v30 = (v27 + 1) * v20 - 1
-                    local v31 = v28(v29, (math.min(v30, p14)))
-                    local v32 = math.random
-                    local v33 = v26 * v20
-                    local v34 = (v26 + 1) * v20 - 1
-                    local v35 = v32(v33, (math.min(v34, p15)))
-                    local v36 = Vector2.new
-                    table.insert(v25, v36(v31, v35))
-                end
-            end
-            return v25
-        end
-
-        local function GetColorFromScreenPosition(p37)
-            local v38 = Vector2.new(u10.ViewportSize.X / 2, u10.ViewportSize.Y / 2)
-            local v39 = (p37 - v38).Magnitude / (v38.Magnitude * 0.7)
-            local v40 = math.clamp(v39, 0, 1)
-            local v41
-            if v40 < 0.5 then
-                local v42 = v40 * 2
-                v41 = Color3.new(1 - v42, v42, 0)
-            else
-                local v43 = (v40 - 0.5) * 2
-                v41 = Color3.new(v43, 1, v43)
-            end
-            local v44, v45, v46 = v41:ToHSV()
-            return Color3.fromHSV(v44, v45, v46 * 0.7)
-        end
-
-        local function CreateLidarSpheres(p47, p48)
-            local v49 = p48:ViewportPointToRay(p47.X, p47.Y)
-            local v50 = RaycastParams.new()
-            v50.FilterDescendantsInstances = { u4.Character }
-            v50.FilterType = Enum.RaycastFilterType.Exclude
-            local v51 = workspace:Raycast(v49.Origin, v49.Direction * 1000, v50)
-            if v51 then
-                local v52 = v5.ItemControllers:WaitForChild("LIDAR Scanner").Part:Clone()
-                v52.Position = v51.Position
-                v52.Color = GetColorFromScreenPosition(p47)
-                v52.Parent = u9
-            end
-        end
-
-        local function RenderLidarOutput()
-            local v53 = u10.ViewportSize.X
-            local v54 = u10.ViewportSize.Y
-            local v55 = GenerateScreenPoints(0.001, v53, v54)
-            workspace.LIDAR:ClearAllChildren()
-            local v56 = workspace:FindFirstChild("Ghost"):Clone()
-            for _, v57 in v56:GetDescendants() do
-                if v57:IsA("BasePart") then
-                    v57.CanCollide = false
-                    v57.CanQuery = true
-                    v57.Anchored = true
-                    v57.CollisionGroup = "Default"
-                    v57.Transparency = 1
-                end
-            end
-            v56.Parent = workspace
-            for v58, v59 in ipairs(v55) do
-                if v58 % 100 == 0 then
-                    u3.Heartbeat:Wait()
-                end
-                CreateLidarSpheres(v59, u10)
-            end
-            v56:Destroy()
-        end
-
-        RenderLidarOutput()
-    end
-
-    ridarScan()
-end)
-
-ItemGroup:AddButton("通知所有稀有物品", function()
-    local found = false
-
-    for _, d in pairs(workspace:WaitForChild("Items"):GetChildren()) do
-        if d:GetAttribute("ItemName") then
-            local NameItem = d:GetAttribute("ItemName")
-            local er = true
-
-            if d:GetAttribute("Uninteractable") == true or d:GetAttribute("Broken") == true then
-                er = false
-            end
-
-            if er and (NameItem == "Energy Drink" or NameItem == "Music Box" or
-                NameItem == "Umbra Board" or NameItem == "Energy Watch" or tonumber(d.Name) >= 100) then
-
-                found = true
-                Library:Notify({
-                    Title = "稀有物品警告",
-                    Description = "发现稀有物品 "..NameItem,
-                    Time = 3.5
-                })
-
-                local hightlight = Instance.new("Highlight")
-                hightlight.Parent = d
-                hightlight.FillColor = Color3.fromRGB(37, 161, 255)
-                game:GetService("Debris"):AddItem(hightlight,5)
-            end
-        end
-    end
-
-    if not found then
-        Library:Notify({
-            Title = "稀有物品警告",
-            Description = "未找到稀有物品",
-            Time = 3.5
-        })
-    end
-end)
-
-ItemGroup:AddButton("切换保险丝盒", function()
-    ReplicatedStorage:WaitForChild("Events"):WaitForChild("ToggleFuseBox"):FireServer()
-end)
-
-local RoomGroup = Tabs.Room:AddLeftGroupbox("房间功能")
-
-RoomGroup:AddButton("获取当前房间温度", function()
-    local room = LocalPlayer:GetAttribute("CurrentRoom")
-
-    if workspace:WaitForChild("Map"):WaitForChild("Rooms"):FindFirstChild(room) and
-        workspace:WaitForChild("Map"):WaitForChild("Rooms"):WaitForChild(room):GetAttribute("Temperature") then
-
-        Library:Notify({
-            Title = "房间温度检查",
-            Description = room.."的温度是 "..tostring(workspace:WaitForChild("Map"):WaitForChild("Rooms"):WaitForChild(room):GetAttribute("Temperature")),
-            Time = 3.5
-        })
-    end
-end)
-
-RoomGroup:AddToggle("GhostRoomTemp", {
-    Text = "通知鬼魂房间温度低于0°C",
-    Default = false,
-    Callback = function(Value)
-        if Value then
-            local room = workspace:WaitForChild("Ghost"):GetAttribute("FavoriteRoom")
-
-            if workspace:WaitForChild("Map"):WaitForChild("Rooms"):WaitForChild(room):GetAttribute("Temperature") <= 0 then
-                Library:Notify({
-                    Title = "房间温度检查(鬼魂)",
-                    Description = room.."的温度低于0°C!",
-                    Time = 3.5
-                })
-            end
-
-            workspace:WaitForChild("Map"):WaitForChild("Rooms"):WaitForChild(room):GetAttributeChangedSignal("Temperature"):Connect(function()
-                if workspace:WaitForChild("Map"):WaitForChild("Rooms"):WaitForChild(room):GetAttribute("Temperature") <= 0 then
-                    Library:Notify({
-                        Title = "房间温度检查(鬼魂)",
-                        Description = room.."的温度低于0°C!",
-                        Time = 3.5
-                    })
+            spawn(function()
+                while getfenv().busman do
+                    task.wait()
+                    pcall(function()
+                        if LocalPlayer.Character.Humanoid.Health < 60 and LocalPlayer.Character.Humanoid.SeatPart == nil then
+                            LocalPlayer.Character:BreakJoints()
+                            warn("角色血量过低，已重置")
+                        end
+                    end)
                 end
             end)
-        end
-    end,
-})
 
-RoomGroup:AddToggle("DoorNoclip", {
-    Text = "穿门无碰撞",
-    Default = false,
-    Callback = function(Value)
-        for _, d in pairs(workspace.Doors:GetChildren()) do
             task.spawn(function()
-                for _, d22 in pairs(d:WaitForChild("Door"):GetChildren()) do
-                    if d22:IsA("BasePart") and d22.Name ~= "GhostTracker" then
-                        d22.CanCollide = not Value
-                    end
+                while getfenv().busman do
+                    wait()
+                    pcall(function()
+                        workspace.Gravity = 196
+                        local plr = LocalPlayer
+                        local car = workspace.Vehicles[plr.Name]
+                        if workspace.Vehicles:FindFirstChild(plr.Name) and LocalPlayer.Team ~= game:GetService("Teams").BusCompany then
+                            repeat wait()
+                                workspace.Vehicles:FindFirstChild(LocalPlayer.Name).DriveSeat:Sit(LocalPlayer.Character.Humanoid)
+                            until LocalPlayer.Character.Humanoid.SeatPart ~= nil
+                            wait()
+                            workspace.Vehicles:FindFirstChild(LocalPlayer.Name):PivotTo(CFrame.new(-1683.09375, 15.630923271179199, -1286.167236328125))
+                            wait(5)
+                            LocalPlayer.Character.Humanoid.Sit = false
+                            wait(2)
+
+                            if LocalPlayer:DistanceFromCharacter(Vector3.new(-1683.09375, 5.630923271179199, -1286.167236328125)) < 50 then
+
+                                LocalPlayer.Character.Humanoid:MoveTo(Vector3.new(-1708.8741455078125, 5.616213321685791, -1281.946044921875))
+                                LocalPlayer.Character.Humanoid.MoveToFinished:wait()
+                                LocalPlayer.Character.Humanoid:MoveTo(Vector3.new(-1730.544677734375, 5.683385848999023, -1280.9140625))
+                                LocalPlayer.Character.Humanoid.MoveToFinished:wait()
+
+                                repeat wait()
+                                    game:GetService("VirtualInputManager"):SendKeyEvent(true,"E",false,game)
+                                    game:GetService("VirtualInputManager"):SendKeyEvent(false,"E",false,game)
+                                until shiftfind() ~= nil
+
+                                wait(3)
+                                local busdriver = getfenv().drivertype or "Rural Bus Driver"
+                                for i,v in pairs(shiftfind():GetDescendants()) do
+                                    if v.ClassName == "ImageButton" and v.Name == busdriver then
+                                        if v.Parent ~= nil then
+                                            firesignal(v.MouseButton1Click)
+                                        end
+                                    end
+                                end
+
+                                wait(3)
+                                for i,v in pairs(shiftfind():GetDescendants()) do
+                                    if v.ClassName == "ImageButton" and v.ImageColor3 == Color3.fromRGB(142, 68, 173) then
+                                        if v.Parent ~= nil then
+                                            firesignal(v.MouseButton1Click)
+                                        end
+                                    end
+                                end
+
+                                wait(2)
+
+                                LocalPlayer.Character.Humanoid:MoveTo(Vector3.new(-1722.3858642578125, 5.645286560058594, -1264.3126220703125))
+                                LocalPlayer.Character.Humanoid.MoveToFinished:wait()
+
+                                repeat wait()
+                                    game:GetService("VirtualInputManager"):SendKeyEvent(true,"E",false,game)
+                                    game:GetService("VirtualInputManager"):SendKeyEvent(false,"E",false,game)
+                                until dealership() ~= nil and dealership().Enabled == true or partfind() ~= nil
+
+                                wait(2)
+                                for i,v in pairs(dealership():GetDescendants()) do
+                                    if v.ClassName == "TextLabel" and v.Text == "Stuttgart Omnibus" then
+                                        local plr = LocalPlayer
+                                        repeat wait()
+                                            if v.Parent ~= nil then
+                                                firesignal(v.Parent.MouseButton1Click)
+                                                for a,b in pairs(dealership():GetDescendants()) do
+                                                    if b.ClassName == "ImageButton" and b:FindFirstChildOfClass("TextLabel").Text == "Spawn Vehicle" or b.ClassName == "ImageButton" and b:FindFirstChildOfClass("TextLabel").Text == "Unlock Vehicle" then
+                                                        firesignal(b.MouseButton1Click)
+                                                    end
+                                                end
+                                            end
+                                        until workspace.Vehicles:FindFirstChild(plr.Name) and partfind() ~= nil or partfind() ~= nil
+                                    end
+                                end
+                            end
+                        elseif partfind() ~= nil and LocalPlayer.Character.Humanoid.SeatPart ~= nil then
+
+                            workspace.Gravity = 0
+                            local plr = LocalPlayer
+                            local chr = plr.Character
+                            local car = workspace.Vehicles[plr.Name]
+                            car.PrimaryPart = car.Body.Mass
+                            local pos = destination() or partfind()
+
+                            if (car.WorldPivot.Position-Vector3.new(pos.Position.X,car.PrimaryPart.Position.Y,pos.Position.Z)).magnitude > 100 then
+                                local TweenService = game:GetService("TweenService")
+                                local TweenInfoToUse = TweenInfo.new(0, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, 0, false, 0)
+                                local TweenValue = Instance.new("CFrameValue")
+                                TweenValue.Value = car.WorldPivot
+                                TweenValue.Changed:Connect(function()
+                                    car:PivotTo(TweenValue.Value)
+                                end)
+                                getfenv().tween = TweenService:Create(TweenValue, TweenInfoToUse, {Value=car.WorldPivot+Vector3.new(0,1000,0)})
+                                getfenv().tween:Play()
+                                repeat task.wait()
+                                until getfenv().tween.PlaybackState == Enum.PlaybackState.Cancelled or getfenv().tween.PlaybackState == Enum.PlaybackState.Completed or getfenv().tween.PlaybackState == Enum.PlaybackState.Paused
+                            end
+
+                            local plr = LocalPlayer
+                            local pos = destination() or partfind()
+                            local car = workspace.Vehicles[plr.Name]
+                            if (car.WorldPivot.Position-Vector3.new(pos.Position.X,car.PrimaryPart.Position.Y,pos.Position.Z)).magnitude < 100 then
+                                car:PivotTo(pos.CFrame)
+                                workspace.Gravity = 196
+                                for i,v in pairs(workspace.BusStops:GetDescendants()) do
+                                    if v.Name == "SelectionBox" and v.Visible == true then
+                                        car:PivotTo(v.Parent.CFrame+Vector3.new(0,5,0))
+                                    end
+                                end
+                                local time = tick()
+                                repeat task.wait()
+                                until partfind() == nil or LocalPlayer:DistanceFromCharacter(partfind().Position) > 70 or tick() - time >= 5
+                            end
+                        end
+                    end)
                 end
             end)
         end
     end,
 })
 
-local VisualGroup = Tabs.Visual:AddLeftGroupbox("视觉功能")
-
-VisualGroup:AddToggle("MaxBrightness", {
-    Text = "最大亮度",
+AutoWorkGroup:AddToggle("TruckDriver", {
+    Text = "自动卡车司机",
     Default = false,
     Callback = function(Value)
+        getfenv().trucker = Value
         if Value then
-            game.Lighting.Brightness = 2
-            game.Lighting.ClockTime = 14
-            game.Lighting.GlobalShadows = false
-            game.Lighting.OutdoorAmbient = Color3.fromRGB(209, 209, 209)
+            spawn(function()
+                while getfenv().trucker do
+                    task.wait()
+                    pcall(function()
+                        if workspace.Vehicles:FindFirstChild(LocalPlayer.Name) and workspace.Vehicles[LocalPlayer.Name].Body:FindFirstChild("Trailer") and LocalPlayer.Character.Humanoid.SeatPart == nil then
+                            local plr = LocalPlayer
+                            local car = workspace.Vehicles[plr.Name]
+                            if getfenv().tween ~= nil then
+                                getfenv().tween:Cancel()
+                                print("Tween Cancelled")
+                            end
+                            car.DriveSeat:Sit(LocalPlayer.Character.Humanoid)
+                        end
+                    end)
+                end
+            end)
+
+            spawn(function()
+                while getfenv().trucker do
+                    task.wait()
+                    pcall(function()
+                        if LocalPlayer.Character.Humanoid.Health < 60 and LocalPlayer.Character.Humanoid.SeatPart == nil then
+                            LocalPlayer.Character:BreakJoints()
+                            warn("角色血量过低，已重置")
+                        end
+                    end)
+                end
+            end)
+
+            spawn(function()
+                while getfenv().trucker do
+                    task.wait()
+                    pcall(function()
+                        for i,v in pairs(workspace.Vehicles:FindFirstChild(LocalPlayer.Name):GetDescendants()) do
+                            pcall(function()
+                                v.Velocity = Vector3.new(0,0,0)
+                            end)
+                        end
+                    end)
+                end
+            end)
+
+            task.spawn(function()
+                while getfenv().trucker do
+                    wait()
+                    pcall(function()
+                        workspace.Gravity = 196
+                        if workspace.Vehicles:FindFirstChild(LocalPlayer.Name) and not workspace.Vehicles[LocalPlayer.Name].Body:FindFirstChild("Trailer") then
+                            repeat wait()
+                                workspace.Vehicles:FindFirstChild(LocalPlayer.Name).DriveSeat:Sit(LocalPlayer.Character.Humanoid)
+                            until LocalPlayer.Character.Humanoid.SeatPart ~= nil
+                            wait()
+                            workspace.Vehicles:FindFirstChild(LocalPlayer.Name):PivotTo(CFrame.new(717.53125, 15.626567840576172, 1462.559814453125))
+                            wait(1)
+                            LocalPlayer.Character.Humanoid.Sit = false
+                            wait(2)
+
+                            if LocalPlayer:DistanceFromCharacter(Vector3.new(717.53125, 15.626567840576172, 1462.559814453125)) < 50 then
+                                LocalPlayer.Character.Humanoid:MoveTo(Vector3.new(712.7074584960938, 5.587162017822266, 1437.5025634765625))
+                                LocalPlayer.Character.Humanoid.MoveToFinished:wait()
+                                LocalPlayer.Character.Humanoid:MoveTo(Vector3.new(707.704345703125, 5.657994270324707, 1426.1021728515625))
+                                LocalPlayer.Character.Humanoid.MoveToFinished:wait()
+
+                                repeat wait()
+                                    game:GetService("VirtualInputManager"):SendKeyEvent(true,"E",false,game)
+                                    game:GetService("VirtualInputManager"):SendKeyEvent(false,"E",false,game)
+                                until shiftfind() ~= nil
+
+                                wait(3)
+                                local timestried = 0
+                                repeat wait()
+                                    if LocalPlayer.Team ~= game:GetService("Teams").TruckCompany then
+                                        repeat wait()
+                                            game:GetService("VirtualInputManager"):SendKeyEvent(true,"E",false,game)
+                                            game:GetService("VirtualInputManager"):SendKeyEvent(false,"E",false,game)
+                                        until shiftfind() ~= nil
+                                        task.wait(1)
+                                        if LocalPlayer.Team ~= game:GetService("Teams").TruckCompany and timestried > 10 then
+                                            for i,v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+                                                if v.ClassName == "TextLabel" and v.Text == "Start Shift" then
+                                                    firesignal(v.Parent.MouseButton1Click)
+                                                end
+                                            end
+                                            timestried = 0
+                                        end
+                                        for i,v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+                                            if v.ClassName == "ImageButton" and v.ImageColor3 == Color3.fromRGB(39, 174, 96) then
+                                                if v.Parent ~= nil then
+                                                    pcall(function()
+                                                        firesignal(v.MouseButton1Down)
+                                                    end)
+                                                end
+                                            end
+                                        end
+                                        timestried=timestried+1
+                                        task.wait(1)
+                                    end
+                                until findxpui() ~= nil
+
+                                repeat wait()
+                                until findxpui() ~= nil and findxpui().Enabled == true
+                                _G.rat = nil
+                                local num = 0
+                                for i,v in pairs(findxpui():GetDescendants()) do
+                                    if v.ClassName == "TextLabel" and string.find(v.Text,"XP") then
+                                        local Val = tonumber(v.Text:split(" ")[1])
+                                        if Val > num then
+                                            num = Val
+                                            print(Val)
+                                            _G.rat = v.Parent
+                                        end
+                                    end
+                                end
+                                if _G.rat ~= nil then
+                                    firesignal(_G.rat.MouseButton1Click)
+                                end
+
+                                LocalPlayer.Character.Humanoid:MoveTo(Vector3.new(699.1327514648438, 5.645294189453125, 1407.9368896484375))
+                                LocalPlayer.Character.Humanoid.MoveToFinished:wait()
+                                LocalPlayer.Character.Humanoid:MoveTo(Vector3.new(700.1976318359375, 5.645294189453125, 1408.7381591796875))
+                                LocalPlayer.Character.Humanoid.MoveToFinished:wait()
+
+                                repeat wait()
+                                    game:GetService("VirtualInputManager"):SendKeyEvent(true,"E",false,game)
+                                    game:GetService("VirtualInputManager"):SendKeyEvent(false,"E",false,game)
+                                until dealership()~= nil and dealership().Enabled == true
+
+                                for i,v in pairs(dealership():GetDescendants()) do
+                                    if v.ClassName == "TextLabel" and v.Text == "Stuttgart Lastkraft" then
+                                        repeat wait()
+                                            if v.Parent ~= nil then
+                                                firesignal(v.Parent.MouseButton1Click)
+                                                wait(1)
+                                                for a,b in pairs(dealership():GetDescendants()) do
+                                                    if b.ClassName == "TextLabel" and b.Text == "Spawn Vehicle" or b.ClassName == "TextLabel" and b.Text == "Unlock Vehicle" then
+                                                        firesignal(b.Parent.MouseButton1Click)
+                                                    end
+                                                end
+                                            end
+                                        until workspace.Vehicles:FindFirstChild(LocalPlayer.Name) and workspace.Vehicles[LocalPlayer.Name].Body:FindFirstChild("Trailer")
+                                    end
+                                end
+                            end
+                        elseif workspace.Vehicles:FindFirstChild(LocalPlayer.Name) and workspace.Vehicles[LocalPlayer.Name].Body:FindFirstChild("Trailer") and LocalPlayer.Character.Humanoid.SeatPart ~= nil then
+                            workspace.Gravity = 0
+                            local plr = LocalPlayer
+                            local chr = plr.Character
+                            local car = workspace.Vehicles[plr.Name]
+                            local pos = destination() or partfind()
+                            car.PrimaryPart = car.Body.Mass
+
+                            if (car.WorldPivot.Position-Vector3.new(pos.Position.X,car.PrimaryPart.Position.Y,pos.Position.Z)).magnitude > 100 then
+                                car:PivotTo(car.WorldPivot+Vector3.new(0,500,0))
+                            end
+
+                            local plr = LocalPlayer
+                            local pos = destination() or partfind()
+                            local car = workspace.Vehicles[plr.Name]
+                            if (car.WorldPivot.Position-Vector3.new(pos.Position.X,car.PrimaryPart.Position.Y,pos.Position.Z)).magnitude > 100 then
+                                local TweenService = game:GetService("TweenService")
+                                local TweenInfoToUse = TweenInfo.new(dist/80, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, 0, false, 0)
+                                local TweenValue = Instance.new("CFrameValue")
+                                TweenValue.Value = car.WorldPivot
+                                TweenValue.Changed:Connect(function()
+                                    car:PivotTo(TweenValue.Value)
+                                end)
+                                getfenv().tween = TweenService:Create(TweenValue, TweenInfoToUse, {Value=pos.CFrame+Vector3.new(0,500,0)})
+                                getfenv().tween:Play()
+                                repeat task.wait()
+                                until getfenv().tween.PlaybackState == Enum.PlaybackState.Cancelled or getfenv().tween.PlaybackState == Enum.PlaybackState.Completed or getfenv().tween.PlaybackState == Enum.PlaybackState.Paused
+                            end
+
+                            local plr = LocalPlayer
+                            local pos = destination() or partfind()
+                            local car = workspace.Vehicles[plr.Name]
+                            if (car.WorldPivot.Position-Vector3.new(pos.Position.X,car.PrimaryPart.Position.Y,pos.Position.Z)).magnitude < 100 then
+                                car:PivotTo(pos.CFrame)
+                                workspace.Gravity = 196
+                                for i,v in pairs(workspace.DeliveryDestinations:GetDescendants()) do
+                                    if v.Name == "SelectionBox" and v.Visible == true then
+                                        car:PivotTo(v.Parent.CFrame+Vector3.new(0,5,0))
+                                    end
+                                end
+                                local time = tick()
+                                repeat task.wait()
+                                until partfind() == nil or LocalPlayer:DistanceFromCharacter(partfind().Position) > 70 or tick() - time > 40
+                            end
+                        end
+                    end)
+                end
+            end)
+        end
+    end,
+})
+
+local PlayerGroup = Tabs.Player:AddLeftGroupbox("玩家设置")
+
+PlayerGroup:AddToggle("AntiFall", {
+    Text = "防坠落伤害",
+    Default = false,
+    Callback = function(Value)
+        getfenv().ANTIFALL = Value
+        if getfenv().ANTIFALL then
+            getfenv().nofall = game:GetService("RunService").RenderStepped:Connect(function()
+                if workspace:Raycast(LocalPlayer.Character.HumanoidRootPart.Position, Vector3.new(0, -20, 0)).Instance ~= nil and
+                   LocalPlayer.Character.HumanoidRootPart.Velocity.Y < -30 then
+                    LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+                end
+            end)
         else
-            game.Lighting.Brightness = 0
-            game.Lighting.ClockTime = 0
-            game.Lighting.GlobalShadows = true
-            game.Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
+            getfenv().nofall:Disconnect()
         end
     end,
 })
 
-local TrollGroup = Tabs.Troll:AddLeftGroupbox("恶搞功能")
-
-TrollGroup:AddToggle("SpamDoors", {
-    Text = "刷门(卡顿)",
+PlayerGroup:AddToggle("AntiDown", {
+    Text = "防倒地",
     Default = false,
     Callback = function(Value)
-        task.spawn(function()
-            while Value do
-                task.wait()
-                for _, d in pairs(workspace.Doors:GetChildren()) do
-                    if d:GetAttribute("Locked") ~= true then
-                        ReplicatedStorage:WaitForChild("Events"):WaitForChild("ClientChangeDoorState"):FireServer(d:WaitForChild("Door"))
-                    end
-                end
-            end
-        end)
-    end,
-})
-
-TrollGroup:AddToggle("SpamLights", {
-    Text = "刷灯(卡顿)",
-    Default = false,
-    Callback = function(Value)
-        task.spawn(function()
-            while Value do
-                task.wait()
-                for _, d in pairs(workspace.Map.Rooms:GetChildren()) do
-                    if d:FindFirstChild("LightSwitch") then
-                        ReplicatedStorage:WaitForChild("Events"):WaitForChild("UseLightSwitch"):FireServer(d)
-                    end
-                end
-            end
-        end)
-    end,
-})
-
-TrollGroup:AddButton("让所有物品消失", function()
-    task.spawn(function()
-        while task.wait() do
-            for _, d in pairs(workspace.Items:GetChildren()) do
-                if d.PrimaryPart then
-                    local newForce = Instance.new("BodyPosition",d.PrimaryPart)
-                    newForce.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
-                    newForce.Position = Vector3.new(1000000,1000000,1000000)
-                end
-            end
-
-            for _, d in pairs(Players:GetChildren()) do
-                local Tools = d:WaitForChild("ToolsHolder")
-
-                for _, d in pairs(Tools:GetChildren()) do
-                    if d.PrimaryPart then
-                        local newForce = Instance.new("BodyPosition",d.PrimaryPart)
-                        newForce.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
-                        newForce.Position = Vector3.new(1000000,1000000,1000000)
-                    end
-                end
-            end
+        getfenv().downed = Value
+        if getfenv().downed == true then
+            getfenv().antichanged1 = LocalPlayer.Character.Humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+                LocalPlayer.Character.Humanoid.Health = 100
+            end)
+        else
+            getfenv().antichanged1:Disconnect()
         end
-    end)
+    end,
+})
+
+PlayerGroup:AddButton("重置角色", function()
+    LocalPlayer.Character:BreakJoints()
 end)
+
+PlayerGroup:AddButton("无限耐力", function()
+    if getfenv().firsttime == nil then
+        getfenv().firsttime = true
+        local func
+        for i,v in pairs(getgc(true)) do
+            if type(v) == "function" and getinfo(v).name == "setStamina" then
+                warn(getinfo(v).name)
+                func = v
+            end
+        end
+        hookfunction(func,function(...)
+            local args = {...}
+            return args[1],math.huge
+        end)
+    end
+end)
+
+local AimbotGroup = Tabs.Aimbot:AddLeftGroupbox("自动瞄准")
+
+local function teams()
+    local teams = {"选择敌方队伍"}
+    for i,v in pairs(game:GetService("Teams"):GetChildren()) do
+        table.insert(teams,v.Name)
+    end
+    return teams
+end
+
+AimbotGroup:AddDropdown("EnemyTeam", {
+    Values = teams(),
+    Default = 1,
+    Multi = false,
+    Text = "选择敌方队伍",
+    Callback = function(Value)
+        if Value ~= "选择敌方队伍" then
+            getfenv().enemy = Value
+        end
+    end,
+})
+
+AimbotGroup:AddToggle("Aimbot", {
+    Text = "自动瞄准",
+    Default = false,
+    Callback = function(Value)
+        getfenv().aimbot = Value
+        task.spawn(function()
+            local function canaim(ye)
+                return LocalPlayer:DistanceFromCharacter(ye) < 3
+            end
+
+            while getfenv().aimbot do
+                task.wait()
+                if LocalPlayer.Character:FindFirstChildOfClass("Tool") and canaim(workspace.Camera.CFrame.Position) then
+                    local plr = nil
+                    local distance = math.huge
+                    for a,b in pairs(Players:GetPlayers()) do
+                        if b.Team.Name == getfenv().enemy then
+                            pcall(function()
+                                local Dist = (LocalPlayer.Character.HumanoidRootPart.Position - b.Character.Head.Position).magnitude
+                                if Dist < distance then
+                                    distance = Dist
+                                    plr = b
+                                end
+                            end)
+                        end
+                    end
+                    if plr ~= nil then
+                        workspace.Camera.CameraType = "Follow"
+                        workspace.Camera.CFrame = CFrame.new(workspace.Camera.CFrame.Position,plr.Character.Head.Position)
+                    end
+                end
+            end
+        end)
+    end,
+})
+
+AimbotGroup:AddToggle("HighlightEnemy", {
+    Text = "高亮敌人",
+    Default = false,
+    Callback = function(Value)
+        getfenv().highlight = Value
+        task.spawn(function()
+            if getfenv().highlight == false then
+                for i,v in pairs(Players:GetChildren()) do
+                    if v.ClassName == "Player" and v.Team.Name == getfenv().enemy and v.Character ~= nil and v.Character:FindFirstChild("Highlight") then
+                        v.Character:FindFirstChild("Highlight"):Destroy()
+                        task.wait()
+                    end
+                end
+            end
+            while getfenv().highlight do
+                task.wait()
+                for i,v in pairs(Players:GetChildren()) do
+                    if v.ClassName == "Player" and v.Team.Name == getfenv().enemy and v.Character ~= nil and not v.Character:FindFirstChild("Highlight") then
+                        Instance.new("Highlight",v.Character)
+                        task.wait()
+                    end
+                end
+            end
+        end)
+    end,
+})
+
+local TeleportGroup = Tabs.Teleport:AddLeftGroupbox("传送点1")
+
+TeleportGroup:AddDropdown("Teleport1", {
+    Values = {"传送点","警察局","银行","停车场","珠宝店","监狱","公交公司","卡车公司","医院"},
+    Default = 1,
+    Multi = false,
+    Text = "选择传送点",
+    Callback = function(Value)
+        print(Value)
+        if Value == "警察局" then
+            task.spawn(vehicleTeleport, CFrame.new(-1549.2081298828125, 5.615050315856934, 2935.314697265625))
+        elseif Value == "银行" then
+            task.spawn(vehicleTeleport, CFrame.new(-1174.68115234375, 5.874685287475586, 3209.03271484375))
+        elseif Value == "停车场" then
+            task.spawn(vehicleTeleport, CFrame.new(-993.5323486328125, -11.622750282287598, 3705.0126953125))
+        elseif Value == "珠宝店" then
+            task.spawn(vehicleTeleport, CFrame.new(-396.0776062011719, 5.6145405769348145, 3508.26318359375))
+        elseif Value == "监狱" then
+            task.spawn(vehicleTeleport, CFrame.new(-548.9014282226562, 5.6149725914001465, 2832.7587890625))
+        elseif Value == "卡车公司" then
+            task.spawn(vehicleTeleport, CFrame.new(717.53125, 15.626567840576172, 1462.559814453125))
+        elseif Value == "公交公司" then
+            task.spawn(vehicleTeleport, CFrame.new(-1683.09375, 15.630923271179199, -1286.167236328125))
+        elseif Value == "医院" then
+            task.spawn(vehicleTeleport, CFrame.new(-304.7102966308594, 5.623022079467773, 1018.22119140625))
+        end
+    end,
+})
+
+local TeleportGroup2 = Tabs.Teleport:AddRightGroupbox("传送点2")
+
+TeleportGroup2:AddDropdown("Teleport2", {
+    Values = {"传送点","工具店","汽车经销商","农场商店","Ares加油站","Osso加油站","Gas-N-Go加油站"},
+    Default = 1,
+    Multi = false,
+    Text = "选择传送点",
+    Callback = function(Value)
+        print(Value)
+        if Value == "工具店" then
+            task.spawn(vehicleTeleport, CFrame.new(-733.7286376953125, 5.614245414733887, 677.4180908203125))
+        elseif Value == "汽车经销商" then
+            task.spawn(vehicleTeleport, CFrame.new(-1422.2327880859375, 5.624246120452881, 939.8997802734375))
+        elseif Value == "农场商店" then
+            task.spawn(vehicleTeleport, CFrame.new(-840.9263305664062, 5.378037929534912, -1179.6783447265625))
+        elseif Value == "Ares加油站" then
+            task.spawn(vehicleTeleport, CFrame.new(-873.4227294921875, 5.614551067352295, 1500.887451171875))
+        elseif Value == "Osso加油站" then
+            task.spawn(vehicleTeleport, CFrame.new(-26.49447250366211, 5.615009307861328, -766.71630859375))
+        elseif Value == "Gas-N-Go加油站" then
+            task.spawn(vehicleTeleport, CFrame.new(-1544.445556640625, 5.628605842590332, 3811.127685546875))
+        end
+    end,
+})
 
 local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理")
 UnloadGroup:AddButton("卸载脚本", function()
@@ -654,3 +770,5 @@ if SaveManager then
     SaveManager:SetFolder("MyScriptConfig")
     SaveManager:BuildConfigSection(Tabs.Settings)
 end
+
+getfenv().jump = LocalPlayer.Character.Humanoid.JumpHeight
