@@ -3,6 +3,7 @@ local Options = Library.Options local Toggles = Library.Toggles local Players = 
 
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local espEnabled = false
@@ -223,6 +224,53 @@ if Toggles.PlantESP_Fill then
                 if data.highlight and data.highlight.Parent then
                     data.highlight.FillTransparency = transparency
                 end
+            end
+        end)
+    end)
+end
+
+local followEnabled = false
+
+local function getPlayerNames()
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    if #names == 0 then
+        table.insert(names, "没有其他玩家")
+    end
+    return names
+end
+
+local FollowGroup = Tabs.Main:AddRightGroupbox("贴背跟随")
+FollowGroup:AddDropdown("FollowTarget", {
+    Text = "选定玩家",
+    Values = getPlayerNames(),
+    Default = 1,
+    Multi = false,
+})
+FollowGroup:AddButton("刷新玩家列表", function()
+    pcall(function()
+        Options.FollowTarget:SetValues(getPlayerNames())
+        Library:Notify({ Title = "贴背跟随", Description = "玩家列表已刷新", Time = 2, })
+    end)
+end)
+FollowGroup:AddToggle("FollowBack", {
+    Text = "开启跟随",
+    Default = false,
+    Tooltip = "平滑跟随在选定玩家身后一米",
+})
+if Toggles.FollowBack then
+    Toggles.FollowBack:OnChanged(function()
+        pcall(function()
+            followEnabled = Toggles.FollowBack.Value
+            if followEnabled then
+                local targetName = Options.FollowTarget.Value
+                Library:Notify({ Title = "贴背跟随", Description = "已开启，目标：" .. tostring(targetName), Time = 3, })
+            else
+                Library:Notify({ Title = "贴背跟随", Description = "已关闭", Time = 3, })
             end
         end)
     end)
@@ -491,4 +539,23 @@ task.spawn(function()
         end
         task.wait(0.5)
     end
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+    if not followEnabled then return end
+    pcall(function()
+        local targetName = Options.FollowTarget.Value
+        if not targetName then return end
+        local target = Players:FindFirstChild(targetName)
+        local tchar = target and target.Character
+        local troot = tchar and tchar:FindFirstChild("HumanoidRootPart")
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if troot and root then
+            local backCF = troot.CFrame * CFrame.new(0, 0, 1)
+            local goal = CFrame.lookAt(backCF.Position, backCF.Position + troot.CFrame.LookVector)
+            local alpha = math.clamp(dt * 12, 0, 1)
+            root.CFrame = root.CFrame:Lerp(goal, alpha)
+        end
+    end)
 end)
