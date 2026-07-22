@@ -36,13 +36,27 @@ if ThemeManager then ThemeManager:SetLibrary(Library) ThemeManager:SetFolder("My
 
 local function getWeight(fruit)
     local ok, result = pcall(function()
-        local w = fruit:FindFirstChild("Weight")
+        local w = fruit:FindFirstChild("Weight", true)
         if w and w:IsA("NumberValue") then
             return w.Value
         end
-        local attr = fruit:GetAttribute("Weight")
-        if type(attr) == "number" then
-            return attr
+        local attrs = fruit:GetAttributes()
+        if attrs then
+            for key, value in pairs(attrs) do
+                if type(value) == "number" and string.find(string.lower(key), "weight") then
+                    return value
+                end
+            end
+            for key, value in pairs(attrs) do
+                if type(value) == "number" and (string.find(string.lower(key), "kg") or string.find(string.lower(key), "mass")) then
+                    return value
+                end
+            end
+            for key, value in pairs(attrs) do
+                if type(value) == "number" and value > 0 and value < 100000 and value ~= math.floor(value) then
+                    return value
+                end
+            end
         end
         return nil
     end)
@@ -62,35 +76,48 @@ local function isFruit(inst)
     return false
 end
 
+local function isBadName(text)
+    if type(text) ~= "string" then return true end
+    if text == "" then return true end
+    local lower = string.lower(text)
+    if lower == "label" or lower == "textlabel" or lower == "text" or text == "标签" or lower == "name" or lower == "unknown" then return true end
+    if string.find(text, " ") and string.match(text, "^%x+_%x+%-") then return true end
+    return false
+end
+
 local function getPlantName(fruit)
     local ok, result = pcall(function()
+        local fruitName = fruit:GetAttribute("Name") or fruit:GetAttribute("FruitName") or fruit:GetAttribute("PlantName") or fruit:GetAttribute("SeedName")
+        if type(fruitName) == "string" and not isBadName(fruitName) then
+            return fruitName
+        end
+        local hp = fruit:FindFirstChild("HarvestPart")
+        if hp then
+            local pp = hp:FindFirstChild("HarvestPrompt")
+            if pp and pp:IsA("ProximityPrompt") and not isBadName(pp.ObjectText) then
+                return pp.ObjectText
+            end
+            local lbl = hp:FindFirstChild("HarvestPromptLabel")
+            if lbl then
+                local nameLabel = lbl:FindFirstChild("Name", true)
+                if nameLabel and nameLabel:IsA("TextLabel") and not isBadName(nameLabel.Text) then
+                    return nameLabel.Text
+                end
+            end
+        end
         local fruitsFolder = fruit.Parent
         local plant = fruitsFolder and fruitsFolder.Parent
         if plant then
             local dg = plant:FindFirstChild("DebugGui")
             if dg then
                 local tl = dg:FindFirstChildWhichIsA("TextLabel", true)
-                if tl and tl.Text ~= "" then
+                if tl and not isBadName(tl.Text) then
                     return tl.Text
                 end
             end
-            local plantName = plant:GetAttribute("Name") or plant:GetAttribute("PlantName") or plant:GetAttribute("Seed_Name")
-            if type(plantName) == "string" and plantName ~= "" then
+            local plantName = plant:GetAttribute("Name") or plant:GetAttribute("PlantName") or plant:GetAttribute("Seed_Name") or plant:GetAttribute("Plant") or plant:GetAttribute("SeedName")
+            if type(plantName) == "string" and not isBadName(plantName) then
                 return plantName
-            end
-        end
-        local hp = fruit:FindFirstChild("HarvestPart")
-        if hp then
-            local pp = hp:FindFirstChild("HarvestPrompt")
-            if pp and pp:IsA("ProximityPrompt") and pp.ObjectText ~= "" then
-                return pp.ObjectText
-            end
-            local lbl = hp:FindFirstChild("HarvestPromptLabel")
-            if lbl then
-                local nameLabel = lbl:FindFirstChild("Name", true)
-                if nameLabel and nameLabel:IsA("TextLabel") and nameLabel.Text ~= "" then
-                    return nameLabel.Text
-                end
             end
         end
         return nil
