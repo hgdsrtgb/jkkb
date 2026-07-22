@@ -38,7 +38,6 @@ local function translateText(text)
         translatedTexts[text] = result
         return result
     end
-    translatedTexts[text] = false
     return nil
 end
 
@@ -435,24 +434,34 @@ scanFruits = function()
     return count
 end
 
+local translateCooldown = {}
+local translating = {}
+
 task.spawn(function()
     while true do
         if espEnabled and nameOn() then
-            local target = nil
             for fruit, data in pairs(espData) do
-                if data.name and isEnglish(data.name) and translatedTexts[data.name] == nil then
-                    target = fruit
-                    break
-                end
-            end
-            if target then
-                local data = espData[target]
-                if data then
-                    local oldName = data.name
-                    local translated = translateText(oldName)
-                    if translated and translated ~= oldName and espData[target] and espData[target].name == oldName then
-                        espData[target].name = translated
-                        refreshLabel(espData[target])
+                local name = data.name
+                if name and isEnglish(name) and translatedTexts[name] == nil and not translating[name] then
+                    local failTime = translateCooldown[name]
+                    if not failTime or (tick() - failTime) >= 10 then
+                        translating[name] = true
+                        task.spawn(function()
+                            pcall(function()
+                                local translated = translateText(name)
+                                if translated and translated ~= name then
+                                    for f, d in pairs(espData) do
+                                        if d.name == name then
+                                            d.name = translated
+                                            refreshLabel(d)
+                                        end
+                                    end
+                                else
+                                    translateCooldown[name] = tick()
+                                end
+                            end)
+                            translating[name] = nil
+                        end)
                     end
                 end
             end
