@@ -7,6 +7,61 @@ local espEnabled = false
 local espData = {}
 local scanFruits
 local clearAll
+local getWeight
+
+local goldColor = Color3.fromRGB(255, 200, 40)
+
+local nameTranslations = {
+    ["corn"] = "玉米", ["carrot"] = "胡萝卜", ["strawberry"] = "草莓", ["blueberry"] = "蓝莓",
+    ["tomato"] = "番茄", ["apple"] = "苹果", ["bamboo"] = "竹子", ["cactus"] = "仙人掌",
+    ["pineapple"] = "菠萝", ["grape"] = "葡萄", ["mango"] = "芒果", ["pumpkin"] = "南瓜",
+    ["watermelon"] = "西瓜", ["banana"] = "香蕉", ["cherry"] = "樱桃", ["coconut"] = "椰子",
+    ["mushroom"] = "蘑菇", ["peach"] = "桃子", ["pear"] = "梨", ["beanstalk"] = "魔豆藤",
+    ["dragon fruit"] = "火龙果", ["star fruit"] = "杨桃", ["acorn"] = "橡果",
+    ["bone blossom"] = "骨花", ["buttercup"] = "毛茛", ["tulip"] = "郁金香",
+    ["sunflower"] = "向日葵", ["rose"] = "玫瑰", ["lavender"] = "薰衣草",
+    ["daffodil"] = "水仙花", ["orange"] = "橙子", ["lemon"] = "柠檬", ["kiwi"] = "猕猴桃",
+    ["papaya"] = "木瓜", ["passionfruit"] = "百香果", ["guava"] = "番石榴",
+    ["lychee"] = "荔枝", ["durian"] = "榴莲", ["eggplant"] = "茄子", ["pepper"] = "辣椒",
+    ["cabbage"] = "卷心菜", ["lettuce"] = "生菜", ["onion"] = "洋葱", ["potato"] = "土豆",
+    ["radish"] = "萝卜", ["cucumber"] = "黄瓜", ["cauliflower"] = "花椰菜",
+    ["broccoli"] = "西兰花", ["spinach"] = "菠菜", ["mint"] = "薄荷",
+    ["candy blossom"] = "糖果花", ["moon blossom"] = "月光花", ["ember lily"] = "余烬百合",
+    ["moon melon"] = "月光瓜", ["blood banana"] = "血香蕉", ["moon mango"] = "月光芒果",
+    ["bean"] = "豆子", ["wheat"] = "小麦", ["rice"] = "水稻", ["sugarglaze"] = "糖霜果",
+}
+
+local function translateName(name)
+    if type(name) ~= "string" then return name end
+    local lower = string.lower(name)
+    if nameTranslations[lower] then
+        return nameTranslations[lower]
+    end
+    for eng, chn in pairs(nameTranslations) do
+        if string.find(lower, eng, 1, true) then
+            return chn
+        end
+    end
+    return name
+end
+
+local function getMinKG()
+    local ok, v = pcall(function() return Options.PlantESP_MinKG.Value end)
+    if ok and type(v) == "number" then return v end
+    return 0
+end
+
+local function getMaxKG()
+    local ok, v = pcall(function() return Options.PlantESP_MaxKG.Value end)
+    if ok and type(v) == "number" then return v end
+    return 1000
+end
+
+local function passFilter(fruit)
+    local w = getWeight(fruit)
+    if w == nil then return true end
+    return w >= getMinKG() and w <= getMaxKG()
+end
 
 local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息") NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本') NoticeGroup:AddLabel('创作者：恐拜大帝') local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理") UnloadGroup:AddButton("卸载脚本", function() Library:Unload() end)
 
@@ -16,6 +71,34 @@ PlantGroup:AddToggle("PlantESP", {
     Default = false,
     Tooltip = "显示植物名字和千克数",
 })
+PlantGroup:AddSlider("PlantESP_MinKG", {
+    Text = "最低千克",
+    Default = 0,
+    Min = 0,
+    Max = 1000,
+    Rounding = 1,
+    Suffix = "kg",
+})
+PlantGroup:AddSlider("PlantESP_MaxKG", {
+    Text = "最高千克",
+    Default = 1000,
+    Min = 0,
+    Max = 1000,
+    Rounding = 1,
+    Suffix = "kg",
+})
+local function refreshESP()
+    if espEnabled then
+        clearAll()
+        scanFruits()
+    end
+end
+if Options.PlantESP_MinKG then
+    Options.PlantESP_MinKG:OnChanged(refreshESP)
+end
+if Options.PlantESP_MaxKG then
+    Options.PlantESP_MaxKG:OnChanged(refreshESP)
+end
 if Toggles.PlantESP then
     Toggles.PlantESP:OnChanged(function()
         pcall(function()
@@ -34,7 +117,7 @@ end
 
 if ThemeManager then ThemeManager:SetLibrary(Library) ThemeManager:SetFolder("MyScriptTheme") ThemeManager:ApplyToTab(Tabs.Settings) end if SaveManager then SaveManager:SetLibrary(Library) SaveManager:IgnoreThemeSettings() SaveManager:SetFolder("MyScriptConfig") SaveManager:BuildConfigSection(Tabs.Settings) end
 
-local function getWeight(fruit)
+getWeight = function(fruit)
     local ok, result = pcall(function()
         local w = fruit:FindFirstChild("Weight", true)
         if w and w:IsA("NumberValue") then
@@ -142,11 +225,11 @@ local function addESP(fruit)
     pcall(function()
         local hp = fruit:FindFirstChild("HarvestPart")
         if not hp then return end
-        local name = getPlantName(fruit)
+        local name = translateName(getPlantName(fruit))
 
         local hl = Instance.new("Highlight")
-        hl.FillColor = Color3.fromRGB(255, 255, 0)
-        hl.OutlineColor = Color3.fromRGB(255, 255, 0)
+        hl.FillColor = goldColor
+        hl.OutlineColor = goldColor
         hl.FillTransparency = 0.65
         hl.OutlineTransparency = 0
         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -163,7 +246,7 @@ local function addESP(fruit)
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(255, 255, 0)
+        label.TextColor3 = goldColor
         label.Font = Enum.Font.GothamBold
         label.TextSize = 15
         label.TextStrokeTransparency = 0
@@ -194,7 +277,7 @@ scanFruits = function()
                                 local fruitsFolder = plant:FindFirstChild("Fruits")
                                 if fruitsFolder then
                                     for _, fruit in ipairs(fruitsFolder:GetChildren()) do
-                                        if isFruit(fruit) then
+                                        if isFruit(fruit) and passFilter(fruit) then
                                             addESP(fruit)
                                             count = count + 1
                                         end
@@ -210,7 +293,7 @@ scanFruits = function()
     if count == 0 then
         pcall(function()
             for _, desc in ipairs(Workspace:GetDescendants()) do
-                if isFruit(desc) then
+                if isFruit(desc) and passFilter(desc) then
                     addESP(desc)
                     count = count + 1
                 end
@@ -224,7 +307,7 @@ Workspace.DescendantAdded:Connect(function(inst)
     if espEnabled and inst:IsA("Model") then
         task.defer(function()
             pcall(function()
-                if espEnabled and inst.Parent and isFruit(inst) then
+                if espEnabled and inst.Parent and isFruit(inst) and passFilter(inst) then
                     addESP(inst)
                 end
             end)
@@ -245,14 +328,18 @@ task.spawn(function()
                 for fruit, data in pairs(espData) do
                     pcall(function()
                         if fruit.Parent and data.label and data.label.Parent then
-                            if data.name == "未知植物" then
-                                data.name = getPlantName(fruit)
-                            end
-                            local w = getWeight(fruit)
-                            if w then
-                                data.label.Text = data.name .. "\n" .. string.format("%.2fkg", w)
+                            if not passFilter(fruit) then
+                                removeESP(fruit)
                             else
-                                data.label.Text = data.name
+                                if data.name == "未知植物" then
+                                    data.name = translateName(getPlantName(fruit))
+                                end
+                                local w = getWeight(fruit)
+                                if w then
+                                    data.label.Text = data.name .. "\n" .. string.format("%.2fkg", w)
+                                else
+                                    data.label.Text = data.name
+                                end
                             end
                         end
                     end)
