@@ -1,18 +1,20 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local RarityColors = {
 	common = Color3.fromRGB(0, 255, 0),
 	uncommon = Color3.fromRGB(0, 170, 255),
-	rare = Color3.fromRGB(255, 255, 0),
-	epic = Color3.fromRGB(255, 0, 0),
-	legendary = Color3.fromRGB(255, 200, 0),
-	mythic = Color3.fromRGB(170, 0, 255),
-	divine = Color3.fromRGB(170, 0, 255),
-	secret = Color3.fromRGB(170, 0, 255)
+	rare = Color3.fromRGB(170, 0, 255),
+	epic = Color3.fromRGB(255, 200, 0),
+	legendary = Color3.fromRGB(255, 0, 0),
+	mythic = Color3.fromRGB(255, 0, 0),
+	divine = Color3.fromRGB(255, 0, 0),
+	secret = Color3.fromRGB(255, 0, 0)
 }
 
 local DefaultColor = Color3.fromRGB(255, 255, 255)
@@ -23,12 +25,13 @@ local watchedFolders = {}
 local connections = {}
 local heartbeatConn = nil
 local heartbeatAcc = 0
+local translatedTexts = {}
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "PetESPGui"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+screenGui.Parent = PlayerGui
 
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0, 130, 0, 40)
@@ -52,6 +55,50 @@ stroke.Thickness = 1
 stroke.Transparency = 0.6
 stroke.Parent = toggleBtn
 
+local function translateText(text)
+	if not text or text == "" or #text < 2 then
+		return nil
+	end
+	if translatedTexts[text] then
+		return translatedTexts[text]
+	end
+	local success, result = pcall(function()
+		local url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=" .. HttpService:UrlEncode(text)
+		local response = game:HttpGet(url)
+		local decoded = HttpService:JSONDecode(response)
+		if decoded and decoded[1] and decoded[1][1] and decoded[1][1][1] then
+			return decoded[1][1][1]
+		end
+		return nil
+	end)
+	if success and result then
+		translatedTexts[text] = result
+		return result
+	end
+	return nil
+end
+
+local function isEnglish(text)
+	if not text or text == "" then
+		return false
+	end
+	local englishCount = 0
+	local totalCount = 0
+	for char in string.gmatch(text, ".") do
+		local byte = string.byte(char)
+		if byte then
+			totalCount = totalCount + 1
+			if (byte >= 65 and byte <= 90) or (byte >= 97 and byte <= 122) then
+				englishCount = englishCount + 1
+			end
+		end
+	end
+	if totalCount == 0 then
+		return false
+	end
+	return (englishCount / totalCount) > 0.5
+end
+
 local function getRarityColor(rarity)
 	if not rarity then
 		return DefaultColor
@@ -65,34 +112,56 @@ local function getRarityColor(rarity)
 	return DefaultColor
 end
 
+local function getInfoFolder()
+	return PlayerGui:FindFirstChild("PetInfoBillboardUIs")
+end
+
 local function getPetInfo(model)
 	local info = {}
-	local attrs = model:GetAttributes()
-	for k, v in pairs(attrs) do
-		local lk = string.lower(k)
-		if string.find(lk, "rarity") then
-			info.Rarity = tostring(v)
-		elseif string.find(lk, "weight") then
-			info.Weight = tostring(v)
-		elseif string.find(lk, "age") then
-			info.Age = tostring(v)
-		elseif string.find(lk, "name") or string.find(lk, "type") or lk == "pet" then
-			if not info.Name then
-				info.Name = tostring(v)
+	local folder = getInfoFolder()
+	if folder then
+		local bb = folder:FindFirstChild(model.Name)
+		local frame = bb and bb:FindFirstChild("Frame")
+		if frame then
+			local petName = frame:FindFirstChild("PetName")
+			if petName and petName:IsA("TextLabel") and petName.Text ~= "" then
+				info.Name = petName.Text
+			end
+			local rarity = frame:FindFirstChild("Rarity")
+			if rarity and rarity:IsA("TextLabel") then
+				if rarity.Text ~= "" then
+					info.Rarity = rarity.Text
+				else
+					for _, c in ipairs(rarity:GetChildren()) do
+						if c:IsA("UIGradient") then
+							info.Rarity = c.Name
+							break
+						end
+					end
+				end
+			end
+			local level = frame:FindFirstChild("Level")
+			if level and level:IsA("TextLabel") and level.Text ~= "" then
+				info.Level = level.Text
 			end
 		end
 	end
+	local attrs = model:GetAttributes()
+	for k, v in pairs(attrs) do
+		local lk = string.lower(k)
+		if string.find(lk, "weight") then
+			info.Weight = tostring(v)
+		elseif string.find(lk, "age") then
+			info.Age = tostring(v)
+		end
+	end
 	for _, child in ipairs(model:GetChildren()) do
-		if child:IsA("StringValue") or child:IsA("NumberValue") or child:IsA("IntValue") then
+		if child:IsA("NumberValue") or child:IsA("IntValue") or child:IsA("StringValue") then
 			local lk = string.lower(child.Name)
-			if string.find(lk, "rarity") and not info.Rarity then
-				info.Rarity = tostring(child.Value)
-			elseif string.find(lk, "weight") and not info.Weight then
+			if string.find(lk, "weight") and not info.Weight then
 				info.Weight = tostring(child.Value)
 			elseif string.find(lk, "age") and not info.Age then
 				info.Age = tostring(child.Value)
-			elseif (string.find(lk, "name") or string.find(lk, "type")) and not info.Name then
-				info.Name = tostring(child.Value)
 			end
 		end
 	end
@@ -111,6 +180,9 @@ local function buildText(model)
 		nameLine = nameLine .. " [" .. info.Rarity .. "]"
 	end
 	table.insert(lines, nameLine)
+	if info.Level then
+		table.insert(lines, "等级: " .. info.Level)
+	end
 	if info.Age then
 		table.insert(lines, "年龄: " .. info.Age)
 	end
@@ -119,6 +191,32 @@ local function buildText(model)
 	end
 	table.insert(lines, "距离: " .. data.Distance .. "m")
 	return table.concat(lines, "\n")
+end
+
+local function refreshESP(model)
+	local data = tracked[model]
+	if not data then
+		return
+	end
+	local info = getPetInfo(model)
+	if not info.Name and data.Info.Name then
+		info.Name = data.Info.Name
+	end
+	data.Info = info
+	local color = getRarityColor(info.Rarity)
+	data.Highlight.FillColor = color
+	data.Highlight.OutlineColor = color
+	data.Label.TextColor3 = color
+	if info.Name and isEnglish(info.Name) and not translatedTexts[info.Name] then
+		task.spawn(function()
+			local translated = translateText(info.Name)
+			if translated and translated ~= info.Name and tracked[model] then
+				tracked[model].Info.Name = translated
+			end
+		end)
+	elseif info.Name and translatedTexts[info.Name] then
+		data.Info.Name = translatedTexts[info.Name]
+	end
 end
 
 local function addESP(model)
@@ -162,6 +260,21 @@ local function addESP(model)
 		Label = label,
 		Distance = "?"
 	}
+	if info.Name and isEnglish(info.Name) then
+		task.spawn(function()
+			local translated = translateText(info.Name)
+			if translated and translated ~= info.Name and tracked[model] then
+				tracked[model].Info.Name = translated
+			end
+		end)
+	end
+	if not info.Name then
+		task.delay(1, function()
+			if tracked[model] then
+				refreshESP(model)
+			end
+		end)
+	end
 end
 
 local function removeESP(model)
@@ -214,6 +327,26 @@ local function scanContainers()
 	end
 end
 
+local function hookInfoFolder()
+	local folder = getInfoFolder()
+	if not folder then
+		return
+	end
+	folder.ChildAdded:Connect(function(bb)
+		if not espEnabled then
+			return
+		end
+		task.delay(0.5, function()
+			for model in pairs(tracked) do
+				if model.Name == bb.Name then
+					refreshESP(model)
+					break
+				end
+			end
+		end)
+	end)
+end
+
 local function startHeartbeat()
 	if heartbeatConn then
 		return
@@ -264,6 +397,14 @@ end
 Workspace.DescendantAdded:Connect(function(obj)
 	if espEnabled and obj:IsA("Folder") and string.find(string.lower(obj.Name), "pets") then
 		watchFolder(obj)
+	end
+end)
+
+hookInfoFolder()
+
+PlayerGui.ChildAdded:Connect(function(obj)
+	if obj.Name == "PetInfoBillboardUIs" then
+		hookInfoFolder()
 	end
 end)
 
