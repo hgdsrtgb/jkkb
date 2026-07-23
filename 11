@@ -1,270 +1,194 @@
-local function safeLoad(url)
-    local success, result = pcall(function() return loadstring(game:HttpGet(url))() end)
-    if not success then
-        warn("加载失败: " .. url)
-        return nil
-    end
-    return result
-end
+local function safeLoad(url) local success, result = pcall(function() return loadstring(game:HttpGet(url))() end) if not success then warn("加载失败: " .. url) return nil end return result end local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui") local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui") local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui") if not Library then game:GetService("StarterGui"):SetCore("SendNotification", { Title = "错误", Text = "UI 库加载失败，请检查网络或脚本资源", Duration = 5, }) return end local Options = Library.Options local Toggles = Library.Toggles local Players = game:GetService("Players") local ReplicatedStorage = game:GetService("ReplicatedStorage") local player = Players.LocalPlayer local Window = Library:CreateWindow({ Title = "死亡之死", Footer = "恐拜大帝 制作", Icon = 131153193945220, NotifySide = "Right", ShowCustomCursor = true, }) Library:Notify({ Title = "死亡之死", Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功", Time = 5, }) local Tabs = { Notice = Window:AddTab("通知", "info"), Main = Window:AddTab("主要", "info"), Settings = Window:AddTab("设置", "settings"), } local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息") NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本') NoticeGroup:AddLabel('创作者：恐拜大帝')
 
-local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui")
-local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui")
-local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui")
-
-if not Library then
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "错误",
-        Text = "UI 库加载失败，请检查网络或脚本资源",
-        Duration = 5,
-    })
-    return
-end
-
-local Options = Library.Options
-local Toggles = Library.Toggles
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local player = Players.LocalPlayer
-
+local LocalPlayer = Players.LocalPlayer
+local Character
+local Humanoid
 local StaminaModule
-pcall(function()
-    StaminaModule = require(player:WaitForChild("PlayerGui"):WaitForChild("MainGui"):WaitForChild("Client"):WaitForChild("Modules"):WaitForChild("Movement"))
+local NoStaminaLoss = false
+
+local function UpdateCharacter()
+    Character = LocalPlayer.Character
+    if Character then
+        Humanoid = Character:FindFirstChildOfClass("Humanoid") or Character:WaitForChild("Humanoid", 5)
+    end
+end
+UpdateCharacter()
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid", 5)
+end)
+
+task.spawn(function()
+    pcall(function()
+        StaminaModule = require(LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("MainGui"):WaitForChild("Client"):WaitForChild("Modules"):WaitForChild("Movement"))
+    end)
 end)
 
 local function SetStaminaProperty(property, value)
-    local char = player.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not Character then return end
     if property == "MaxStamina" then
-        char:SetAttribute("MaxStamina", value)
+        Character:SetAttribute("MaxStamina", value)
     elseif property == "Stamina" then
         if StaminaModule then
             StaminaModule["Stamina"] = value
         end
-    elseif property == "WalkSpeed" then
-        if hum then hum.WalkSpeed = value end
-    elseif property == "SprintSpeed" then
-        char:SetAttribute("SprintSpeed", value)
     end
 end
 
-local Window = Library:CreateWindow({
-    Title = "死亡之死",
-    Footer = "恐拜大帝 制作",
-    Icon = 131153193945220,
-    NotifySide = "Right",
-    ShowCustomCursor = true,
-})
-
-Library:Notify({
-    Title = "死亡之死",
-    Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功",
-    Time = 5,
-})
-
-local Tabs = {
-    Notice = Window:AddTab("通知", "info"),
-    Main = Window:AddTab("主要", "info"),
-    Settings = Window:AddTab("设置", "settings"),
-}
-
-local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息")
-NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本')
-NoticeGroup:AddLabel('创作者：恐拜大帝')
-
-local StaminaGroup = Tabs.Main:AddLeftGroupbox("体力功能")
-
-StaminaGroup:AddToggle("无限体力", {
-    Text = "无限体力",
-    Default = false,
-    Callback = function(Value)
-        if Value then
-            SetStaminaProperty("MaxStamina", math.huge)
-            SetStaminaProperty("Stamina", math.huge)
-        else
-            SetStaminaProperty("MaxStamina", 100)
-            SetStaminaProperty("Stamina", 100)
-        end
-    end
-})
-
-local NoStaminaLoss = false
-task.spawn(function()
-    while task.wait(0.003) do
-        if NoStaminaLoss then
-            local char = player.Character
-            if char and char:GetAttribute("MaxStamina") then
-                SetStaminaProperty("Stamina", char:GetAttribute("MaxStamina"))
-            end
-        end
-    end
+local StaminaGroup = Tabs.Main:AddLeftGroupbox("体力")
+StaminaGroup:AddButton("无限体力", function()
+    SetStaminaProperty("MaxStamina", 1/0)
+    SetStaminaProperty("Stamina", 1/0)
+    Library:Notify({ Title = "死亡之死", Description = "无限体力已开启", Time = 3, })
 end)
-
-StaminaGroup:AddToggle("无体力消耗", {
+StaminaGroup:AddToggle("NoStaminaLoss", {
     Text = "无体力消耗",
     Default = false,
     Callback = function(Value)
         NoStaminaLoss = Value
-    end
+        if Value == true then
+            task.spawn(function()
+                repeat task.wait(0.003)
+                    if Character and Character:GetAttribute("MaxStamina") then
+                        SetStaminaProperty("Stamina", Character:GetAttribute("MaxStamina"))
+                    end
+                until NoStaminaLoss == false
+            end)
+        end
+    end,
 })
 
-local ESPFolder = nil
-local ESPConnections = {}
-local ESPEnabled = false
-local ESPTrans = 0.3
-
-local function ClearESP()
-    for _, con in pairs(ESPConnections) do
-        pcall(function() con:Disconnect() end)
-    end
-    ESPConnections = {}
-    if ESPFolder then
-        pcall(function() ESPFolder:Destroy() end)
-    end
-    ESPFolder = nil
+if not game:GetService("CoreGui"):FindFirstChild("DOD_ESP_HANDLER") then
+    Instance.new("Folder", game:GetService("CoreGui")).Name = "DOD_ESP_HANDLER"
 end
 
-local function UpdateESPTransparency(trans)
-    if not ESPFolder then return end
-    for _, v in pairs(ESPFolder:GetDescendants()) do
-        if v:IsA("BoxHandleAdornment") then
-            v.Transparency = trans
-        end
-    end
-end
+_G.ESPenabledHandler = false
+_G.ESPtransHandler = 0.3
 
-local function CreateESP(plr)
-    if plr == player then return end
+local function CreateHighlight(plr)
     task.spawn(function()
-        if ESPFolder then
-            local old = ESPFolder:FindFirstChild("esp_" .. plr.Name)
-            if old then old:Destroy() end
+        for i,v in pairs(game:GetService("CoreGui"):FindFirstChild("DOD_ESP_HANDLER"):GetChildren()) do
+            if v and v.Name == ("sillyfolder_"..plr.Name) then
+                v:Destroy()
+            end
         end
+        repeat task.wait() until game:GetService("CoreGui"):WaitForChild("DOD_ESP_HANDLER"):FindFirstChild("sillyfolder_"..plr.Name) == nil
+        local esp_folder = Instance.new("Folder")
+        esp_folder.Name = "sillyfolder_"..plr.Name
+        esp_folder.Parent = game:GetService("CoreGui"):FindFirstChild("DOD_ESP_HANDLER")
         repeat task.wait() until plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid")
-        local plrChar = plr.Character
-        if not ESPFolder then return end
-        local espFolder = Instance.new("Folder")
-        espFolder.Name = "esp_" .. plr.Name
-        espFolder.Parent = ESPFolder
-        for _, v in pairs(plrChar:GetChildren()) do
-            if v:IsA("BasePart") and (v.Name == "Left Leg" or v.Name == "Left Arm" or v.Name == "Right Leg" or v.Name == "Right Arm" or v.Name == "Torso" or v.Name == "Head") then
-                local box = Instance.new("BoxHandleAdornment")
-                box.Name = "box_" .. plr.Name
-                box.Adornee = v
-                box.AlwaysOnTop = true
-                box.ZIndex = 10
-                box.Size = v.Size
-                box.Transparency = ESPTrans
-                local teamColor = "Bright green"
-                if plrChar.Parent and plrChar.Parent.Name == "Killer" then
-                    teamColor = "Bright red"
-                elseif plrChar.Parent and plrChar.Parent.Name == "Ghost" then
-                    teamColor = "White"
-                end
-                box.Color = BrickColor.new(teamColor)
-                box.Parent = espFolder
+        local plr_char = plr.Character or plr.CharacterAdded:Wait()
+        for i,v in pairs(plr_char:GetChildren()) do
+            if v and v:IsA("BasePart") and (v.Name == "Left Leg" or v.Name == "Left Arm" or v.Name == "Right Leg" or v.Name == "Right Arm" or v.Name == "Torso" or v.Name == "Head") then
+                local esp = Instance.new("BoxHandleAdornment")
+                esp.Name = "sillygirl_"..plr.Name
+                esp.Adornee = v
+                esp.AlwaysOnTop = true
+                esp.ZIndex = 10 or 1
+                esp.Size = v.Size
+                esp.Transparency = (plr_char.Parent.Name == "Workspace" and 1) or tonumber(_G.ESPtransHandler)
+                esp.Color = (plr_char.Parent.Name == "Killer" and BrickColor.new("Bright red")) or (plr_char.Parent.Name == "Ghost" and BrickColor.new("White")) or BrickColor.new("Bright green")
+                esp.Parent = game:GetService("CoreGui"):WaitForChild("DOD_ESP_HANDLER"):FindFirstChild("sillyfolder_"..plr.Name)
                 if v.Name == "Head" then
-                    local bill = Instance.new("BillboardGui")
-                    bill.Adornee = v
-                    bill.AlwaysOnTop = true
-                    bill.Size = UDim2.new(0, 80, 0, 50)
-                    bill.StudsOffset = Vector3.new(0, 0.2, 0)
-                    bill.Parent = espFolder
-                    local text = Instance.new("TextLabel")
-                    text.BackgroundTransparency = 1
-                    text.Position = UDim2.new(0, 0, 0, -50)
-                    text.Size = UDim2.new(0, 80, 0, 80)
-                    text.Font = Enum.Font.SourceSansSemibold
-                    text.TextSize = 15
-                    text.TextColor3 = Color3.new(1, 1, 1)
-                    text.TextStrokeTransparency = 0
-                    text.TextYAlignment = Enum.TextYAlignment.Bottom
-                    text.Parent = bill
+                    local esp_stat = Instance.new("BillboardGui")
+                    local stat_text = Instance.new("TextLabel")
+                    esp_stat.Adornee = v
+                    esp_stat.AlwaysOnTop = true
+                    esp_stat.Parent = esp
+                    esp_stat.Size = UDim2.new(0, 80, 0, 50)
+                    esp_stat.StudsOffset = Vector3.new(0, .2, 0)
+                    stat_text.ZIndex = 10
+                    stat_text.BackgroundTransparency = 1
+                    stat_text.Position = UDim2.new(0, 0, 0, -50)
+                    stat_text.Size = UDim2.new(0, 80, 0, 80)
+                    stat_text.Font = Enum.Font.SourceSansSemibold
+                    stat_text.TextSize = 15
+                    stat_text.TextColor3 = Color3.new(1, 1, 1)
+                    stat_text.TextStrokeTransparency = 0
+                    stat_text.TextYAlignment = Enum.TextYAlignment.Bottom
+                    stat_text.Parent = esp_stat
                     task.spawn(function()
-                        while bill and bill.Parent do
-                            pcall(function()
-                                text.Text = "Name: " .. plr.Name .. "\nHealth: " .. plrChar.Humanoid.Health
-                            end)
-                            task.wait(0.05)
-                        end
+                        pcall(function()
+                            while task.wait(.05) do
+                                stat_text.Text = "Name: "..plr.Name.."\nHealth: "..plr_char.Humanoid.Health..""
+                            end
+                        end)
                     end)
                 end
             end
         end
-        local charCon = plr.CharacterAdded:Connect(function()
-            if espFolder then espFolder:Destroy() end
+        local char_connection, team_connection, dstr_connection
+        char_connection = plr.CharacterAdded:Connect(function()
+            if game:GetService("CoreGui"):WaitForChild("DOD_ESP_HANDLER"):FindFirstChild("sillyfolder_"..plr.Name) then
+                game:GetService("CoreGui"):WaitForChild("DOD_ESP_HANDLER"):FindFirstChild("sillyfolder_"..plr.Name):Destroy()
+            end
+            dstr_connection:Disconnect()
+            team_connection:Disconnect()
             repeat task.wait(1.25) until plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid")
-            CreateESP(plr)
-            charCon:Disconnect()
+            CreateHighlight(plr)
+            char_connection:Disconnect()
         end)
-        table.insert(ESPConnections, charCon)
+        team_connection = plr:GetPropertyChangedSignal("TeamColor"):Connect(function()
+            if game:GetService("CoreGui"):WaitForChild("DOD_ESP_HANDLER"):FindFirstChild("sillyfolder_"..plr.Name) then
+                game:GetService("CoreGui"):WaitForChild("DOD_ESP_HANDLER"):FindFirstChild("sillyfolder_"..plr.Name):Destroy()
+            end
+            dstr_connection:Disconnect()
+            char_connection:Disconnect()
+            repeat task.wait(1.25) until plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid")
+            CreateHighlight(plr)
+            team_connection:Disconnect()
+        end)
+        dstr_connection = game:GetService("CoreGui").ChildRemoved:Connect(function(child)
+            if child.Name == "DOD_ESP_HANDLER" then
+                Instance.new("Folder", game:GetService("CoreGui")).Name = "DOD_ESP_HANDLER"
+                team_connection:Disconnect()
+                char_connection:Disconnect()
+                dstr_connection:Disconnect()
+            end
+        end)
     end)
 end
 
-local VisualGroup = Tabs.Main:AddRightGroupbox("透视功能")
+local plradded_esp = nil
+local plrremoved_esp = nil
 
-VisualGroup:AddToggle("透视", {
+local ESPGroup = Tabs.Main:AddRightGroupbox("透视")
+ESPGroup:AddToggle("ESPEnabled", {
     Text = "透视",
     Default = false,
     Callback = function(Value)
-        ESPEnabled = Value
-        if Value then
-            if not game:GetService("CoreGui"):FindFirstChild("DOD_ESP") then
-                ESPFolder = Instance.new("Folder")
-                ESPFolder.Name = "DOD_ESP"
-                ESPFolder.Parent = game:GetService("CoreGui")
-            else
-                ESPFolder = game:GetService("CoreGui"):FindFirstChild("DOD_ESP")
+        _G.ESPenabledHandler = Value
+        if _G.ESPenabledHandler == true then
+            if not game:GetService("CoreGui"):FindFirstChild("DOD_ESP_HANDLER") then
+                Instance.new("Folder", game:GetService("CoreGui")).Name = "DOD_ESP_HANDLER"
             end
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= player then
-                    CreateESP(plr)
+            for i,v in pairs(game:GetService("Players"):GetPlayers()) do
+                if v and v ~= LocalPlayer then
+                    CreateHighlight(v)
                 end
             end
-            local con1 = Players.PlayerAdded:Connect(function(plr)
-                if ESPEnabled then
-                    CreateESP(plr)
+            plradded_esp = game:GetService("Players").PlayerAdded:Connect(function(plr)
+                CreateHighlight(plr)
+            end)
+            plrremoved_esp = game:GetService("Players").PlayerRemoving:Connect(function(plr)
+                if game:GetService("CoreGui"):WaitForChild("DOD_ESP_HANDLER"):FindFirstChild("sillyfolder_"..plr.Name) then
+                    game:GetService("CoreGui"):WaitForChild("DOD_ESP_HANDLER"):FindFirstChild("sillyfolder_"..plr.Name):Destroy()
                 end
             end)
-            local con2 = Players.PlayerRemoving:Connect(function(plr)
-                if ESPFolder then
-                    local f = ESPFolder:FindFirstChild("esp_" .. plr.Name)
-                    if f then f:Destroy() end
-                end
-            end)
-            table.insert(ESPConnections, con1)
-            table.insert(ESPConnections, con2)
-        else
-            ClearESP()
+        elseif _G.ESPenabledHandler == false then
+            if game:GetService("CoreGui"):FindFirstChild("DOD_ESP_HANDLER") then
+                game:GetService("CoreGui"):FindFirstChild("DOD_ESP_HANDLER"):Destroy()
+            end
+            if plradded_esp ~= nil then
+                plradded_esp:Disconnect()
+                plradded_esp = nil
+            end
+            if plrremoved_esp ~= nil then
+                plrremoved_esp:Disconnect()
+                plrremoved_esp = nil
+            end
         end
-    end
+    end,
 })
 
-VisualGroup:AddSlider("透视透明度", {
-    Text = "透视透明度",
-    Default = 30,
-    Min = 0,
-    Max = 100,
-    Rounding = 0,
-    Suffix = "%",
-    Callback = function(Value)
-        ESPTrans = Value / 100
-        UpdateESPTransparency(ESPTrans)
-    end
-})
-
-local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理")
-UnloadGroup:AddButton("卸载脚本", function() Library:Unload() end)
-
-if ThemeManager then
-    ThemeManager:SetLibrary(Library)
-    ThemeManager:SetFolder("MyScriptTheme")
-    ThemeManager:ApplyToTab(Tabs.Settings)
-end
-
-if SaveManager then
-    SaveManager:SetLibrary(Library)
-    SaveManager:IgnoreThemeSettings()
-    SaveManager:SetFolder("MyScriptConfig")
-    SaveManager:BuildConfigSection(Tabs.Settings)
-end
+local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理") UnloadGroup:AddButton("卸载脚本", function() _G.ESPenabledHandler = false if game:GetService("CoreGui"):FindFirstChild("DOD_ESP_HANDLER") then game:GetService("CoreGui"):FindFirstChild("DOD_ESP_HANDLER"):Destroy() end Library:Unload() end) if ThemeManager then ThemeManager:SetLibrary(Library) ThemeManager:SetFolder("MyScriptTheme") ThemeManager:ApplyToTab(Tabs.Settings) end if SaveManager then SaveManager:SetLibrary(Library) SaveManager:IgnoreThemeSettings() SaveManager:SetFolder("MyScriptConfig") SaveManager:BuildConfigSection(Tabs.Settings) end
