@@ -112,56 +112,37 @@ local function getRarityColor(rarity)
 	return DefaultColor
 end
 
-local function getInfoFolder()
-	return PlayerGui:FindFirstChild("PetInfoBillboardUIs")
-end
-
 local function getPetInfo(model)
 	local info = {}
-	local folder = getInfoFolder()
-	if folder then
-		local bb = folder:FindFirstChild(model.Name)
+	local name = model:GetAttribute("Name")
+	if name and tostring(name) ~= "" then
+		info.Name = tostring(name)
+	end
+	local level = model:GetAttribute("Level")
+	if level and tostring(level) ~= "" then
+		info.Level = tostring(level)
+	end
+	local rarity = model:GetAttribute("Rarity")
+	if rarity and tostring(rarity) ~= "" then
+		info.Rarity = tostring(rarity)
+	end
+	if not info.Rarity then
+		local folder = PlayerGui:FindFirstChild("PetInfoBillboardUIs")
+		local bb = folder and folder:FindFirstChild(model.Name)
 		local frame = bb and bb:FindFirstChild("Frame")
 		if frame then
-			local petName = frame:FindFirstChild("PetName")
-			if petName and petName:IsA("TextLabel") and petName.Text ~= "" then
-				info.Name = petName.Text
-			end
-			local rarity = frame:FindFirstChild("Rarity")
-			if rarity and rarity:IsA("TextLabel") then
-				if rarity.Text ~= "" then
-					info.Rarity = rarity.Text
+			local rarityLabel = frame:FindFirstChild("Rarity")
+			if rarityLabel and rarityLabel:IsA("TextLabel") then
+				if rarityLabel.Text ~= "" then
+					info.Rarity = rarityLabel.Text
 				else
-					for _, c in ipairs(rarity:GetChildren()) do
+					for _, c in ipairs(rarityLabel:GetChildren()) do
 						if c:IsA("UIGradient") then
 							info.Rarity = c.Name
 							break
 						end
 					end
 				end
-			end
-			local level = frame:FindFirstChild("Level")
-			if level and level:IsA("TextLabel") and level.Text ~= "" then
-				info.Level = level.Text
-			end
-		end
-	end
-	local attrs = model:GetAttributes()
-	for k, v in pairs(attrs) do
-		local lk = string.lower(k)
-		if string.find(lk, "weight") then
-			info.Weight = tostring(v)
-		elseif string.find(lk, "age") then
-			info.Age = tostring(v)
-		end
-	end
-	for _, child in ipairs(model:GetChildren()) do
-		if child:IsA("NumberValue") or child:IsA("IntValue") or child:IsA("StringValue") then
-			local lk = string.lower(child.Name)
-			if string.find(lk, "weight") and not info.Weight then
-				info.Weight = tostring(child.Value)
-			elseif string.find(lk, "age") and not info.Age then
-				info.Age = tostring(child.Value)
 			end
 		end
 	end
@@ -182,12 +163,6 @@ local function buildText(model)
 	table.insert(lines, nameLine)
 	if info.Level then
 		table.insert(lines, "等级: " .. info.Level)
-	end
-	if info.Age then
-		table.insert(lines, "年龄: " .. info.Age)
-	end
-	if info.Weight then
-		table.insert(lines, "重量: " .. info.Weight .. "kg")
 	end
 	table.insert(lines, "距离: " .. data.Distance .. "m")
 	return table.concat(lines, "\n")
@@ -239,7 +214,7 @@ local function addESP(model)
 	highlight.Parent = model
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "PetESPBillboard"
-	billboard.Size = UDim2.new(0, 220, 0, 80)
+	billboard.Size = UDim2.new(0, 220, 0, 60)
 	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Adornee = model
@@ -327,26 +302,6 @@ local function scanContainers()
 	end
 end
 
-local function hookInfoFolder()
-	local folder = getInfoFolder()
-	if not folder then
-		return
-	end
-	folder.ChildAdded:Connect(function(bb)
-		if not espEnabled then
-			return
-		end
-		task.delay(0.5, function()
-			for model in pairs(tracked) do
-				if model.Name == bb.Name then
-					refreshESP(model)
-					break
-				end
-			end
-		end)
-	end)
-end
-
 local function startHeartbeat()
 	if heartbeatConn then
 		return
@@ -397,14 +352,6 @@ end
 Workspace.DescendantAdded:Connect(function(obj)
 	if espEnabled and obj:IsA("Folder") and string.find(string.lower(obj.Name), "pets") then
 		watchFolder(obj)
-	end
-end)
-
-hookInfoFolder()
-
-PlayerGui.ChildAdded:Connect(function(obj)
-	if obj.Name == "PetInfoBillboardUIs" then
-		hookInfoFolder()
 	end
 end)
 
