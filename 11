@@ -1,59 +1,8 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local HttpService = game:GetService("HttpService")
+local function safeLoad(url) local success, result = pcall(function() return loadstring(game:HttpGet(url))() end) if not success then warn("加载失败: " .. url) return nil end return result end local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui") local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui") local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui") if not Library then game:GetService("StarterGui"):SetCore("SendNotification", { Title = "错误", Text = "UI 库加载失败，请检查网络或脚本资源", Duration = 5, }) return end local Options = Library.Options local Toggles = Library.Toggles local Players = game:GetService("Players") local ReplicatedStorage = game:GetService("ReplicatedStorage") local Workspace = game:GetService("Workspace") local HttpService = game:GetService("HttpService") local player = Players.LocalPlayer local Window = Library:CreateWindow({ Title = "捕捉并驯服", Footer = "恐拜大帝 制作", Icon = 131153193945220, NotifySide = "Right", ShowCustomCursor = true, }) Library:Notify({ Title = "捕捉并驯服", Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功", Time = 5, }) local Tabs = { Notice = Window:AddTab("通知", "info"), Main = Window:AddTab("主要", "info"), Settings = Window:AddTab("设置", "settings"), } local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息") NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本') NoticeGroup:AddLabel('创作者：恐拜大帝') NoticeGroup:AddLabel('周大头 定制') local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理") UnloadGroup:AddButton("卸载脚本", function() Library:Unload() end) if ThemeManager then ThemeManager:SetLibrary(Library) ThemeManager:SetFolder("MyScriptTheme") ThemeManager:ApplyToTab(Tabs.Settings) end if SaveManager then SaveManager:SetLibrary(Library) SaveManager:IgnoreThemeSettings() SaveManager:SetFolder("MyScriptConfig") SaveManager:BuildConfigSection(Tabs.Settings) end
 
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
-local RarityColors = {
-	common = Color3.fromRGB(0, 255, 0),
-	uncommon = Color3.fromRGB(0, 170, 255),
-	rare = Color3.fromRGB(170, 0, 255),
-	epic = Color3.fromRGB(255, 200, 0),
-	legendary = Color3.fromRGB(255, 0, 0),
-	mythic = Color3.fromRGB(255, 0, 0),
-	divine = Color3.fromRGB(255, 0, 0),
-	secret = Color3.fromRGB(255, 0, 0)
-}
-
-local DefaultColor = Color3.fromRGB(255, 255, 255)
-
-local espEnabled = false
-local tracked = {}
-local watchedFolders = {}
-local connections = {}
-local heartbeatConn = nil
-local heartbeatAcc = 0
 local translatedTexts = {}
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "PetESPGui"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = PlayerGui
-
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0, 130, 0, 40)
-toggleBtn.Position = UDim2.new(0, 15, 0.5, -20)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-toggleBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
-toggleBtn.Text = "宠物透视: 关"
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 15
-toggleBtn.Active = true
-toggleBtn.Draggable = true
-toggleBtn.Parent = screenGui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = toggleBtn
-
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(255, 255, 255)
-stroke.Thickness = 1
-stroke.Transparency = 0.6
-stroke.Parent = toggleBtn
+local petMap = {}
+local selectedPetText = nil
 
 local function translateText(text)
 	if not text or text == "" or #text < 2 then
@@ -99,272 +48,120 @@ local function isEnglish(text)
 	return (englishCount / totalCount) > 0.5
 end
 
-local function getRarityColor(rarity)
-	if not rarity then
-		return DefaultColor
-	end
-	local key = string.lower(tostring(rarity))
-	for name, color in pairs(RarityColors) do
-		if string.find(key, name) then
-			return color
-		end
-	end
-	return DefaultColor
-end
-
-local function getPetInfo(model)
-	local info = {}
-	local name = model:GetAttribute("Name")
-	if name and tostring(name) ~= "" then
-		info.Name = tostring(name)
-	end
-	local level = model:GetAttribute("Level")
-	if level and tostring(level) ~= "" then
-		info.Level = tostring(level)
-	end
-	local rarity = model:GetAttribute("Rarity")
-	if rarity and tostring(rarity) ~= "" then
-		info.Rarity = tostring(rarity)
-	end
-	if not info.Rarity then
-		local folder = PlayerGui:FindFirstChild("PetInfoBillboardUIs")
-		local bb = folder and folder:FindFirstChild(model.Name)
-		local frame = bb and bb:FindFirstChild("Frame")
-		if frame then
-			local rarityLabel = frame:FindFirstChild("Rarity")
-			if rarityLabel and rarityLabel:IsA("TextLabel") then
-				if rarityLabel.Text ~= "" then
-					info.Rarity = rarityLabel.Text
-				else
-					for _, c in ipairs(rarityLabel:GetChildren()) do
-						if c:IsA("UIGradient") then
-							info.Rarity = c.Name
-							break
+local function scanPets()
+	local pets = {}
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("Folder") and string.find(string.lower(obj.Name), "pets") then
+			for _, child in ipairs(obj:GetChildren()) do
+				if child:IsA("Model") and child:FindFirstChild("HumanoidRootPart") then
+					table.insert(pets, child)
+				elseif child:IsA("Folder") then
+					for _, sub in ipairs(child:GetChildren()) do
+						if sub:IsA("Model") and sub:FindFirstChild("HumanoidRootPart") then
+							table.insert(pets, sub)
 						end
 					end
 				end
 			end
 		end
 	end
-	return info
+	return pets
 end
 
-local function buildText(model)
-	local data = tracked[model]
-	if not data then
-		return ""
-	end
-	local info = data.Info
-	local lines = {}
-	local nameLine = info.Name or "宠物"
-	if info.Rarity then
-		nameLine = nameLine .. " [" .. info.Rarity .. "]"
-	end
-	table.insert(lines, nameLine)
-	if info.Level then
-		table.insert(lines, "等级: " .. info.Level)
-	end
-	table.insert(lines, "距离: " .. data.Distance .. "m")
-	return table.concat(lines, "\n")
-end
-
-local function refreshESP(model)
-	local data = tracked[model]
-	if not data then
-		return
-	end
-	local info = getPetInfo(model)
-	if not info.Name and data.Info.Name then
-		info.Name = data.Info.Name
-	end
-	data.Info = info
-	local color = getRarityColor(info.Rarity)
-	data.Highlight.FillColor = color
-	data.Highlight.OutlineColor = color
-	data.Label.TextColor3 = color
-	if info.Name and isEnglish(info.Name) and not translatedTexts[info.Name] then
-		task.spawn(function()
-			local translated = translateText(info.Name)
-			if translated and translated ~= info.Name and tracked[model] then
-				tracked[model].Info.Name = translated
-			end
-		end)
-	elseif info.Name and translatedTexts[info.Name] then
-		data.Info.Name = translatedTexts[info.Name]
-	end
-end
-
-local function addESP(model)
-	if tracked[model] then
-		return
-	end
-	if not model:IsA("Model") then
-		return
-	end
-	local info = getPetInfo(model)
-	local color = getRarityColor(info.Rarity)
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "PetESPHighlight"
-	highlight.FillColor = color
-	highlight.OutlineColor = color
-	highlight.FillTransparency = 0.55
-	highlight.OutlineTransparency = 0
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Adornee = model
-	highlight.Parent = model
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "PetESPBillboard"
-	billboard.Size = UDim2.new(0, 220, 0, 60)
-	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.5, 0)
-	billboard.AlwaysOnTop = true
-	billboard.Adornee = model
-	billboard.Parent = model
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.BackgroundTransparency = 1
-	label.TextColor3 = color
-	label.TextStrokeTransparency = 0.3
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 14
-	label.Text = ""
-	label.Parent = billboard
-	tracked[model] = {
-		Info = info,
-		Highlight = highlight,
-		Billboard = billboard,
-		Label = label,
-		Distance = "?"
-	}
-	if info.Name and isEnglish(info.Name) then
-		task.spawn(function()
-			local translated = translateText(info.Name)
-			if translated and translated ~= info.Name and tracked[model] then
-				tracked[model].Info.Name = translated
-			end
-		end)
-	end
-	if not info.Name then
-		task.delay(1, function()
-			if tracked[model] then
-				refreshESP(model)
-			end
-		end)
-	end
-end
-
-local function removeESP(model)
-	local data = tracked[model]
-	if not data then
-		return
-	end
-	if data.Highlight then
-		data.Highlight:Destroy()
-	end
-	if data.Billboard then
-		data.Billboard:Destroy()
-	end
-	tracked[model] = nil
-end
-
-local function isPetModel(obj)
-	return obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") ~= nil
-end
-
-local function onFolderChild(obj)
-	if isPetModel(obj) then
-		addESP(obj)
-	elseif obj:IsA("Folder") then
-		watchFolder(obj)
-	end
-end
-
-function watchFolder(folder)
-	if watchedFolders[folder] then
-		return
-	end
-	watchedFolders[folder] = true
-	for _, child in ipairs(folder:GetChildren()) do
-		onFolderChild(child)
-	end
-	table.insert(connections, folder.ChildAdded:Connect(onFolderChild))
-	table.insert(connections, folder.ChildRemoved:Connect(function(obj)
-		if tracked[obj] then
-			removeESP(obj)
+local function buildDropdownValues(pets)
+	petMap = {}
+	local values = {}
+	local nameCount = {}
+	for _, model in ipairs(pets) do
+		local engName = model:GetAttribute("Name") or model.Name
+		local disp = translatedTexts[engName] or engName
+		local level = model:GetAttribute("Level")
+		local text = disp
+		if level then
+			text = text .. " Lv." .. tostring(level)
 		end
-	end))
+		nameCount[text] = (nameCount[text] or 0) + 1
+		if nameCount[text] > 1 then
+			text = text .. " #" .. tostring(nameCount[text])
+		end
+		petMap[text] = model
+		table.insert(values, text)
+	end
+	table.sort(values)
+	Options.PetDropdown:SetValues(values)
 end
 
-local function scanContainers()
-	for _, obj in ipairs(Workspace:GetDescendants()) do
-		if obj:IsA("Folder") and string.find(string.lower(obj.Name), "pets") then
-			watchFolder(obj)
+local function refreshPetList()
+	local pets = scanPets()
+	if #pets == 0 then
+		Library:Notify({ Title = "传送宠物", Description = "没有找到任何宠物", Time = 3 })
+		return
+	end
+	for _, model in ipairs(pets) do
+		local engName = model:GetAttribute("Name")
+		if engName and isEnglish(engName) and not translatedTexts[engName] then
+			task.spawn(function()
+				translateText(engName)
+			end)
 		end
 	end
-end
-
-local function startHeartbeat()
-	if heartbeatConn then
-		return
-	end
-	heartbeatConn = RunService.Heartbeat:Connect(function(dt)
-		heartbeatAcc = heartbeatAcc + dt
-		if heartbeatAcc < 0.15 then
-			return
-		end
-		heartbeatAcc = 0
-		local char = LocalPlayer.Character
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
-		if not hrp then
-			return
-		end
-		local myPos = hrp.Position
-		for model, data in pairs(tracked) do
+	buildDropdownValues(pets)
+	task.delay(2.5, function()
+		local currentPets = {}
+		for text, model in pairs(petMap) do
 			if model.Parent then
-				local ok, pivot = pcall(function()
-					return model:GetPivot()
-				end)
-				if ok and pivot then
-					data.Distance = tostring(math.floor((pivot.Position - myPos).Magnitude))
-					data.Label.Text = buildText(model)
-				end
-			else
-				removeESP(model)
+				table.insert(currentPets, model)
 			end
+		end
+		if #currentPets > 0 then
+			buildDropdownValues(currentPets)
 		end
 	end)
+	Library:Notify({ Title = "传送宠物", Description = "已刷新，共找到 " .. tostring(#pets) .. " 只宠物", Time = 3 })
 end
 
-local function stopAll()
-	if heartbeatConn then
-		heartbeatConn:Disconnect()
-		heartbeatConn = nil
-	end
-	for _, conn in ipairs(connections) do
-		conn:Disconnect()
-	end
-	table.clear(connections)
-	table.clear(watchedFolders)
-	for model in pairs(tracked) do
-		removeESP(model)
-	end
-end
+local TeleportGroup = Tabs.Main:AddLeftGroupbox("传送宠物")
 
-Workspace.DescendantAdded:Connect(function(obj)
-	if espEnabled and obj:IsA("Folder") and string.find(string.lower(obj.Name), "pets") then
-		watchFolder(obj)
+TeleportGroup:AddDropdown("PetDropdown", {
+	Text = "选定宠物",
+	Values = {},
+	Default = nil,
+	Callback = function(value)
+		selectedPetText = value
+	end,
+})
+
+TeleportGroup:AddButton("刷新宠物列表", function()
+	refreshPetList()
+end)
+
+TeleportGroup:AddButton("一键传送到选定宠物", function()
+	if not selectedPetText then
+		Library:Notify({ Title = "传送宠物", Description = "请先在选定框里选择一只宠物", Time = 3 })
+		return
+	end
+	local model = petMap[selectedPetText]
+	if not model or not model.Parent then
+		Library:Notify({ Title = "传送宠物", Description = "该宠物已消失，请刷新宠物列表", Time = 3 })
+		return
+	end
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		Library:Notify({ Title = "传送宠物", Description = "角色未加载，无法传送", Time = 3 })
+		return
+	end
+	local ok, pivot = pcall(function()
+		return model:GetPivot()
+	end)
+	if ok and pivot then
+		char:PivotTo(CFrame.new(pivot.Position + Vector3.new(0, 3, 4)))
+		Library:Notify({ Title = "传送宠物", Description = "已传送到: " .. selectedPetText, Time = 3 })
+	else
+		Library:Notify({ Title = "传送宠物", Description = "传送失败，请刷新后重试", Time = 3 })
 	end
 end)
 
-toggleBtn.MouseButton1Click:Connect(function()
-	espEnabled = not espEnabled
-	if espEnabled then
-		toggleBtn.Text = "宠物透视: 开"
-		toggleBtn.TextColor3 = Color3.fromRGB(80, 255, 80)
-		scanContainers()
-		startHeartbeat()
-	else
-		toggleBtn.Text = "宠物透视: 关"
-		toggleBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
-		stopAll()
-	end
+task.delay(3, function()
+	refreshPetList()
 end)
