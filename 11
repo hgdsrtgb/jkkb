@@ -279,18 +279,46 @@ ESPGroup:AddButton("刷新透视", function()
     end
 end)
 
-local function pullAllItems()
+local categoryMap = {
+    ["全部物资"] = nil,
+    ["医疗物品"] = {"Bandage", "Defibrillator"},
+    ["枪械物品"] = {"Glock", "Pistol Ammo", "Shotgun Ammo", "Rifle Ammo", "Katana", "Spiked Bat", "Repair Hammer", "Molotov", "Dynamite"},
+    ["珍贵物品"] = {"Gold Bar", "Silver Bar", "Silver Painting", "Silver Vase", "Laptop", "Wood Painting"},
+}
+
+local selectedCategory = "全部物资"
+
+PullGroup:AddDropdown("CategoryDropdown", {
+    Text = "选择分类",
+    Default = 1,
+    Values = {"全部物资", "医疗物品", "枪械物品", "珍贵物品"},
+    Callback = function(Value)
+        selectedCategory = Value
+    end
+})
+
+local function pullItems(category)
     local char = player.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then
         Library:Notify({Title = "拉取", Description = "角色未加载", Time = 3})
         return
     end
     local hrp = char.HumanoidRootPart
+    local names = categoryMap[category]
     local items = {}
     if draggableFolder then
         for _, item in ipairs(draggableFolder:GetChildren()) do
             if item:IsA("Model") then
-                table.insert(items, item)
+                if not names then
+                    table.insert(items, item)
+                else
+                    for _, n in ipairs(names) do
+                        if item.Name == n then
+                            table.insert(items, item)
+                            break
+                        end
+                    end
+                end
             end
         end
     end
@@ -315,8 +343,12 @@ local function pullAllItems()
     end)
 end
 
+PullGroup:AddButton("拉取选定分类", function()
+    pullItems(selectedCategory)
+end)
+
 PullGroup:AddButton("拉取全部物资", function()
-    pullAllItems()
+    pullItems("全部物资")
 end)
 
 local bulletAimEnabled = false
