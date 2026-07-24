@@ -25,7 +25,6 @@ end
 local Options = Library.Options
 local Toggles = Library.Toggles
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
@@ -78,9 +77,42 @@ if SaveManager then
     SaveManager:BuildConfigSection(Tabs.Settings)
 end
 
-local espEnabled = false
-local espLabels = {}
+local espScreen = Instance.new("ScreenGui")
+espScreen.Name = "ItemESP"
+espScreen.ResetOnSpawn = false
+espScreen.Parent = player:WaitForChild("PlayerGui")
+
+local espContainer = Instance.new("Frame")
+espContainer.Size = UDim2.new(1, 0, 1, 0)
+espContainer.BackgroundTransparency = 1
+espContainer.Parent = espScreen
+
+local labelPool = {}
+local allEspItems = {}
+local itemLabelMap = {}
 local highlights = {}
+
+local function getLabel()
+    if #labelPool > 0 then
+        local lbl = table.remove(labelPool)
+        lbl.Visible = false
+        return lbl
+    end
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.SourceSansBold
+    lbl.TextStrokeTransparency = 0
+    lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    lbl.Parent = espContainer
+    return lbl
+end
+
+local function recycleLabel(lbl)
+    if lbl then
+        lbl.Visible = false
+        table.insert(labelPool, lbl)
+    end
+end
 
 local function getPrimaryPart(item)
     if not item:IsA("Model") then return nil end
@@ -95,75 +127,28 @@ local function getPrimaryPart(item)
     return nil
 end
 
-local function createEsp(item)
-    local part = getPrimaryPart(item)
-    if not part then return end
-
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "ItemESP"
-    bb.AlwaysOnTop = true
-    bb.Size = UDim2.new(0, 200, 0, 36)
-    bb.StudsOffset = Vector3.new(0, 2.5, 0)
-    bb.Adornee = part
-    bb.Parent = part
-
-    local nl = Instance.new("TextLabel")
-    nl.Name = "NameLabel"
-    nl.Size = UDim2.new(1, 0, 0.5, 0)
-    nl.BackgroundTransparency = 1
-    nl.Text = item.Name
-    nl.TextColor3 = Color3.fromRGB(255, 255, 0)
-    nl.TextStrokeTransparency = 0
-    nl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    nl.TextSize = 12
-    nl.Font = Enum.Font.SourceSansBold
-    nl.Parent = bb
-    nl.Visible = Toggles.NameESP and Toggles.NameESP.Value or true
-
-    local dl = Instance.new("TextLabel")
-    dl.Name = "DistLabel"
-    dl.Size = UDim2.new(1, 0, 0.5, 0)
-    dl.Position = UDim2.new(0, 0, 0.5, 0)
-    dl.BackgroundTransparency = 1
-    dl.Text = "0m"
-    dl.TextColor3 = Color3.fromRGB(0, 255, 255)
-    dl.TextStrokeTransparency = 0
-    dl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    dl.TextSize = 11
-    dl.Font = Enum.Font.SourceSansBold
-    dl.Parent = bb
-    dl.Visible = Toggles.DistESP and Toggles.DistESP.Value or true
-
-    espLabels[item] = {bb = bb, nl = nl, dl = dl, part = part}
-
-    local hl = Instance.new("Highlight")
-    hl.Name = "ItemHighlight"
-    hl.Adornee = item
-    hl.OutlineColor = Color3.fromRGB(255, 255, 0)
-    hl.FillColor = Color3.fromRGB(255, 255, 0)
-    hl.OutlineTransparency = 1
-    hl.FillTransparency = 1
-    hl.Parent = item
-    highlights[item] = hl
-end
-
-local function clearEsp()
-    for item, data in pairs(espLabels) do
-        if data.bb then data.bb:Destroy() end
+local function refreshEspList()
+    for _, data in ipairs(allEspItems) do
+        if data.hl then
+            data.hl:Destroy()
+        end
     end
-    espLabels = {}
-    for item, hl in pairs(highlights) do
-        if hl then hl:Destroy() end
-    end
-    highlights = {}
-end
-
-local function refreshEsp()
-    clearEsp()
+    allEspItems = {}
     if not draggableFolder then return end
     for _, item in ipairs(draggableFolder:GetChildren()) do
         if item:IsA("Model") then
-            createEsp(item)
+            local part = getPrimaryPart(item)
+            if part then
+                local hl = Instance.new("Highlight")
+                hl.Name = "ItemHighlight"
+                hl.Adornee = item
+                hl.OutlineColor = Color3.fromRGB(255, 255, 0)
+                hl.FillColor = Color3.fromRGB(255, 255, 0)
+                hl.OutlineTransparency = 1
+                hl.FillTransparency = 1
+                hl.Parent = item
+                table.insert(allEspItems, {item = item, part = part, hl = hl})
+            end
         end
     end
 end
@@ -171,39 +156,78 @@ end
 local function updateEsp()
     if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
     local hrp = player.Character.HumanoidRootPart
-    for item, data in pairs(espLabels) do
-        if not item or not item.Parent or not data.part or not data.part.Parent then
-            if data.bb then data.bb:Destroy() end
-            espLabels[item] = nil
-            if highlights[item] then
-                highlights[item]:Destroy()
-                highlights[item] = nil
+    local nameOn = Toggles.NameESP and Toggles.NameESP.Value
+    local distOn = Toggles.DistESP and Toggles.DistESP.Value
+
+    for item, ld in pairs(itemLabelMap) do
+        recycleLabel(ld.nl)
+        recycleLabel(ld.dl)
+    end
+    itemLabelMap = {}
+
+    for _, data in ipairs(allEspItems) do
+        if not data.item or not data.item.Parent or not data.part or not data.part.Parent then
+            if data.hl then
+                data.hl:Destroy()
             end
             continue
         end
-        local dist = (hrp.Position - data.part.Position).Magnitude
-        data.dl.Text = string.format("%.1fm", dist)
-    end
-end
 
-local function updateHighlightSettings()
-    local outlineOn = Toggles.OutlineESP and Toggles.OutlineESP.Value
-    local fillOn = Toggles.FillESP and Toggles.FillESP.Value
-    for item, hl in pairs(highlights) do
-        if hl then
-            hl.OutlineTransparency = outlineOn and 0 or 1
-            hl.FillTransparency = fillOn and 0.7 or 1
+        local outlineOn = Toggles.OutlineESP and Toggles.OutlineESP.Value
+        local fillOn = Toggles.FillESP and Toggles.FillESP.Value
+        if data.hl then
+            data.hl.OutlineTransparency = outlineOn and 0 or 1
+            data.hl.FillTransparency = fillOn and 0.7 or 1
+        end
+
+        local pos = data.part.Position + Vector3.new(0, 2.5, 0)
+        local screenPos, onScreen = camera:WorldToViewportPoint(pos)
+        if onScreen and screenPos.Z > 0 then
+            local dist = (hrp.Position - data.part.Position).Magnitude
+            local ld = {}
+            if nameOn then
+                local nl = getLabel()
+                nl.Text = data.item.Name
+                nl.TextColor3 = Color3.fromRGB(255, 255, 0)
+                nl.TextSize = 12
+                nl.Position = UDim2.new(0, screenPos.X - 100, 0, screenPos.Y - 20)
+                nl.Visible = true
+                ld.nl = nl
+            end
+            if distOn then
+                local dl = getLabel()
+                dl.Text = string.format("%.1fm", dist)
+                dl.TextColor3 = Color3.fromRGB(0, 255, 255)
+                dl.TextSize = 11
+                dl.Position = UDim2.new(0, screenPos.X - 100, 0, screenPos.Y - 8)
+                dl.Visible = true
+                ld.dl = dl
+            end
+            if ld.nl or ld.dl then
+                itemLabelMap[data.item] = ld
+            end
         end
     end
 end
 
-local function updateLabelVisibility()
-    local nameOn = Toggles.NameESP and Toggles.NameESP.Value
-    local distOn = Toggles.DistESP and Toggles.DistESP.Value
-    for item, data in pairs(espLabels) do
-        if data.nl then data.nl.Visible = nameOn end
-        if data.dl then data.dl.Visible = distOn end
-    end
+local espEnabled = false
+local espRunning = false
+
+local function espLoop()
+    if espRunning then return end
+    espRunning = true
+    task.spawn(function()
+        while espEnabled do
+            updateEsp()
+            task.wait(0.2)
+        end
+        for item, ld in pairs(itemLabelMap) do
+            recycleLabel(ld.nl)
+            recycleLabel(ld.dl)
+        end
+        itemLabelMap = {}
+        espRunning = false
+    end)
 end
 
 ESPGroup:AddToggle("ItemESP", {
@@ -212,11 +236,15 @@ ESPGroup:AddToggle("ItemESP", {
     Callback = function(Value)
         espEnabled = Value
         if espEnabled then
-            refreshEsp()
-            updateHighlightSettings()
-            updateLabelVisibility()
+            refreshEspList()
+            espLoop()
         else
-            clearEsp()
+            for _, data in ipairs(allEspItems) do
+                if data.hl then
+                    data.hl:Destroy()
+                end
+            end
+            allEspItems = {}
         end
     end
 })
@@ -224,40 +252,30 @@ ESPGroup:AddToggle("ItemESP", {
 ESPGroup:AddToggle("NameESP", {
     Text = "透视名字",
     Default = true,
-    Callback = function(Value)
-        updateLabelVisibility()
-    end
+    Callback = function() end
 })
 
 ESPGroup:AddToggle("DistESP", {
     Text = "透视距离",
     Default = true,
-    Callback = function(Value)
-        updateLabelVisibility()
-    end
+    Callback = function() end
 })
 
 ESPGroup:AddToggle("OutlineESP", {
     Text = "透视轮廓",
     Default = false,
-    Callback = function(Value)
-        updateHighlightSettings()
-    end
+    Callback = function() end
 })
 
 ESPGroup:AddToggle("FillESP", {
     Text = "透视内填充",
     Default = false,
-    Callback = function(Value)
-        updateHighlightSettings()
-    end
+    Callback = function() end
 })
 
 ESPGroup:AddButton("刷新透视", function()
     if espEnabled then
-        refreshEsp()
-        updateHighlightSettings()
-        updateLabelVisibility()
+        refreshEspList()
     end
 end)
 
@@ -281,78 +299,32 @@ local function pullAllItems()
         return
     end
     Library:Notify({Title = "拉取", Description = "已找到，正在拉取 " .. #items .. " 个物资", Time = 3})
-    for i, item in ipairs(items) do
-        pcall(function()
-            local angle = (i - 1) * (math.pi * 2 / math.max(#items, 1))
-            local ring = math.floor((i - 1) / 12)
-            local dist = 4 + ring * 4
-            local offset = CFrame.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
-            item:PivotTo(hrp.CFrame * offset)
-        end)
-    end
-end
-
-local function pullByName(name)
-    local char = player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then
-        Library:Notify({Title = "拉取", Description = "角色未加载", Time = 3})
-        return
-    end
-    local hrp = char.HumanoidRootPart
-    local items = {}
-    if draggableFolder then
-        for _, item in ipairs(draggableFolder:GetChildren()) do
-            if item:IsA("Model") and item.Name == name then
-                table.insert(items, item)
+    task.spawn(function()
+        for i, item in ipairs(items) do
+            pcall(function()
+                local angle = (i - 1) * (math.pi * 2 / math.max(#items, 1))
+                local ring = math.floor((i - 1) / 12)
+                local dist = 4 + ring * 4
+                local offset = CFrame.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
+                item:PivotTo(hrp.CFrame * offset)
+            end)
+            if i % 10 == 0 then
+                RunService.Heartbeat:Wait()
             end
         end
-    end
-    if #items == 0 then
-        Library:Notify({Title = "拉取", Description = "没有该物种: " .. name, Time = 3})
-        return
-    end
-    Library:Notify({Title = "拉取", Description = "已找到 " .. name .. " x" .. #items .. "，正在拉取", Time = 3})
-    for i, item in ipairs(items) do
-        pcall(function()
-            local angle = (i - 1) * (math.pi * 2 / math.max(#items, 1))
-            local ring = math.floor((i - 1) / 12)
-            local dist = 4 + ring * 4
-            local offset = CFrame.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
-            item:PivotTo(hrp.CFrame * offset)
-        end)
-    end
+    end)
 end
 
 PullGroup:AddButton("拉取全部物资", function()
     pullAllItems()
 end)
 
-PullGroup:AddInput("PullByNameInput", {
-    Text = "拉取指定物种",
-    Default = "",
-    Placeholder = "输入物资英文名",
-    Numeric = false,
-    Finished = true,
-    Callback = function(Value)
-        if Value and Value ~= "" then
-            pullByName(Value)
-        end
-    end
-})
-
-PullGroup:AddButton("执行拉取指定物种", function()
-    local name = Options.PullByNameInput and Options.PullByNameInput.Value or ""
-    if name ~= "" then
-        pullByName(name)
-    else
-        Library:Notify({Title = "拉取", Description = "请输入物种名称", Time = 3})
-    end
-end)
-
 local bulletAimEnabled = false
+local enemyCache = {}
+local lastCacheTime = 0
 
-local function getEnemies()
-    local enemies = {}
+local function refreshEnemyCache()
+    enemyCache = {}
     for _, model in ipairs(Workspace:GetDescendants()) do
         if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") then
             local isPlayer = false
@@ -363,11 +335,18 @@ local function getEnemies()
                 end
             end
             if not isPlayer then
-                table.insert(enemies, model)
+                table.insert(enemyCache, model)
             end
         end
     end
-    return enemies
+    lastCacheTime = tick()
+end
+
+local function getEnemies()
+    if tick() - lastCacheTime > 1 then
+        refreshEnemyCache()
+    end
+    return enemyCache
 end
 
 local function getNearestEnemyPart(fromPos)
@@ -387,50 +366,50 @@ local function getNearestEnemyPart(fromPos)
     return nearest
 end
 
-local trackedConns = {}
-
-local function trackBullet(obj)
-    if obj:GetAttribute("BulletTracked") then return end
-    local nearest = getNearestEnemyPart(obj.Position)
-    if not nearest then return end
-    obj:SetAttribute("BulletTracked", true)
-    pcall(function()
-        obj.Size = obj.Size * 4
-    end)
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
-        if not obj or not obj.Parent then
-            conn:Disconnect()
-            return
-        end
-        if not bulletAimEnabled then
-            conn:Disconnect()
-            return
-        end
-        local target = getNearestEnemyPart(obj.Position)
-        if target then
-            obj.CFrame = CFrame.new(obj.Position, target.Position)
-            obj.Velocity = (target.Position - obj.Position).Unit * math.max(obj.Velocity.Magnitude, 200)
-        end
-    end)
-    table.insert(trackedConns, conn)
-end
+local trackedBullets = {}
+local lastScan = 0
 
 RunService.Heartbeat:Connect(function()
     if not bulletAimEnabled then
-        for _, conn in ipairs(trackedConns) do
-            pcall(function() conn:Disconnect() end)
+        for i = #trackedBullets, 1, -1 do
+            trackedBullets[i] = nil
         end
-        trackedConns = {}
         return
     end
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and not obj:GetAttribute("BulletTracked") then
-            local vel = obj.Velocity.Magnitude
-            if vel > 40 and vel < 600 then
-                trackBullet(obj)
+
+    local now = tick()
+    if now - lastScan >= 0.15 then
+        lastScan = now
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and not obj:GetAttribute("BulletTracked") then
+                local vel = obj.Velocity.Magnitude
+                if vel > 40 and vel < 600 then
+                    obj:SetAttribute("BulletTracked", true)
+                    pcall(function()
+                        obj.Size = obj.Size * 4
+                    end)
+                    table.insert(trackedBullets, obj)
+                end
             end
         end
+    end
+
+    for i = #trackedBullets, 1, -1 do
+        if not trackedBullets[i] or not trackedBullets[i].Parent then
+            table.remove(trackedBullets, i)
+        end
+    end
+
+    if #trackedBullets == 0 then return end
+
+    local target = getNearestEnemyPart(player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position or Vector3.new())
+    if not target then return end
+
+    for _, bullet in ipairs(trackedBullets) do
+        pcall(function()
+            bullet.CFrame = CFrame.new(bullet.Position, target.Position)
+            bullet.Velocity = (target.Position - bullet.Position).Unit * math.max(bullet.Velocity.Magnitude, 200)
+        end)
     end
 end)
 
@@ -440,46 +419,47 @@ AimGroup:AddToggle("BulletAim", {
     Callback = function(Value)
         bulletAimEnabled = Value
         if Value then
-            Library:Notify({Title = "子弹追踪", Description = "已开启，若无效请提供游戏内子弹与僵尸信息", Time = 5})
+            Library:Notify({Title = "子弹追踪", Description = "已开启", Time = 3})
         else
-            for _, conn in ipairs(trackedConns) do
-                pcall(function() conn:Disconnect() end)
+            for i = #trackedBullets, 1, -1 do
+                trackedBullets[i] = nil
             end
-            trackedConns = {}
         end
     end
 })
-
-AimGroup:AddLabel("提示：若追踪无效，请提供以下信息：")
-AimGroup:AddLabel("1. 僵尸在Workspace中的路径或名字")
-AimGroup:AddLabel("2. 子弹发射的远程事件名")
-AimGroup:AddLabel("3. 子弹部件名或模型名")
-
-RunService.RenderStepped:Connect(function()
-    if espEnabled then
-        updateEsp()
-    end
-end)
 
 if draggableFolder then
     draggableFolder.ChildAdded:Connect(function(child)
         if espEnabled and child:IsA("Model") then
             task.wait(0.3)
-            createEsp(child)
-            updateHighlightSettings()
-            updateLabelVisibility()
+            local part = getPrimaryPart(child)
+            if part then
+                local hl = Instance.new("Highlight")
+                hl.Name = "ItemHighlight"
+                hl.Adornee = child
+                hl.OutlineColor = Color3.fromRGB(255, 255, 0)
+                hl.FillColor = Color3.fromRGB(255, 255, 0)
+                hl.OutlineTransparency = 1
+                hl.FillTransparency = 1
+                hl.Parent = child
+                table.insert(allEspItems, {item = child, part = part, hl = hl})
+            end
         end
     end)
     draggableFolder.ChildRemoved:Connect(function(child)
-        if espLabels[child] then
-            if espLabels[child].bb then
-                espLabels[child].bb:Destroy()
+        for i = #allEspItems, 1, -1 do
+            if allEspItems[i].item == child then
+                if allEspItems[i].hl then
+                    allEspItems[i].hl:Destroy()
+                end
+                table.remove(allEspItems, i)
+                break
             end
-            espLabels[child] = nil
         end
-        if highlights[child] then
-            highlights[child]:Destroy()
-            highlights[child] = nil
+        if itemLabelMap[child] then
+            recycleLabel(itemLabelMap[child].nl)
+            recycleLabel(itemLabelMap[child].dl)
+            itemLabelMap[child] = nil
         end
     end)
 end
