@@ -1,112 +1,85 @@
+local function safeLoad(url)
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet(url))()
+    end)
+    if not success then
+        warn("加载失败: " .. url)
+        return nil
+    end
+    return result
+end
+
+local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui")
+local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui")
+local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui")
+
+if not Library then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "错误",
+        Text = "UI 库加载失败，请检查网络或脚本资源",
+        Duration = 5,
+    })
+    return
+end
+
+local Options = Library.Options
+local Toggles = Library.Toggles
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local draggableFolder = Workspace:WaitForChild("DraggableFolder")
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ItemESPAndPull"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
+local Window = Library:CreateWindow({
+    Title = "死亡避难所",
+    Footer = "恐拜大帝 制作",
+    Icon = 131153193945220,
+    NotifySide = "Right",
+    ShowCustomCursor = true,
+})
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 320)
-mainFrame.Position = UDim2.new(0, 20, 0.5, -160)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-mainFrame.BorderSizePixel = 0
-mainFrame.Parent = screenGui
+Library:Notify({
+    Title = "死亡避难所",
+    Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功",
+    Time = 5,
+})
 
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 6)
+local Tabs = {
+    Notice = Window:AddTab("通知", "info"),
+    Main = Window:AddTab("主要", "info"),
+    Settings = Window:AddTab("设置", "settings"),
+}
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 32)
-title.BackgroundTransparency = 1
-title.Text = "物资透视与拉取"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 16
-title.Font = Enum.Font.SourceSansBold
-title.Parent = mainFrame
+local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息")
+NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本')
+NoticeGroup:AddLabel('创作者：恐拜大帝')
 
-local espToggle = Instance.new("TextButton")
-espToggle.Size = UDim2.new(0, 200, 0, 32)
-espToggle.Position = UDim2.new(0, 20, 0, 40)
-espToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-espToggle.Text = "透视: 关"
-espToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-espToggle.TextSize = 14
-espToggle.Font = Enum.Font.SourceSansBold
-espToggle.Parent = mainFrame
-Instance.new("UICorner", espToggle).CornerRadius = UDim.new(0, 4)
+local ESPGroup = Tabs.Main:AddLeftGroupbox("物资透视")
+local PullGroup = Tabs.Main:AddRightGroupbox("物资拉取")
+local AimGroup = Tabs.Main:AddLeftGroupbox("子弹追踪")
 
-local dropdownFrame = Instance.new("Frame")
-dropdownFrame.Size = UDim2.new(0, 200, 0, 28)
-dropdownFrame.Position = UDim2.new(0, 20, 0, 82)
-dropdownFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-dropdownFrame.Parent = mainFrame
-Instance.new("UICorner", dropdownFrame).CornerRadius = UDim.new(0, 4)
+local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理")
+UnloadGroup:AddButton("卸载脚本", function()
+    Library:Unload()
+end)
 
-local dropdownBtn = Instance.new("TextButton")
-dropdownBtn.Size = UDim2.new(1, 0, 1, 0)
-dropdownBtn.BackgroundTransparency = 1
-dropdownBtn.Text = "选择物资 ▼"
-dropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-dropdownBtn.TextSize = 13
-dropdownBtn.Font = Enum.Font.SourceSans
-dropdownBtn.Parent = dropdownFrame
+if ThemeManager then
+    ThemeManager:SetLibrary(Library)
+    ThemeManager:SetFolder("MyScriptTheme")
+    ThemeManager:ApplyToTab(Tabs.Settings)
+end
 
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(0, 200, 0, 140)
-scrollFrame.Position = UDim2.new(0, 20, 0, 112)
-scrollFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-scrollFrame.BorderSizePixel = 0
-scrollFrame.ScrollBarThickness = 4
-scrollFrame.Visible = false
-scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-scrollFrame.Parent = mainFrame
-Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 4)
-
-local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0, 2)
-listLayout.Parent = scrollFrame
-
-local pullBtn = Instance.new("TextButton")
-pullBtn.Size = UDim2.new(0, 200, 0, 32)
-pullBtn.Position = UDim2.new(0, 20, 0, 260)
-pullBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-pullBtn.Text = "拉取物资"
-pullBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-pullBtn.TextSize = 14
-pullBtn.Font = Enum.Font.SourceSansBold
-pullBtn.Parent = mainFrame
-Instance.new("UICorner", pullBtn).CornerRadius = UDim.new(0, 4)
-
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0, 200, 0, 40)
-statusLabel.Position = UDim2.new(0, 20, 0, 296)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "状态: 等待"
-statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-statusLabel.TextSize = 12
-statusLabel.Font = Enum.Font.SourceSans
-statusLabel.TextWrapped = true
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = mainFrame
-
-local refreshBtn = Instance.new("TextButton")
-refreshBtn.Size = UDim2.new(0, 200, 0, 24)
-refreshBtn.Position = UDim2.new(0, 20, 0, 228)
-refreshBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-refreshBtn.Text = "刷新物资列表"
-refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-refreshBtn.TextSize = 12
-refreshBtn.Font = Enum.Font.SourceSansBold
-refreshBtn.Parent = mainFrame
-Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 4)
+if SaveManager then
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetFolder("MyScriptConfig")
+    SaveManager:BuildConfigSection(Tabs.Settings)
+end
 
 local espEnabled = false
 local espLabels = {}
-local selectedItem = nil
 
 local function getPrimaryPart(item)
     if not item:IsA("Model") then return nil end
@@ -136,7 +109,8 @@ local function createEsp(item)
     nl.BackgroundTransparency = 1
     nl.Text = item.Name
     nl.TextColor3 = Color3.fromRGB(255, 255, 0)
-    nl.TextStrokeTransparency = 0
+    nl.TextStrokeTransparency = 0.2
+    nl.TextStrokeColor3 = Color3.fromRGB(255, 255, 0)
     nl.TextSize = 14
     nl.Font = Enum.Font.SourceSansBold
     nl.Parent = bb
@@ -145,8 +119,9 @@ local function createEsp(item)
     dl.Position = UDim2.new(0, 0, 0.5, 0)
     dl.BackgroundTransparency = 1
     dl.Text = "0m"
-    dl.TextColor3 = Color3.fromRGB(0, 255, 255)
-    dl.TextStrokeTransparency = 0
+    dl.TextColor3 = Color3.fromRGB(255, 255, 0)
+    dl.TextStrokeTransparency = 0.2
+    dl.TextStrokeColor3 = Color3.fromRGB(255, 255, 0)
     dl.TextSize = 12
     dl.Font = Enum.Font.SourceSansBold
     dl.Parent = bb
@@ -184,87 +159,165 @@ local function updateEsp()
     end
 end
 
-local function refreshDropdown()
-    for _, child in ipairs(scrollFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
+ESPGroup:AddToggle("ItemESP", {
+    Text = "物资透视",
+    Default = false,
+    Callback = function(Value)
+        espEnabled = Value
+        if espEnabled then
+            refreshEsp()
+        else
+            clearEsp()
         end
     end
-    selectedItem = nil
-    dropdownBtn.Text = "选择物资 ▼"
-    if not draggableFolder then return end
-    for _, item in ipairs(draggableFolder:GetChildren()) do
-        if item:IsA("Model") then
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, 0, 0, 22)
-            btn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-            btn.Text = item.Name
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.TextSize = 12
-            btn.Font = Enum.Font.SourceSans
-            btn.Parent = scrollFrame
-            btn.MouseButton1Click:Connect(function()
-                selectedItem = item
-                dropdownBtn.Text = item.Name .. " ▼"
-                scrollFrame.Visible = false
-            end)
-        end
-    end
-end
+})
 
-local function pullItem()
-    if not selectedItem or not selectedItem.Parent then
-        statusLabel.Text = "状态: 没有"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        return
+ESPGroup:AddButton("刷新透视", function()
+    if espEnabled then
+        refreshEsp()
     end
-    statusLabel.Text = "状态: 已找到，正在拉取"
-    statusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+end)
+
+local function pullAllItems()
     local char = player.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then
-        statusLabel.Text = "状态: 角色未加载"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        Library:Notify({Title = "拉取", Description = "角色未加载", Time = 3})
         return
     end
     local hrp = char.HumanoidRootPart
-    local targetCFrame = hrp.CFrame * CFrame.new(0, 0, -4)
-    pcall(function()
-        selectedItem:PivotTo(targetCFrame)
-    end)
-end
-
-espToggle.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        espToggle.Text = "透视: 开"
-        espToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        refreshEsp()
-    else
-        espToggle.Text = "透视: 关"
-        espToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        clearEsp()
-    end
-end)
-
-dropdownBtn.MouseButton1Click:Connect(function()
-    scrollFrame.Visible = not scrollFrame.Visible
-end)
-
-pullBtn.MouseButton1Click:Connect(function()
-    pullItem()
-end)
-
-refreshBtn.MouseButton1Click:Connect(function()
-    refreshDropdown()
-    local count = 0
+    local items = {}
     if draggableFolder then
         for _, item in ipairs(draggableFolder:GetChildren()) do
-            if item:IsA("Model") then count = count + 1 end
+            if item:IsA("Model") then
+                table.insert(items, item)
+            end
         end
     end
-    statusLabel.Text = "状态: 已刷新，共" .. count .. "个物资"
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    if #items == 0 then
+        Library:Notify({Title = "拉取", Description = "没有物资", Time = 3})
+        return
+    end
+    Library:Notify({Title = "拉取", Description = "已找到，正在拉取 " .. #items .. " 个物资", Time = 3})
+    for i, item in ipairs(items) do
+        pcall(function()
+            local angle = (i - 1) * (math.pi * 2 / math.max(#items, 1))
+            local ring = math.floor((i - 1) / 12)
+            local dist = 4 + ring * 4
+            local offset = CFrame.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
+            item:PivotTo(hrp.CFrame * offset)
+        end)
+    end
+end
+
+PullGroup:AddButton("拉取全部物资", function()
+    pullAllItems()
 end)
+
+local bulletAimEnabled = false
+
+local function getEnemies()
+    local enemies = {}
+    for _, model in ipairs(Workspace:GetDescendants()) do
+        if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") then
+            local isPlayer = false
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr.Character == model then
+                    isPlayer = true
+                    break
+                end
+            end
+            if not isPlayer then
+                table.insert(enemies, model)
+            end
+        end
+    end
+    return enemies
+end
+
+local function getNearestEnemyPart(fromPos)
+    local enemies = getEnemies()
+    local nearest = nil
+    local minDist = math.huge
+    for _, enemy in ipairs(enemies) do
+        local part = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head") or enemy:FindFirstChildWhichIsA("BasePart")
+        if part then
+            local d = (part.Position - fromPos).Magnitude
+            if d < minDist then
+                minDist = d
+                nearest = part
+            end
+        end
+    end
+    return nearest
+end
+
+local trackedConns = {}
+
+local function trackBullet(obj)
+    if obj:GetAttribute("BulletTracked") then return end
+    local nearest = getNearestEnemyPart(obj.Position)
+    if not nearest then return end
+    obj:SetAttribute("BulletTracked", true)
+    pcall(function()
+        obj.Size = obj.Size * 4
+    end)
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not obj or not obj.Parent then
+            conn:Disconnect()
+            return
+        end
+        if not bulletAimEnabled then
+            conn:Disconnect()
+            return
+        end
+        local target = getNearestEnemyPart(obj.Position)
+        if target then
+            obj.CFrame = CFrame.new(obj.Position, target.Position)
+            obj.Velocity = (target.Position - obj.Position).Unit * math.max(obj.Velocity.Magnitude, 200)
+        end
+    end)
+    table.insert(trackedConns, conn)
+end
+
+RunService.Heartbeat:Connect(function()
+    if not bulletAimEnabled then
+        for _, conn in ipairs(trackedConns) do
+            pcall(function() conn:Disconnect() end)
+        end
+        trackedConns = {}
+        return
+    end
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and not obj:GetAttribute("BulletTracked") then
+            local vel = obj.Velocity.Magnitude
+            if vel > 40 and vel < 600 then
+                trackBullet(obj)
+            end
+        end
+    end
+end)
+
+AimGroup:AddToggle("BulletAim", {
+    Text = "子弹追踪",
+    Default = false,
+    Callback = function(Value)
+        bulletAimEnabled = Value
+        if Value then
+            Library:Notify({Title = "子弹追踪", Description = "已开启，若无效请提供游戏内子弹与僵尸信息", Time = 5})
+        else
+            for _, conn in ipairs(trackedConns) do
+                pcall(function() conn:Disconnect() end)
+            end
+            trackedConns = {}
+        end
+    end
+})
+
+AimGroup:AddLabel("提示：若追踪无效，请提供以下信息：")
+AimGroup:AddLabel("1. 僵尸在Workspace中的路径或名字")
+AimGroup:AddLabel("2. 子弹发射的远程事件名")
+AimGroup:AddLabel("3. 子弹部件名或模型名")
 
 RunService.RenderStepped:Connect(function()
     if espEnabled then
@@ -288,5 +341,3 @@ if draggableFolder then
         end
     end)
 end
-
-refreshDropdown()
