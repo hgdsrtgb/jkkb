@@ -80,6 +80,7 @@ end
 
 local espEnabled = false
 local espLabels = {}
+local highlights = {}
 
 local function getPrimaryPart(item)
     if not item:IsA("Model") then return nil end
@@ -97,35 +98,53 @@ end
 local function createEsp(item)
     local part = getPrimaryPart(item)
     if not part then return end
+
     local bb = Instance.new("BillboardGui")
     bb.Name = "ItemESP"
     bb.AlwaysOnTop = true
-    bb.Size = UDim2.new(0, 200, 0, 40)
+    bb.Size = UDim2.new(0, 200, 0, 36)
     bb.StudsOffset = Vector3.new(0, 2.5, 0)
     bb.Adornee = part
     bb.Parent = part
+
     local nl = Instance.new("TextLabel")
+    nl.Name = "NameLabel"
     nl.Size = UDim2.new(1, 0, 0.5, 0)
     nl.BackgroundTransparency = 1
     nl.Text = item.Name
     nl.TextColor3 = Color3.fromRGB(255, 255, 0)
-    nl.TextStrokeTransparency = 0.2
-    nl.TextStrokeColor3 = Color3.fromRGB(255, 255, 0)
-    nl.TextSize = 14
+    nl.TextStrokeTransparency = 0
+    nl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nl.TextSize = 12
     nl.Font = Enum.Font.SourceSansBold
     nl.Parent = bb
+    nl.Visible = Toggles.NameESP and Toggles.NameESP.Value or true
+
     local dl = Instance.new("TextLabel")
+    dl.Name = "DistLabel"
     dl.Size = UDim2.new(1, 0, 0.5, 0)
     dl.Position = UDim2.new(0, 0, 0.5, 0)
     dl.BackgroundTransparency = 1
     dl.Text = "0m"
-    dl.TextColor3 = Color3.fromRGB(255, 255, 0)
-    dl.TextStrokeTransparency = 0.2
-    dl.TextStrokeColor3 = Color3.fromRGB(255, 255, 0)
-    dl.TextSize = 12
+    dl.TextColor3 = Color3.fromRGB(0, 255, 255)
+    dl.TextStrokeTransparency = 0
+    dl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    dl.TextSize = 11
     dl.Font = Enum.Font.SourceSansBold
     dl.Parent = bb
-    espLabels[item] = {bb = bb, dl = dl, part = part}
+    dl.Visible = Toggles.DistESP and Toggles.DistESP.Value or true
+
+    espLabels[item] = {bb = bb, nl = nl, dl = dl, part = part}
+
+    local hl = Instance.new("Highlight")
+    hl.Name = "ItemHighlight"
+    hl.Adornee = item
+    hl.OutlineColor = Color3.fromRGB(255, 255, 0)
+    hl.FillColor = Color3.fromRGB(255, 255, 0)
+    hl.OutlineTransparency = 1
+    hl.FillTransparency = 1
+    hl.Parent = item
+    highlights[item] = hl
 end
 
 local function clearEsp()
@@ -133,6 +152,10 @@ local function clearEsp()
         if data.bb then data.bb:Destroy() end
     end
     espLabels = {}
+    for item, hl in pairs(highlights) do
+        if hl then hl:Destroy() end
+    end
+    highlights = {}
 end
 
 local function refreshEsp()
@@ -152,6 +175,10 @@ local function updateEsp()
         if not item or not item.Parent or not data.part or not data.part.Parent then
             if data.bb then data.bb:Destroy() end
             espLabels[item] = nil
+            if highlights[item] then
+                highlights[item]:Destroy()
+                highlights[item] = nil
+            end
             continue
         end
         local dist = (hrp.Position - data.part.Position).Magnitude
@@ -159,22 +186,78 @@ local function updateEsp()
     end
 end
 
+local function updateHighlightSettings()
+    local outlineOn = Toggles.OutlineESP and Toggles.OutlineESP.Value
+    local fillOn = Toggles.FillESP and Toggles.FillESP.Value
+    for item, hl in pairs(highlights) do
+        if hl then
+            hl.OutlineTransparency = outlineOn and 0 or 1
+            hl.FillTransparency = fillOn and 0.7 or 1
+        end
+    end
+end
+
+local function updateLabelVisibility()
+    local nameOn = Toggles.NameESP and Toggles.NameESP.Value
+    local distOn = Toggles.DistESP and Toggles.DistESP.Value
+    for item, data in pairs(espLabels) do
+        if data.nl then data.nl.Visible = nameOn end
+        if data.dl then data.dl.Visible = distOn end
+    end
+end
+
 ESPGroup:AddToggle("ItemESP", {
-    Text = "物资透视",
+    Text = "物资透视总开关",
     Default = false,
     Callback = function(Value)
         espEnabled = Value
         if espEnabled then
             refreshEsp()
+            updateHighlightSettings()
+            updateLabelVisibility()
         else
             clearEsp()
         end
     end
 })
 
+ESPGroup:AddToggle("NameESP", {
+    Text = "透视名字",
+    Default = true,
+    Callback = function(Value)
+        updateLabelVisibility()
+    end
+})
+
+ESPGroup:AddToggle("DistESP", {
+    Text = "透视距离",
+    Default = true,
+    Callback = function(Value)
+        updateLabelVisibility()
+    end
+})
+
+ESPGroup:AddToggle("OutlineESP", {
+    Text = "透视轮廓",
+    Default = false,
+    Callback = function(Value)
+        updateHighlightSettings()
+    end
+})
+
+ESPGroup:AddToggle("FillESP", {
+    Text = "透视内填充",
+    Default = false,
+    Callback = function(Value)
+        updateHighlightSettings()
+    end
+})
+
 ESPGroup:AddButton("刷新透视", function()
     if espEnabled then
         refreshEsp()
+        updateHighlightSettings()
+        updateLabelVisibility()
     end
 end)
 
@@ -209,8 +292,61 @@ local function pullAllItems()
     end
 end
 
+local function pullByName(name)
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        Library:Notify({Title = "拉取", Description = "角色未加载", Time = 3})
+        return
+    end
+    local hrp = char.HumanoidRootPart
+    local items = {}
+    if draggableFolder then
+        for _, item in ipairs(draggableFolder:GetChildren()) do
+            if item:IsA("Model") and item.Name == name then
+                table.insert(items, item)
+            end
+        end
+    end
+    if #items == 0 then
+        Library:Notify({Title = "拉取", Description = "没有该物种: " .. name, Time = 3})
+        return
+    end
+    Library:Notify({Title = "拉取", Description = "已找到 " .. name .. " x" .. #items .. "，正在拉取", Time = 3})
+    for i, item in ipairs(items) do
+        pcall(function()
+            local angle = (i - 1) * (math.pi * 2 / math.max(#items, 1))
+            local ring = math.floor((i - 1) / 12)
+            local dist = 4 + ring * 4
+            local offset = CFrame.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
+            item:PivotTo(hrp.CFrame * offset)
+        end)
+    end
+end
+
 PullGroup:AddButton("拉取全部物资", function()
     pullAllItems()
+end)
+
+PullGroup:AddInput("PullByNameInput", {
+    Text = "拉取指定物种",
+    Default = "",
+    Placeholder = "输入物资英文名",
+    Numeric = false,
+    Finished = true,
+    Callback = function(Value)
+        if Value and Value ~= "" then
+            pullByName(Value)
+        end
+    end
+})
+
+PullGroup:AddButton("执行拉取指定物种", function()
+    local name = Options.PullByNameInput and Options.PullByNameInput.Value or ""
+    if name ~= "" then
+        pullByName(name)
+    else
+        Library:Notify({Title = "拉取", Description = "请输入物种名称", Time = 3})
+    end
 end)
 
 local bulletAimEnabled = false
@@ -330,6 +466,8 @@ if draggableFolder then
         if espEnabled and child:IsA("Model") then
             task.wait(0.3)
             createEsp(child)
+            updateHighlightSettings()
+            updateLabelVisibility()
         end
     end)
     draggableFolder.ChildRemoved:Connect(function(child)
@@ -338,6 +476,10 @@ if draggableFolder then
                 espLabels[child].bb:Destroy()
             end
             espLabels[child] = nil
+        end
+        if highlights[child] then
+            highlights[child]:Destroy()
+            highlights[child] = nil
         end
     end)
 end
