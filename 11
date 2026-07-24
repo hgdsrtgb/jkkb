@@ -1,272 +1,292 @@
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+local draggableFolder = Workspace:WaitForChild("DraggableFolder")
 
-local localPlayer = Players.LocalPlayer
-local folderName = "AuctionPriceESP"
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ItemESPAndPull"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
-_G.AuctionPriceESPLoadId = (_G.AuctionPriceESPLoadId or 0) + 1
-local loadId = _G.AuctionPriceESPLoadId
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 240, 0, 320)
+mainFrame.Position = UDim2.new(0, 20, 0.5, -160)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
 
-local oldFolder = Workspace:FindFirstChild(folderName)
-if oldFolder then
-	oldFolder:Destroy()
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 6)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 32)
+title.BackgroundTransparency = 1
+title.Text = "物资透视与拉取"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 16
+title.Font = Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+local espToggle = Instance.new("TextButton")
+espToggle.Size = UDim2.new(0, 200, 0, 32)
+espToggle.Position = UDim2.new(0, 20, 0, 40)
+espToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+espToggle.Text = "透视: 关"
+espToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+espToggle.TextSize = 14
+espToggle.Font = Enum.Font.SourceSansBold
+espToggle.Parent = mainFrame
+Instance.new("UICorner", espToggle).CornerRadius = UDim.new(0, 4)
+
+local dropdownFrame = Instance.new("Frame")
+dropdownFrame.Size = UDim2.new(0, 200, 0, 28)
+dropdownFrame.Position = UDim2.new(0, 20, 0, 82)
+dropdownFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+dropdownFrame.Parent = mainFrame
+Instance.new("UICorner", dropdownFrame).CornerRadius = UDim.new(0, 4)
+
+local dropdownBtn = Instance.new("TextButton")
+dropdownBtn.Size = UDim2.new(1, 0, 1, 0)
+dropdownBtn.BackgroundTransparency = 1
+dropdownBtn.Text = "选择物资 ▼"
+dropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+dropdownBtn.TextSize = 13
+dropdownBtn.Font = Enum.Font.SourceSans
+dropdownBtn.Parent = dropdownFrame
+
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(0, 200, 0, 140)
+scrollFrame.Position = UDim2.new(0, 20, 0, 112)
+scrollFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+scrollFrame.BorderSizePixel = 0
+scrollFrame.ScrollBarThickness = 4
+scrollFrame.Visible = false
+scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollFrame.Parent = mainFrame
+Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 4)
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 2)
+listLayout.Parent = scrollFrame
+
+local pullBtn = Instance.new("TextButton")
+pullBtn.Size = UDim2.new(0, 200, 0, 32)
+pullBtn.Position = UDim2.new(0, 20, 0, 260)
+pullBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+pullBtn.Text = "拉取物资"
+pullBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+pullBtn.TextSize = 14
+pullBtn.Font = Enum.Font.SourceSansBold
+pullBtn.Parent = mainFrame
+Instance.new("UICorner", pullBtn).CornerRadius = UDim.new(0, 4)
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0, 200, 0, 40)
+statusLabel.Position = UDim2.new(0, 20, 0, 296)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "状态: 等待"
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.TextSize = 12
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextWrapped = true
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = mainFrame
+
+local refreshBtn = Instance.new("TextButton")
+refreshBtn.Size = UDim2.new(0, 200, 0, 24)
+refreshBtn.Position = UDim2.new(0, 20, 0, 228)
+refreshBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+refreshBtn.Text = "刷新物资列表"
+refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+refreshBtn.TextSize = 12
+refreshBtn.Font = Enum.Font.SourceSansBold
+refreshBtn.Parent = mainFrame
+Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 4)
+
+local espEnabled = false
+local espLabels = {}
+local selectedItem = nil
+
+local function getPrimaryPart(item)
+    if not item:IsA("Model") then return nil end
+    if item:FindFirstChild("Primary") and item.Primary:IsA("BasePart") then
+        return item.Primary
+    end
+    for _, child in ipairs(item:GetDescendants()) do
+        if child:IsA("BasePart") then
+            return child
+        end
+    end
+    return nil
 end
 
-local espFolder = Instance.new("Folder")
-espFolder.Name = folderName
-espFolder.Parent = Workspace
-
-local entries = {}
-
-local function getPlayerGui()
-	return localPlayer and localPlayer:FindFirstChildOfClass("PlayerGui")
+local function createEsp(item)
+    local part = getPrimaryPart(item)
+    if not part then return end
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "ItemESP"
+    bb.AlwaysOnTop = true
+    bb.Size = UDim2.new(0, 200, 0, 40)
+    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    bb.Adornee = part
+    bb.Parent = part
+    local nl = Instance.new("TextLabel")
+    nl.Size = UDim2.new(1, 0, 0.5, 0)
+    nl.BackgroundTransparency = 1
+    nl.Text = item.Name
+    nl.TextColor3 = Color3.fromRGB(255, 255, 0)
+    nl.TextStrokeTransparency = 0
+    nl.TextSize = 14
+    nl.Font = Enum.Font.SourceSansBold
+    nl.Parent = bb
+    local dl = Instance.new("TextLabel")
+    dl.Size = UDim2.new(1, 0, 0.5, 0)
+    dl.Position = UDim2.new(0, 0, 0.5, 0)
+    dl.BackgroundTransparency = 1
+    dl.Text = "0m"
+    dl.TextColor3 = Color3.fromRGB(0, 255, 255)
+    dl.TextStrokeTransparency = 0
+    dl.TextSize = 12
+    dl.Font = Enum.Font.SourceSansBold
+    dl.Parent = bb
+    espLabels[item] = {bb = bb, dl = dl, part = part}
 end
 
-local function findAuctionFrame()
-	local playerGui = getPlayerGui()
-	return playerGui and playerGui:FindFirstChild("Auction")
+local function clearEsp()
+    for item, data in pairs(espLabels) do
+        if data.bb then data.bb:Destroy() end
+    end
+    espLabels = {}
 end
 
-local function findAuctionStand()
-	return Workspace:FindFirstChild("AuctionStand", true) or Workspace:FindFirstChild("AuctioneerStand", true)
+local function refreshEsp()
+    clearEsp()
+    if not draggableFolder then return end
+    for _, item in ipairs(draggableFolder:GetChildren()) do
+        if item:IsA("Model") then
+            createEsp(item)
+        end
+    end
 end
 
-local function getStandInfo()
-	local stand = findAuctionStand()
-	if not stand then
-		return nil
-	end
-	if stand:IsA("Model") then
-		local success, boundingCFrame, boundingSize = pcall(function()
-			return stand:GetBoundingBox()
-		end)
-		if success and boundingCFrame and boundingSize then
-			return boundingCFrame, boundingSize
-		end
-	end
-	local part = stand:IsA("BasePart") and stand or stand:FindFirstChildWhichIsA("BasePart", true)
-	if part then
-		return part.CFrame, part.Size
-	end
-	return nil
+local function updateEsp()
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = player.Character.HumanoidRootPart
+    for item, data in pairs(espLabels) do
+        if not item or not item.Parent or not data.part or not data.part.Parent then
+            if data.bb then data.bb:Destroy() end
+            espLabels[item] = nil
+            continue
+        end
+        local dist = (hrp.Position - data.part.Position).Magnitude
+        data.dl.Text = string.format("%.1fm", dist)
+    end
 end
 
-local function getLots()
-	local lots = {}
-	local auction = findAuctionFrame()
-	if not auction then
-		return lots
-	end
-	local scrollingFrame = auction:FindFirstChildWhichIsA("ScrollingFrame", true)
-	local searchRoot = scrollingFrame or auction
-	for _, object in ipairs(searchRoot:GetDescendants()) do
-		if object:IsA("Frame") and string.match(object.Name, "^Lot_auction:") then
-			table.insert(lots, object)
-		end
-	end
-	table.sort(lots, function(a, b)
-		local aIndex = tonumber(string.match(a.Name, ":(%d+)$")) or 0
-		local bIndex = tonumber(string.match(b.Name, ":(%d+)$")) or 0
-		if aIndex == bIndex then
-			return a.Name < b.Name
-		end
-		return aIndex < bIndex
-	end)
-	return lots
+local function refreshDropdown()
+    for _, child in ipairs(scrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    selectedItem = nil
+    dropdownBtn.Text = "选择物资 ▼"
+    if not draggableFolder then return end
+    for _, item in ipairs(draggableFolder:GetChildren()) do
+        if item:IsA("Model") then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 22)
+            btn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+            btn.Text = item.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextSize = 12
+            btn.Font = Enum.Font.SourceSans
+            btn.Parent = scrollFrame
+            btn.MouseButton1Click:Connect(function()
+                selectedItem = item
+                dropdownBtn.Text = item.Name .. " ▼"
+                scrollFrame.Visible = false
+            end)
+        end
+    end
 end
 
-local function readAttribute(root, names)
-	for _, attributeName in ipairs(names) do
-		local value = root:GetAttribute(attributeName)
-		if value ~= nil and tostring(value) ~= "" then
-			return tostring(value)
-		end
-	end
-	return nil
+local function pullItem()
+    if not selectedItem or not selectedItem.Parent then
+        statusLabel.Text = "状态: 没有"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        return
+    end
+    statusLabel.Text = "状态: 已找到，正在拉取"
+    statusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        statusLabel.Text = "状态: 角色未加载"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        return
+    end
+    local hrp = char.HumanoidRootPart
+    local targetCFrame = hrp.CFrame * CFrame.new(0, 0, -4)
+    pcall(function()
+        selectedItem:PivotTo(targetCFrame)
+    end)
 end
 
-local function getItemName(lot)
-	local attributeName = readAttribute(lot, {"ItemName", "Item", "Name", "DisplayName", "ProductName"})
-	if attributeName then
-		return attributeName
-	end
-	local label = lot:FindFirstChild("ItemName", true)
-	if label and label:IsA("TextLabel") and label.Text ~= "" then
-		return label.Text
-	end
-	return "未知物品"
-end
-
-local function getValuePrice(lot)
-	for _, object in ipairs(lot:GetDescendants()) do
-		if object:IsA("NumberValue") or object:IsA("IntValue") or object:IsA("StringValue") then
-			local lowerName = string.lower(object.Name)
-			if string.find(lowerName, "price") or string.find(lowerName, "cost") then
-				return tostring(object.Value)
-			end
-		end
-	end
-	return nil
-end
-
-local function getPriceText(lot)
-	local attributePrice = readAttribute(lot, {"Price", "Cost", "ItemPrice", "CurrentPrice", "CurrentBid", "Bid", "Value"})
-	if attributePrice then
-		return attributePrice
-	end
-	local valuePrice = getValuePrice(lot)
-	if valuePrice then
-		return valuePrice
-	end
-	local bestText = ""
-	local bestScore = -math.huge
-	for _, object in ipairs(lot:GetDescendants()) do
-		if object:IsA("TextLabel") or object:IsA("TextButton") then
-			local text = object.Text or ""
-			if text ~= "" and string.find(text, "%d") then
-				local lowerName = string.lower(object.Name)
-				local lowerPath = string.lower(object:GetFullName())
-				local score = 0
-				if string.find(lowerName, "price") or string.find(lowerName, "cost") then
-					score = score + 100
-				end
-				if string.find(lowerPath, "buybutton") then
-					score = score + 90
-				end
-				if string.find(lowerPath, "robuxbutton") then
-					score = score + 80
-				end
-				if string.find(lowerName, "amount") then
-					score = score - 90
-				end
-				if string.find(lowerName, "stock") or string.find(lowerPath, "out_of_stock") then
-					score = score - 120
-				end
-				if string.find(lowerName, "timer") or string.find(lowerPath, "refreshin") then
-					score = score - 130
-				end
-				if string.find(lowerName, "rarity") then
-					score = score - 150
-				end
-				if string.find(text, "%%") then
-					score = score - 80
-				end
-				if #text <= 30 then
-					score = score + 15
-				end
-				if score > bestScore then
-					bestScore = score
-					bestText = text
-				end
-			end
-		end
-	end
-	if bestText == "" then
-		return "未找到价格"
-	end
-	return bestText
-end
-
-local function createEntry(lot)
-	local part = Instance.new("Part")
-	part.Name = lot.Name
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = false
-	part.Transparency = 1
-	part.Size = Vector3.new(0.1, 0.1, 0.1)
-	part.Parent = espFolder
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "PriceESP"
-	billboard.Size = UDim2.fromOffset(240, 60)
-	billboard.AlwaysOnTop = true
-	billboard.MaxDistance = 1000
-	billboard.Parent = part
-
-	local label = Instance.new("TextLabel")
-	label.Name = "Text"
-	label.AnchorPoint = Vector2.new(0.5, 0.5)
-	label.Position = UDim2.fromScale(0.5, 0.5)
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-	label.BackgroundTransparency = 0.2
-	label.BorderSizePixel = 0
-	label.Font = Enum.Font.GothamBold
-	label.TextColor3 = Color3.fromRGB(255, 255, 255)
-	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-	label.TextStrokeTransparency = 0.2
-	label.TextWrapped = true
-	label.TextScaled = true
-	label.RichText = false
-	label.Parent = billboard
-
-	local textConstraint = Instance.new("UITextSizeConstraint")
-	textConstraint.MinTextSize = 10
-	textConstraint.MaxTextSize = 18
-	textConstraint.Parent = label
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = label
-
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(255, 255, 255)
-	stroke.Transparency = 0.35
-	stroke.Thickness = 1.5
-	stroke.Parent = label
-
-	entries[lot] = {
-		Part = part,
-		Label = label
-	}
-end
-
-local function removeMissing(seen)
-	for lot, entry in pairs(entries) do
-		if not seen[lot] or not lot.Parent then
-			if entry.Part then
-				entry.Part:Destroy()
-			end
-			entries[lot] = nil
-		end
-	end
-end
-
-local function getEntryPosition(index, total, boundingCFrame, boundingSize)
-	local columns = 3
-	local row = math.floor((index - 1) / columns)
-	local column = (index - 1) % columns
-	local itemsInRow = math.min(columns, total - row * columns)
-	local horizontal = (column - (itemsInRow - 1) / 2) * 10
-	local vertical = 5 - row * 4.5
-	local sideOffset = boundingCFrame.RightVector * (boundingSize.X * 0.5 + 7)
-	local spreadOffset = boundingCFrame.LookVector * horizontal
-	return boundingCFrame.Position + sideOffset + spreadOffset + Vector3.new(0, vertical, 0)
-end
-
-local function refresh()
-	local boundingCFrame, boundingSize = getStandInfo()
-	local lots = getLots()
-	local seen = {}
-	if boundingCFrame and boundingSize then
-		for index, lot in ipairs(lots) do
-			seen[lot] = true
-			if not entries[lot] then
-				createEntry(lot)
-			end
-			local entry = entries[lot]
-			entry.Part.CFrame = CFrame.new(getEntryPosition(index, #lots, boundingCFrame, boundingSize))
-			entry.Label.Text = "物品：" .. getItemName(lot) .. "\n价格：" .. getPriceText(lot)
-		end
-	end
-	removeMissing(seen)
-end
-
-task.spawn(function()
-	while _G.AuctionPriceESPLoadId == loadId do
-		pcall(refresh)
-		task.wait(0.35)
-	end
+espToggle.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    if espEnabled then
+        espToggle.Text = "透视: 开"
+        espToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        refreshEsp()
+    else
+        espToggle.Text = "透视: 关"
+        espToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        clearEsp()
+    end
 end)
+
+dropdownBtn.MouseButton1Click:Connect(function()
+    scrollFrame.Visible = not scrollFrame.Visible
+end)
+
+pullBtn.MouseButton1Click:Connect(function()
+    pullItem()
+end)
+
+refreshBtn.MouseButton1Click:Connect(function()
+    refreshDropdown()
+    local count = 0
+    if draggableFolder then
+        for _, item in ipairs(draggableFolder:GetChildren()) do
+            if item:IsA("Model") then count = count + 1 end
+        end
+    end
+    statusLabel.Text = "状态: 已刷新，共" .. count .. "个物资"
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+end)
+
+RunService.RenderStepped:Connect(function()
+    if espEnabled then
+        updateEsp()
+    end
+end)
+
+if draggableFolder then
+    draggableFolder.ChildAdded:Connect(function(child)
+        if espEnabled and child:IsA("Model") then
+            task.wait(0.3)
+            createEsp(child)
+        end
+    end)
+    draggableFolder.ChildRemoved:Connect(function(child)
+        if espLabels[child] then
+            if espLabels[child].bb then
+                espLabels[child].bb:Destroy()
+            end
+            espLabels[child] = nil
+        end
+    end)
+end
+
+refreshDropdown()
