@@ -3097,7 +3097,21 @@ kbCurrentBg = nil
 kbApplyBackground = function(name)
     if name == "恐脚本背景图" then
         local ok, err = pcall(function()
-            Window:SetBackgroundImage("rbxassetid://113517588654522")
+            local bg = Window.UIElements.Main.Background
+            local img = bg:FindFirstChild("ImageLabel")
+            if not img then
+                img = Instance.new("ImageLabel")
+                img.Name = "ImageLabel"
+                img.BackgroundTransparency = 1
+                img.Size = UDim2.new(1, 0, 1, 0)
+                img.ScaleType = Enum.ScaleType.Crop
+                img.ImageTransparency = 0
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(0, Window.UICorner or 16)
+                corner.Parent = img
+                img.Parent = bg
+            end
+            img.Image = "rbxassetid://113517588654522"
         end)
         if ok then
             kbCurrentBg = name
@@ -3123,6 +3137,8 @@ Tabs.SettingsTab:Button({
             return
         end
         kbApplyBackground(kbBgSelected)
+        kbBgSelected = nil
+        pcall(function() kbBgDropdown:Select(nil) end)
     end
 })
 task.spawn(function()
