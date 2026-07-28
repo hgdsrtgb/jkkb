@@ -9,6 +9,18 @@ if pcall(function() return readfile(filename) end) then
 end
 count = count + 1
 pcall(function() writefile(filename, tostring(count)) end)
+local kbTadaAsset = nil
+task.spawn(function()
+    local ok, data = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/TADA.WAV") end)
+    if ok and data then
+        pcall(function()
+            if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
+            writefile("恐脚本/TADA.WAV", data)
+        end)
+        local ok2, asset = pcall(function() return getcustomasset("恐脚本/TADA.WAV") end)
+        if ok2 and asset then kbTadaAsset = asset end
+    end
+end)
 local Player = player
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -1328,6 +1340,82 @@ Tabs.MainTab = Window:Tab({ Title = "主要", Icon = "zap" })
 Tabs.SecondaryTab = Window:Tab({ Title = "次要", Icon = "mouse-pointer-2" })
 Tabs.MiscTab = Window:Tab({ Title = "杂项", Icon = "settings" })
 Tabs.GamesTab = Window:Tab({ Title = "支持服务器", Icon = "gamepad-2" })
+Tabs.SettingsTab = Window:Tab({ Title = "设置", Icon = "settings-2" })
+local kbStartupSoundEnabled = true
+local kbCfgElements = {}
+for kbTabName, kbTab in pairs(Tabs) do
+    for _, kbMType in ipairs({"Toggle", "Slider", "Dropdown", "Input"}) do
+        local kbOldFunc = kbTab[kbMType]
+        if kbOldFunc then
+            kbTab[kbMType] = function(kbSelf, kbOpt)
+                local kbEl = kbOldFunc(kbSelf, kbOpt)
+                if kbOpt and kbOpt.Title then
+                    local kbKey = kbTabName .. "/" .. kbOpt.Title
+                    if kbTabName ~= "SettingsTab" or kbOpt.Title == "开启启动音效" then
+                        kbCfgElements[kbKey] = {el = kbEl, mtype = kbMType}
+                    end
+                end
+                return kbEl
+            end
+        end
+    end
+end
+local kbCfgFolder = "恐脚本/配置"
+pcall(function()
+    if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
+    if makefolder and not isfolder(kbCfgFolder) then makefolder(kbCfgFolder) end
+end)
+local function kbListConfigs()
+    local list = {}
+    if listfiles then
+        local ok, files = pcall(function() return listfiles(kbCfgFolder) end)
+        if ok and files then
+            for _, f in ipairs(files) do
+                local name = f:match("([^/\\]+)%.json$")
+                if name then table.insert(list, name) end
+            end
+        end
+    end
+    table.sort(list)
+    return list
+end
+local function kbSaveConfig(name)
+    local data = {}
+    for key, item in pairs(kbCfgElements) do
+        local el = item.el
+        local v
+        if item.mtype == "Toggle" then
+            v = el.Value
+        elseif item.mtype == "Slider" then
+            v = tonumber(el.Value.Default) or el.Value.Default
+        else
+            v = el.Value
+        end
+        if type(v) == "string" or type(v) == "number" or type(v) == "boolean" then
+            data[key] = {t = item.mtype, v = v}
+        end
+    end
+    writefile(kbCfgFolder .. "/" .. name .. ".json", HttpService:JSONEncode(data))
+end
+local function kbLoadConfig(name)
+    local path = kbCfgFolder .. "/" .. name .. ".json"
+    if not isfile or not isfile(path) then return false end
+    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(path)) end)
+    if not ok or type(data) ~= "table" then return false end
+    for key, saved in pairs(data) do
+        local item = kbCfgElements[key]
+        if item and saved.t == item.mtype then
+            pcall(function()
+                if item.mtype == "Dropdown" then
+                    item.el:Select(saved.v)
+                else
+                    item.el:Set(saved.v)
+                end
+            end)
+        end
+    end
+    return true
+end
 Window:SelectTab(1)
 Tabs.NotifyTab:Paragraph({
     Title = "恐脚本--通用",
@@ -1370,11 +1458,17 @@ Tabs.NotifyTab:Button({
         end)
     end
 })
-
+Tabs.NotifyTab:Divider()
 Tabs.NotifyTab:Button({
     Title = "复制作者QQ",
     Callback = function()
         copyToClipboard("3999698324", "作者QQ")
+    end
+})
+Tabs.NotifyTab:Button({
+    Title = "复制大群: 461440703",
+    Callback = function()
+        copyToClipboard("461440703", "大群")
     end
 })
 Tabs.NotifyTab:Button({
@@ -1463,9 +1557,8 @@ Tabs.NotifyTab:Button({
 
 Tabs.NotifyTab:Paragraph({
     Title = "目前捐赠最多的人：",
-    Desc = "宥\nQQ：1072765538\n捐赠金额：32（牛逼）",
+    Desc = "宥\nQQ：1072765538\n捐赠金额：52（牛逼）",
 })
-Tabs.NotifyTab:Divider()
 
 Tabs.MainTab:Toggle({
     Title = "透视",
@@ -1553,7 +1646,7 @@ Tabs.MainTab:Toggle({
         WindUI:Notify({ Title = "飞行v2", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-Tabs.MainTab:Slider({
+local flyV2SpeedSlider = Tabs.MainTab:Slider({
     Title = "飞行v2速度 (当前: 50)",
     Value = {
         Min = 10,
@@ -1568,6 +1661,20 @@ sliderReleaseActions["flyv2speed"] = function(v)
     flyV2Speed = v
     WindUI:Notify({ Title = "飞行v2速度", Content = "已设置为：" .. v, Duration = 2 })
 end
+Tabs.MainTab:Input({
+    Title = "输入飞行v2速度",
+    Placeholder = "10 - 200",
+    Callback = function(text)
+        local v = tonumber(text)
+        if not v then return end
+        v = math.floor(v)
+        if v > 200 then v = 200 end
+        if v < 10 then v = 10 end
+        flyV2SpeedSlider:Set(v)
+        pendingSliderValues["flyv2speed"] = nil
+        sliderReleaseActions["flyv2speed"](v)
+    end
+})
 Tabs.MainTab:Toggle({
     Title = "无限跳",
     Value = false,
@@ -1644,7 +1751,7 @@ Tabs.MainTab:Toggle({
         end
     end
 })
-Tabs.MainTab:Slider({
+local speedSlider = Tabs.MainTab:Slider({
     Title = "移速数值 (当前: 16)",
     Value = {
         Min = 5,
@@ -1658,6 +1765,18 @@ Tabs.MainTab:Slider({
             if hum then hum.WalkSpeed = value end
             startSpeedAntiPull(value)
         end
+    end
+})
+Tabs.MainTab:Input({
+    Title = "输入移速数值",
+    Placeholder = "5 - 1000",
+    Callback = function(text)
+        local v = tonumber(text)
+        if not v then return end
+        v = math.floor(v)
+        if v > 1000 then v = 1000 end
+        if v < 5 then v = 5 end
+        speedSlider:Set(v)
     end
 })
 Tabs.MainTab:Toggle({
@@ -2060,6 +2179,132 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
+local markerList = {}
+local markerCount = 0
+local selectedMarkers = {}
+local markerLoopEnabled = false
+local cnNums = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十"}
+local function getMarkerName(n)
+    return "标点" .. (cnNums[n] or tostring(n))
+end
+local function refreshMarkerDropdown()
+    if not markerDropdown then return end
+    local names = {}
+    for _, m in ipairs(markerList) do
+        table.insert(names, m.name)
+    end
+    markerDropdown:Refresh(names)
+end
+local function teleportToMarker(m)
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(m.pos)
+    end
+end
+Tabs.SecondaryTab:Button({
+    Title = "保存标点",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            WindUI:Notify({ Title = "标点", Content = "你的角色未加载", Duration = 3 })
+            return
+        end
+        markerCount = markerCount + 1
+        local name = getMarkerName(markerCount)
+        local markerPart = Instance.new("Part")
+        markerPart.Name = name
+        markerPart.Anchored = true
+        markerPart.CanCollide = false
+        markerPart.CanQuery = false
+        markerPart.CanTouch = false
+        markerPart.Transparency = 1
+        markerPart.Size = Vector3.new(1, 1, 1)
+        markerPart.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 2.5, 0))
+        markerPart.Parent = workspace
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "MarkerLabel"
+        billboard.Size = UDim2.new(0, 100, 0, 40)
+        billboard.StudsOffset = Vector3.new(0, 1, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = markerPart
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = name
+        label.TextColor3 = Color3.fromRGB(255, 255, 0)
+        label.TextStrokeTransparency = 0
+        label.TextSize = 18
+        label.Font = Enum.Font.SourceSansBold
+        label.Parent = billboard
+        table.insert(markerList, {name = name, pos = hrp.Position, part = markerPart})
+        refreshMarkerDropdown()
+        WindUI:Notify({ Title = "标点", Content = "已保存 " .. name, Duration = 3 })
+    end
+})
+markerDropdown = Tabs.SecondaryTab:Dropdown({
+    Title = "选定标点（可多选）",
+    Values = {},
+    Multi = true,
+    Callback = function(value)
+        selectedMarkers = {}
+        if type(value) == "table" then
+            for k, v in pairs(value) do
+                if type(k) == "number" then
+                    selectedMarkers[v] = true
+                elseif v then
+                    selectedMarkers[k] = true
+                end
+            end
+        elseif type(value) == "string" then
+            selectedMarkers[value] = true
+        end
+    end
+})
+Tabs.SecondaryTab:Button({
+    Title = "传送标记点",
+    Callback = function()
+        task.spawn(function()
+            local tpCount = 0
+            for _, m in ipairs(markerList) do
+                if selectedMarkers[m.name] then
+                    teleportToMarker(m)
+                    tpCount = tpCount + 1
+                    task.wait(0.5)
+                end
+            end
+            if tpCount == 0 then
+                WindUI:Notify({ Title = "标点", Content = "请先选定标点", Duration = 3 })
+            end
+        end)
+    end
+})
+Tabs.SecondaryTab:Toggle({
+    Title = "全部循环传送",
+    Value = false,
+    Callback = function(state)
+        markerLoopEnabled = state
+        if state then
+            task.spawn(function()
+                while markerLoopEnabled do
+                    local tpCount = 0
+                    for _, m in ipairs(markerList) do
+                        if not markerLoopEnabled then break end
+                        if selectedMarkers[m.name] then
+                            teleportToMarker(m)
+                            tpCount = tpCount + 1
+                            task.wait(0.5)
+                        end
+                    end
+                    if tpCount == 0 then
+                        task.wait(0.5)
+                    end
+                end
+            end)
+        end
+        WindUI:Notify({ Title = "全部循环传送", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
 local currentFollowTarget = nil
 followDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定跟随玩家",
@@ -2390,6 +2635,27 @@ Tabs.MiscTab:Button({
         copyToClipboard(id, "实例ID")
     end
 })
+local jobIdTpStr = ""
+Tabs.MiscTab:Input({
+    Title = "实例ID传送",
+    Placeholder = "输入实例ID (JobId)",
+    Callback = function(v)
+        jobIdTpStr = v
+    end
+})
+Tabs.MiscTab:Button({
+    Title = "执行实例ID传送",
+    Callback = function()
+        if not jobIdTpStr or jobIdTpStr == "" then
+            WindUI:Notify({ Title = "实例ID传送", Content = "请先输入实例ID", Duration = 3 })
+            return
+        end
+        WindUI:Notify({ Title = "实例ID传送", Content = "正在传送...", Duration = 5 })
+        pcall(function()
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobIdTpStr, LocalPlayer)
+        end)
+    end
+})
 Tabs.MiscTab:Button({
     Title = "复制数字ID (PlaceId)",
     Callback = function()
@@ -2502,4 +2768,122 @@ Tabs.GamesTab:Paragraph({
 })
 Window:OnClose(function()
     print("界面已关闭。")
+end)Tabs.SettingsTab:Toggle({
+    Title = "开启启动音效",
+    Desc = "需要保存配置使用",
+    Value = true,
+    Callback = function(state)
+        kbStartupSoundEnabled = state
+        WindUI:Notify({ Title = "开启启动音效", Content = state and "已开启" or "已关闭", Duration = 3 })
+    end
+})
+local kbSelectedConfig = nil
+local kbConfigDropdown = Tabs.SettingsTab:Dropdown({
+    Title = "选择配置",
+    Values = kbListConfigs(),
+    Callback = function(v)
+        kbSelectedConfig = v
+    end
+})
+Tabs.SettingsTab:Button({
+    Title = "加载配置",
+    Callback = function()
+        if not kbSelectedConfig then
+            WindUI:Notify({ Title = "加载配置", Content = "请先在上面选择一个配置", Duration = 3 })
+            return
+        end
+        local name = kbSelectedConfig
+        if kbLoadConfig(name) then
+            WindUI:Notify({ Title = "加载配置", Content = "已加载配置：" .. name, Duration = 3 })
+        else
+            WindUI:Notify({ Title = "加载配置", Content = "加载失败：" .. name, Duration = 3 })
+        end
+        kbSelectedConfig = nil
+        pcall(function() kbConfigDropdown:Select(nil) end)
+    end
+})
+local kbAutoLoadName = nil
+local kbAutoPath = kbCfgFolder .. "/autoload.txt"
+if isfile and isfile(kbAutoPath) then
+    local nm = readfile(kbAutoPath)
+    if nm and nm ~= "" then kbAutoLoadName = nm end
+end
+local kbAutoDropdown = Tabs.SettingsTab:Dropdown({
+    Title = "自动加载配置",
+    Values = kbListConfigs(),
+    Callback = function(v)
+        kbAutoLoadName = v
+    end
+})
+local kbAutoToggle = nil
+kbAutoToggle = Tabs.SettingsTab:Toggle({
+    Title = "自动加载",
+    Value = kbAutoLoadName ~= nil,
+    Callback = function(state)
+        if state then
+            if not kbAutoLoadName then
+                WindUI:Notify({ Title = "自动加载", Content = "请先在上面选择一个配置", Duration = 3 })
+                if kbAutoToggle then pcall(function() kbAutoToggle:Set(false) end) end
+                return
+            end
+            writefile(kbAutoPath, kbAutoLoadName)
+            WindUI:Notify({ Title = "自动加载", Content = "已设置自动加载配置：" .. kbAutoLoadName, Duration = 3 })
+        else
+            pcall(function()
+                if isfile(kbAutoPath) then delfile(kbAutoPath) end
+            end)
+            WindUI:Notify({ Title = "自动加载", Content = "已关闭自动加载", Duration = 3 })
+        end
+    end
+})
+local kbCfgSaveName = ""
+Tabs.SettingsTab:Input({
+    Title = "输入配置名字",
+    Placeholder = "配置名字",
+    Callback = function(text)
+        kbCfgSaveName = text
+    end
+})
+Tabs.SettingsTab:Button({
+    Title = "保存当前配置",
+    Callback = function()
+        if not kbCfgSaveName or kbCfgSaveName == "" then
+            WindUI:Notify({ Title = "保存当前配置", Content = "请先在上面输入配置名字", Duration = 3 })
+            return
+        end
+        local ok, err = pcall(function() kbSaveConfig(kbCfgSaveName) end)
+        if ok then
+            WindUI:Notify({ Title = "保存当前配置", Content = "已保存配置：" .. kbCfgSaveName, Duration = 3 })
+            local kbNewList = kbListConfigs()
+            kbConfigDropdown.Values = kbNewList
+            kbAutoDropdown.Values = kbNewList
+            pcall(function() kbConfigDropdown:Refresh(kbNewList) end)
+            pcall(function() kbAutoDropdown:Refresh(kbNewList) end)
+        else
+            WindUI:Notify({ Title = "保存当前配置", Content = "保存失败：" .. tostring(err), Duration = 3 })
+        end
+    end
+})
+task.spawn(function()
+    task.wait(0.5)
+    if isfile and isfile(kbAutoPath) then
+        local nm = readfile(kbAutoPath)
+        if nm and nm ~= "" then
+            local ok = kbLoadConfig(nm)
+            if ok then
+                WindUI:Notify({ Title = "配置", Content = "已自动加载配置：" .. nm, Duration = 3 })
+            end
+        end
+    end
+    task.wait(0.2)
+    if kbStartupSoundEnabled and kbTadaAsset then
+        local kbSound = Instance.new("Sound")
+        kbSound.SoundId = kbTadaAsset
+        kbSound.Volume = 2
+        kbSound.Parent = CoreGui
+        kbSound:Play()
+        kbSound.Ended:Connect(function()
+            kbSound:Destroy()
+        end)
+    end
 end)
