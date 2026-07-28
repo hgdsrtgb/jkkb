@@ -34,16 +34,26 @@ task.spawn(function()
     end
 end)
 kbPlayDing = function()
-    if not kbDingAsset then return end
+    if kbToggleSoundMuted then return end
     pcall(function()
-        local kbDingSound = Instance.new("Sound")
-        kbDingSound.SoundId = kbDingAsset
-        kbDingSound.Volume = 2
-        kbDingSound.Parent = CoreGui
-        kbDingSound:Play()
-        kbDingSound.Ended:Connect(function()
-            kbDingSound:Destroy()
-        end)
+        if not kbDingAsset then
+            local kbDingData = game:HttpGet("https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/DING.WAV")
+            if kbDingData then
+                if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
+                writefile("恐脚本/DING.WAV", kbDingData)
+                kbDingAsset = getcustomasset("恐脚本/DING.WAV")
+            end
+        end
+        if kbDingAsset then
+            local kbDingSound = Instance.new("Sound")
+            kbDingSound.SoundId = kbDingAsset
+            kbDingSound.Volume = 2
+            kbDingSound.Parent = CoreGui
+            kbDingSound:Play()
+            kbDingSound.Ended:Connect(function()
+                kbDingSound:Destroy()
+            end)
+        end
     end)
 end
 
@@ -1598,7 +1608,7 @@ Tabs.MainTab:Toggle({
     Callback = function(state)
         espEnabled = state
         WindUI:Notify({ Title = "透视", Content = state and "已打开" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
         if state then
             startEspLoops()
             for _, p in ipairs(Players:GetPlayers()) do setupPlayerESP(p) end
@@ -1677,7 +1687,7 @@ Tabs.MainTab:Toggle({
         flyV2Enabled = state
         if state then startFlyV2() else stopFlyV2() end
         WindUI:Notify({ Title = "飞行v2", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 local flyV2SpeedSlider = Tabs.MainTab:Slider({
@@ -1759,7 +1769,7 @@ do
             flyCarEnabled = state
             if state then startFlyCar() else stopFlyCar() end
             WindUI:Notify({ Title = "飞车", Content = state and "已开启" or "已关闭", Duration = 3 })
-            if state and not kbToggleSoundMuted then kbPlayDing() end
+            if state then kbPlayDing() end
         end
     })
     local flyCarSpeedSlider = Tabs.MainTab:Slider({
@@ -1793,7 +1803,7 @@ Tabs.MainTab:Toggle({
         InfiniteJumpEnabled = state
         if state then startInfiniteJump() else stopInfiniteJump() end
         WindUI:Notify({ Title = "无限跳", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 Tabs.MainTab:Button({
@@ -1841,7 +1851,7 @@ Tabs.MainTab:Toggle({
             end
         end
         WindUI:Notify({ Title = "穿墙", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 local speedToggle = false
@@ -1856,13 +1866,13 @@ Tabs.MainTab:Toggle({
             if hum then hum.WalkSpeed = speedValue end
             startSpeedAntiPull(speedValue)
             WindUI:Notify({ Title = "修改移速", Content = "已开启，当前移速：" .. speedValue, Duration = 3 })
-            if state and not kbToggleSoundMuted then kbPlayDing() end
+            if state then kbPlayDing() end
         else
             stopSpeedAntiPull()
             local hum = getHumanoid()
             if hum then hum.WalkSpeed = 16 end
             WindUI:Notify({ Title = "修改移速", Content = "已关闭，恢复默认移速", Duration = 3 })
-            if state and not kbToggleSoundMuted then kbPlayDing() end
+            if state then kbPlayDing() end
         end
     end
 })
@@ -1921,7 +1931,7 @@ Tabs.MainTab:Toggle({
             Lighting.OutdoorAmbient = Color3.new(0.7, 0.7, 0.7)
         end
         WindUI:Notify({ Title = "夜视", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 Tabs.MainTab:Button({
@@ -1941,7 +1951,7 @@ Tabs.MainTab:Toggle({
         jumpFloatActive = state
         if state then createJumpFloat() else destroyJumpFloat() end
         WindUI:Notify({ Title = "解锁跳跃", Content = state and "已显示跳跃按钮" or "已隐藏跳跃按钮", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 Tabs.MainTab:Button({
@@ -2036,7 +2046,7 @@ Tabs.MainTab:Toggle({
         AntiFlingEnabled = state
         if state then startAntiFling() else stopAntiFling() end
         WindUI:Notify({ Title = "防甩飞", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 local activeImpersonateClone = nil
@@ -2421,7 +2431,7 @@ Tabs.SecondaryTab:Toggle({
             end)
         end
         WindUI:Notify({ Title = "全部循环传送", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 local currentFollowTarget = nil
@@ -2511,7 +2521,7 @@ Tabs.SecondaryTab:Toggle({
     Callback = function(state)
         if state then showFlyUI() else hideFlyUI() end
         WindUI:Notify({ Title = "飞行控制", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 local currentHarassTarget = nil
@@ -2589,7 +2599,7 @@ Tabs.SecondaryTab:Toggle({
         SpinEnabled = state
         if state then startSpin() else stopSpin() end
         WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 do
@@ -2658,11 +2668,11 @@ do
                     airWalkLastPos = pos
                 end)
                 WindUI:Notify({ Title = "踏空行走", Content = "已开启，锁定高度：" .. string.format("%.1f", airWalkLockedY), Duration = 3 })
-                if state and not kbToggleSoundMuted then kbPlayDing() end
+                if state then kbPlayDing() end
             else
                 stopAirWalk()
                 WindUI:Notify({ Title = "踏空行走", Content = "已关闭", Duration = 3 })
-                if state and not kbToggleSoundMuted then kbPlayDing() end
+                if state then kbPlayDing() end
             end
         end
     })
@@ -2711,7 +2721,7 @@ Tabs.MiscTab:Toggle({
             newSky.SkyboxUp = "rbxassetid://113517588654522"
             newSky.Parent = Lighting
             WindUI:Notify({ Title = "天空盒子", Content = "已修改（仅自己可见）", Duration = 3 })
-            if state and not kbToggleSoundMuted then kbPlayDing() end
+            if state then kbPlayDing() end
         else
             local sky = Lighting:FindFirstChildOfClass("Sky")
             if sky then sky:Destroy() end
@@ -2720,7 +2730,7 @@ Tabs.MiscTab:Toggle({
                 kbOldSky = nil
             end
             WindUI:Notify({ Title = "天空盒子", Content = "已恢复", Duration = 3 })
-            if state and not kbToggleSoundMuted then kbPlayDing() end
+            if state then kbPlayDing() end
         end
     end
 })
@@ -2814,7 +2824,7 @@ Tabs.MiscTab:Toggle({
         CrosshairEnabled = state
         if state then startCrosshairLoop() else stopCrosshairLoop() end
         WindUI:Notify({ Title = "准星", Content = state and "已显示" or "已隐藏", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 Tabs.MiscTab:Toggle({
@@ -2823,7 +2833,7 @@ Tabs.MiscTab:Toggle({
     Callback = function(state)
         CrosshairSpinEnabled = state
         WindUI:Notify({ Title = "准星旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 Tabs.MiscTab:Toggle({
@@ -2833,7 +2843,7 @@ Tabs.MiscTab:Toggle({
         antiAFKEnabled = state
         if state then startAntiAFK() else stopAntiAFK() end
         WindUI:Notify({ Title = "反挂机踢出", Content = state and "已开启" or "已关闭", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 Tabs.MiscTab:Button({
@@ -2986,7 +2996,7 @@ Tabs.SettingsTab:Toggle({
     Callback = function(state)
         kbStartupSoundMuted = state
         WindUI:Notify({ Title = "关闭启动音效", Content = state and "启动音效已静音" or "启动音效已恢复", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 Tabs.SettingsTab:Toggle({
@@ -2996,7 +3006,7 @@ Tabs.SettingsTab:Toggle({
     Callback = function(state)
         kbToggleSoundMuted = state
         WindUI:Notify({ Title = "关闭开关音效", Content = state and "开关音效已静音" or "开关音效已恢复", Duration = 3 })
-        if state and not kbToggleSoundMuted then kbPlayDing() end
+        if state then kbPlayDing() end
     end
 })
 local kbSelectedConfig = nil
@@ -3092,13 +3102,13 @@ kbAutoToggle = Tabs.SettingsTab:Toggle({
             end
             writefile(kbAutoPath, kbAutoLoadName)
             WindUI:Notify({ Title = "自动加载", Content = "已设置自动加载配置：" .. kbAutoLoadName, Duration = 3 })
-            if state and not kbToggleSoundMuted then kbPlayDing() end
+            if state then kbPlayDing() end
         else
             pcall(function()
                 if isfile(kbAutoPath) then delfile(kbAutoPath) end
             end)
             WindUI:Notify({ Title = "自动加载", Content = "已关闭自动加载", Duration = 3 })
-            if state and not kbToggleSoundMuted then kbPlayDing() end
+            if state then kbPlayDing() end
         end
     end
 })
