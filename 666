@@ -46,6 +46,16 @@ kbPlayDing = function()
         end)
     end)
 end
+kbOldWindUINotify = WindUI.Notify
+WindUI.Notify = function(self, opt)
+    if opt and opt.Content and not kbToggleSoundMuted then
+        local kbContent = tostring(opt.Content)
+        if string.find(kbContent, "已开启", 1, true) or string.find(kbContent, "已打开", 1, true) then
+            kbPlayDing()
+        end
+    end
+    return kbOldWindUINotify(self, opt)
+end
 local Player = player
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -1366,22 +1376,13 @@ Tabs.SecondaryTab = Window:Tab({ Title = "次要", Icon = "mouse-pointer-2" })
 Tabs.MiscTab = Window:Tab({ Title = "杂项", Icon = "settings-2" })
 Tabs.GamesTab = Window:Tab({ Title = "支持服务器", Icon = "gamepad-2" })
 Tabs.SettingsTab = Window:Tab({ Title = "设置", Icon = "settings" })
-local kbCfgElements = {}
+kbCfgElements = {}
 for kbTabName, kbTab in pairs(Tabs) do
     for _, kbMType in ipairs({"Toggle", "Slider", "Dropdown", "Input"}) do
         local kbOldFunc = kbTab[kbMType]
         if kbOldFunc then
             kbTab[kbMType] = function(kbSelf, kbOpt)
                 local kbEl = kbOldFunc(kbSelf, kbOpt)
-                if kbMType == "Toggle" then
-                    local kbOldSet = kbEl.Set
-                    kbEl.Set = function(kbS, kbV, ...)
-                        kbOldSet(kbS, kbV, ...)
-                        if kbV == true and not kbToggleSoundMuted and kbPlayDing then
-                            kbPlayDing()
-                        end
-                    end
-                end
                 if kbOpt and kbOpt.Title then
                     local kbKey = kbTabName .. "/" .. kbOpt.Title
                     if kbTabName ~= "SettingsTab" or kbOpt.Title == "关闭启动音效" or kbOpt.Title == "关闭开关音效" then
@@ -1393,12 +1394,12 @@ for kbTabName, kbTab in pairs(Tabs) do
         end
     end
 end
-local kbCfgFolder = "恐脚本/配置"
+kbCfgFolder = "恐脚本/配置"
 pcall(function()
     if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
     if makefolder and not isfolder(kbCfgFolder) then makefolder(kbCfgFolder) end
 end)
-local function kbListConfigs()
+function kbListConfigs()
     local list = {}
     if listfiles then
         local ok, files = pcall(function() return listfiles(kbCfgFolder) end)
@@ -1412,7 +1413,7 @@ local function kbListConfigs()
     table.sort(list)
     return list
 end
-local function kbSaveConfig(name)
+function kbSaveConfig(name)
     local data = {}
     for key, item in pairs(kbCfgElements) do
         local el = item.el
@@ -1433,7 +1434,7 @@ local function kbSaveConfig(name)
     end
     writefile(kbCfgFolder .. "/" .. name .. ".json", HttpService:JSONEncode(data))
 end
-local function kbLoadConfig(name)
+function kbLoadConfig(name)
     local path = kbCfgFolder .. "/" .. name .. ".json"
     if not isfile or not isfile(path) then return false end
     local ok, data = pcall(function() return HttpService:JSONDecode(readfile(path)) end)
@@ -2507,6 +2508,7 @@ Tabs.SecondaryTab:Toggle({
     Value = false,
     Callback = function(state)
         if state then showFlyUI() else hideFlyUI() end
+        WindUI:Notify({ Title = "飞行控制", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
 local currentHarassTarget = nil
@@ -3138,6 +3140,20 @@ Tabs.SettingsTab:Button({
 })
 kbCurrentBg = nil
 kbApplyBackground = function(name)
+    if name == "默认背景图" then
+        local ok, err = pcall(function()
+            local bg = Window.UIElements.Main.Background
+            local img = bg:FindFirstChild("KbBgImage")
+            if img then img:Destroy() end
+        end)
+        if ok then
+            kbCurrentBg = name
+            WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
+        else
+            WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
+        end
+        return
+    end
     if name == "恐脚本背景图" then
         local ok, err = pcall(function()
             local bg = Window.UIElements.Main.Background
@@ -3170,7 +3186,7 @@ end
 local kbBgSelected = nil
 local kbBgDropdown = Tabs.SettingsTab:Dropdown({
     Title = "切换背景图",
-    Values = {"恐脚本背景图"},
+    Values = {"默认背景图", "恐脚本背景图"},
     Callback = function(v)
         kbBgSelected = v
     end
