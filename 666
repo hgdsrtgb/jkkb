@@ -1394,6 +1394,9 @@ local function kbSaveConfig(name)
             data[key] = {t = item.mtype, v = v}
         end
     end
+    if kbCurrentBg then
+        data["SettingsTab/切换背景图"] = {t = "Background", v = kbCurrentBg}
+    end
     writefile(kbCfgFolder .. "/" .. name .. ".json", HttpService:JSONEncode(data))
 end
 local function kbLoadConfig(name)
@@ -1412,6 +1415,10 @@ local function kbLoadConfig(name)
                 end
             end)
         end
+    end
+    local kbSavedBg = data["SettingsTab/切换背景图"]
+    if kbSavedBg and kbSavedBg.v and kbApplyBackground then
+        pcall(function() kbApplyBackground(kbSavedBg.v) end)
     end
     return true
 end
@@ -1674,6 +1681,82 @@ Tabs.MainTab:Input({
         sliderReleaseActions["flyv2speed"](v)
     end
 })
+do
+    local flyCarEnabled = false
+    local flyCarSpeed = 50
+    local flyCarConn = nil
+    local flyCarBV = nil
+    local flyCarBG = nil
+    local function stopFlyCar()
+        if flyCarConn then flyCarConn:Disconnect() flyCarConn = nil end
+        if flyCarBV then flyCarBV:Destroy() flyCarBV = nil end
+        if flyCarBG then flyCarBG:Destroy() flyCarBG = nil end
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+    end
+    local function startFlyCar()
+        stopFlyCar()
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+        hum.PlatformStand = true
+        flyCarBV = Instance.new("BodyVelocity")
+        flyCarBV.MaxForce = Vector3.new(1000000, 1000000, 1000000)
+        flyCarBV.Velocity = Vector3.zero
+        flyCarBV.Parent = root
+        flyCarBG = Instance.new("BodyGyro")
+        flyCarBG.MaxTorque = Vector3.new(1000000, 1000000, 1000000)
+        flyCarBG.P = 10000
+        flyCarBG.D = 500
+        flyCarBG.Parent = root
+        flyCarConn = RunService.Heartbeat:Connect(function()
+            if not flyCarBV or not flyCarBV.Parent then return end
+            flyCarBV.Velocity = Camera.CFrame.LookVector * flyCarSpeed
+            flyCarBG.CFrame = Camera.CFrame
+        end)
+    end
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        if flyCarEnabled then
+            task.wait(1)
+            startFlyCar()
+        end
+    end)
+    Tabs.MainTab:Toggle({
+        Title = "飞车",
+        Value = false,
+        Callback = function(state)
+            flyCarEnabled = state
+            if state then startFlyCar() else stopFlyCar() end
+            WindUI:Notify({ Title = "飞车", Content = state and "已开启" or "已关闭", Duration = 3 })
+        end
+    })
+    local flyCarSpeedSlider = Tabs.MainTab:Slider({
+        Title = "飞车速度 (当前: 50)",
+        Value = {
+            Min = 10,
+            Max = 200,
+            Default = 50,
+        },
+        Callback = function(value)
+            flyCarSpeed = value
+        end
+    })
+    Tabs.MainTab:Input({
+        Title = "输入飞车速度",
+        Placeholder = "10 - 200",
+        Callback = function(text)
+            local v = tonumber(text)
+            if not v then return end
+            v = math.floor(v)
+            if v > 200 then v = 200 end
+            if v < 10 then v = 10 end
+            flyCarSpeedSlider:Set(v)
+        end
+    })
+end
 Tabs.MainTab:Toggle({
     Title = "无限跳",
     Value = false,
@@ -2427,6 +2510,21 @@ Tabs.SecondaryTab:Button({
         currentHarassTarget = nil
     end
 })
+Tabs.SecondaryTab:Slider({
+    Title = "操人速度 (当前: 5)",
+    Value = {
+        Min = 1,
+        Max = 20,
+        Default = 5,
+    },
+    Callback = function(value)
+        pendingSliderValues["harassspeed"] = value
+    end
+})
+sliderReleaseActions["harassspeed"] = function(speed)
+    harassSpeed = speed
+    WindUI:Notify({ Title = "操人速度", Content = "已设置为：" .. speed .. " 次/秒", Duration = 2 })
+end
 Tabs.SecondaryTab:Button({
     Title = "操最近的人",
     Callback = function()
@@ -2532,21 +2630,6 @@ do
             airWalkEnabled = false
         end
     end)
-end
-Tabs.SecondaryTab:Slider({
-    Title = "操人速度 (当前: 5)",
-    Value = {
-        Min = 1,
-        Max = 20,
-        Default = 5,
-    },
-    Callback = function(value)
-        pendingSliderValues["harassspeed"] = value
-    end
-})
-sliderReleaseActions["harassspeed"] = function(speed)
-    harassSpeed = speed
-    WindUI:Notify({ Title = "操人速度", Content = "已设置为：" .. speed .. " 次/秒", Duration = 2 })
 end
 Tabs.SecondaryTab:Slider({
     Title = "旋转速度 (当前: 360)",
@@ -3008,6 +3091,38 @@ Tabs.SettingsTab:Button({
         kbDeleteSelected = {}
         pcall(function() kbDeleteDropdown:Select(nil) end)
         kbRefreshAllDropdowns()
+    end
+})
+kbCurrentBg = nil
+kbApplyBackground = function(name)
+    if name == "恐脚本背景图" then
+        local ok, err = pcall(function()
+            Window:SetBackgroundImage("rbxassetid://113517588654522")
+        end)
+        if ok then
+            kbCurrentBg = name
+            WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
+        else
+            WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
+        end
+    end
+end
+local kbBgSelected = nil
+local kbBgDropdown = Tabs.SettingsTab:Dropdown({
+    Title = "切换背景图",
+    Values = {"恐脚本背景图"},
+    Callback = function(v)
+        kbBgSelected = v
+    end
+})
+Tabs.SettingsTab:Button({
+    Title = "切换此背景图",
+    Callback = function()
+        if not kbBgSelected then
+            WindUI:Notify({ Title = "切换此背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
+            return
+        end
+        kbApplyBackground(kbBgSelected)
     end
 })
 task.spawn(function()
