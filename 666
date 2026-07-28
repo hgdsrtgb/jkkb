@@ -21,6 +21,31 @@ task.spawn(function()
         if ok2 and asset then kbTadaAsset = asset end
     end
 end)
+kbDingAsset = nil
+task.spawn(function()
+    local ok, data = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/DING.WAN") end)
+    if ok and data then
+        pcall(function()
+            if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
+            writefile("恐脚本/DING.WAV", data)
+        end)
+        local ok2, asset = pcall(function() return getcustomasset("恐脚本/DING.WAV") end)
+        if ok2 and asset then kbDingAsset = asset end
+    end
+end)
+kbPlayDing = function()
+    if not kbDingAsset then return end
+    pcall(function()
+        local kbDingSound = Instance.new("Sound")
+        kbDingSound.SoundId = kbDingAsset
+        kbDingSound.Volume = 2
+        kbDingSound.Parent = CoreGui
+        kbDingSound:Play()
+        kbDingSound.Ended:Connect(function()
+            kbDingSound:Destroy()
+        end)
+    end)
+end
 local Player = player
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -1348,9 +1373,18 @@ for kbTabName, kbTab in pairs(Tabs) do
         if kbOldFunc then
             kbTab[kbMType] = function(kbSelf, kbOpt)
                 local kbEl = kbOldFunc(kbSelf, kbOpt)
+                if kbMType == "Toggle" then
+                    local kbOldSet = kbEl.Set
+                    kbEl.Set = function(kbS, kbV, ...)
+                        kbOldSet(kbS, kbV, ...)
+                        if kbV == true and not kbToggleSoundMuted and kbPlayDing then
+                            kbPlayDing()
+                        end
+                    end
+                end
                 if kbOpt and kbOpt.Title then
                     local kbKey = kbTabName .. "/" .. kbOpt.Title
-                    if kbTabName ~= "SettingsTab" or kbOpt.Title == "开启启动音效" then
+                    if kbTabName ~= "SettingsTab" or kbOpt.Title == "关闭启动音效" or kbOpt.Title == "关闭开关音效" then
                         kbCfgElements[kbKey] = {el = kbEl, mtype = kbMType}
                     end
                 end
@@ -2931,14 +2965,23 @@ Window:OnClose(function()
     print("界面已关闭。")
 end)
 task.spawn(function()
-local kbStartupSoundEnabled = true
+local kbStartupSoundMuted = false
 Tabs.SettingsTab:Toggle({
-    Title = "开启启动音效",
+    Title = "关闭启动音效",
     Desc = "需要保存配置使用",
-    Value = true,
+    Value = false,
     Callback = function(state)
-        kbStartupSoundEnabled = state
-        WindUI:Notify({ Title = "开启启动音效", Content = state and "已开启" or "已关闭", Duration = 3 })
+        kbStartupSoundMuted = state
+        WindUI:Notify({ Title = "关闭启动音效", Content = state and "启动音效已静音" or "启动音效已恢复", Duration = 3 })
+    end
+})
+Tabs.SettingsTab:Toggle({
+    Title = "关闭开关音效",
+    Desc = "需要保存配置使用",
+    Value = false,
+    Callback = function(state)
+        kbToggleSoundMuted = state
+        WindUI:Notify({ Title = "关闭开关音效", Content = state and "开关音效已静音" or "开关音效已恢复", Duration = 3 })
     end
 })
 local kbSelectedConfig = nil
@@ -3098,20 +3141,23 @@ kbApplyBackground = function(name)
     if name == "恐脚本背景图" then
         local ok, err = pcall(function()
             local bg = Window.UIElements.Main.Background
-            local img = bg:FindFirstChild("ImageLabel")
+            local img = bg:FindFirstChild("KbBgImage")
             if not img then
                 img = Instance.new("ImageLabel")
-                img.Name = "ImageLabel"
+                img.Name = "KbBgImage"
                 img.BackgroundTransparency = 1
                 img.Size = UDim2.new(1, 0, 1, 0)
                 img.ScaleType = Enum.ScaleType.Crop
                 img.ImageTransparency = 0
+                img.ZIndex = 1
                 local corner = Instance.new("UICorner")
                 corner.CornerRadius = UDim.new(0, Window.UICorner or 16)
                 corner.Parent = img
                 img.Parent = bg
             end
             img.Image = "rbxassetid://113517588654522"
+            img.Visible = true
+            pcall(function() Window:SetBackgroundImage("rbxassetid://113517588654522") end)
         end)
         if ok then
             kbCurrentBg = name
@@ -3153,7 +3199,7 @@ task.spawn(function()
         end
     end
     task.wait(0.2)
-    if kbStartupSoundEnabled and kbTadaAsset then
+    if not kbStartupSoundMuted and kbTadaAsset then
         pcall(function()
             local kbSound = Instance.new("Sound")
             kbSound.SoundId = kbTadaAsset
