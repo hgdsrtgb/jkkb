@@ -1,14 +1,16 @@
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 local player = game:GetService("Players").LocalPlayer
 local plrId = player.UserId
-local filename = "script_count_" .. plrId .. ".txt"
 local count = 0
-if pcall(function() return readfile(filename) end) then
-    local data = readfile(filename)
-    count = tonumber(data) or 0
-end
-count = count + 1
-pcall(function() writefile(filename, tostring(count)) end)
+(function()
+    local filename = "script_count_" .. plrId .. ".txt"
+    if pcall(function() return readfile(filename) end) then
+        local data = readfile(filename)
+        count = tonumber(data) or 0
+    end
+    count = count + 1
+    pcall(function() writefile(filename, tostring(count)) end)
+end)()
 kbTadaAsset = nil
 task.spawn(function()
     local ok, data = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/TADA.WAV") end)
@@ -1342,6 +1344,7 @@ Tabs.MiscTab = Window:Tab({ Title = "杂项", Icon = "settings-2" })
 Tabs.GamesTab = Window:Tab({ Title = "支持服务器", Icon = "gamepad-2" })
 Tabs.SettingsTab = Window:Tab({ Title = "设置", Icon = "settings" })
 local kbCfgElements = {}
+(function()
 for kbTabName, kbTab in pairs(Tabs) do
     for _, kbMType in ipairs({"Toggle", "Slider", "Dropdown", "Input"}) do
         local kbOldFunc = kbTab[kbMType]
@@ -1359,6 +1362,7 @@ for kbTabName, kbTab in pairs(Tabs) do
         end
     end
 end
+end)()
 local kbCfgFolder = "恐脚本/配置"
 pcall(function()
     if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
@@ -1422,6 +1426,7 @@ Tabs.NotifyTab:Paragraph({
     Image = "rbxassetid://5107182114",
     ImageSize = 42,
 })
+(function()
 local function kbFormatDiff(mins)
     mins = math.max(0, math.floor(mins))
     return string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
@@ -1446,6 +1451,7 @@ Tabs.NotifyTab:Paragraph({
     Title = "距离一周年还有",
     Desc = kbFormatDiff((kbAnnivTime - os.time()) / 60),
 })
+end)()
 Tabs.NotifyTab:Divider()
 Tabs.NotifyTab:Button({
     Title = "ROB脚本v2",
@@ -1583,6 +1589,7 @@ Tabs.MainTab:Button({
         end)
     end
 })
+(function()
 local flyV2Enabled = false
 local flyV2Speed = 50
 local flyV2Conn = nil
@@ -1674,6 +1681,7 @@ Tabs.MainTab:Input({
         sliderReleaseActions["flyv2speed"](v)
     end
 })
+end)()
 Tabs.MainTab:Toggle({
     Title = "无限跳",
     Value = false,
@@ -2178,6 +2186,7 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
+(function()
 local markerList = {}
 local markerCount = 0
 local selectedMarkers = {}
@@ -2304,6 +2313,7 @@ Tabs.SecondaryTab:Toggle({
         WindUI:Notify({ Title = "全部循环传送", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
+end)()
 local currentFollowTarget = nil
 followDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定跟随玩家",
@@ -2392,6 +2402,7 @@ Tabs.SecondaryTab:Toggle({
         if state then showFlyUI() else hideFlyUI() end
     end
 })
+(function()
 local airWalkEnabled = false
 local airWalkConn = nil
 local airWalkPlatform = nil
@@ -2477,6 +2488,7 @@ Tabs.SecondaryTab:Toggle({
         WindUI:Notify({ Title = "踏空行走", Content = state and "已开启，已记录当前高度" or "已关闭", Duration = 3 })
     end
 })
+end)()
 local currentHarassTarget = nil
 harassDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定操人目标",
