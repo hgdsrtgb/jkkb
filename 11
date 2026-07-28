@@ -1,497 +1,881 @@
-local function safeLoad(url)
-    local success, result = pcall(function()
-        return loadstring(game:HttpGet(url))()
-    end)
-    if not success then
-        warn("加载失败: " .. url)
-        return nil
-    end
-    return result
-end
+local function safeLoad(url) local success, result = pcall(function() return loadstring(game:HttpGet(url))() end) if not success then warn("加载失败: " .. url) return nil end return result end local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui") local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui") local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui") if not Library then game:GetService("StarterGui"):SetCore("SendNotification", { Title = "错误", Text = "UI 库加载失败，请检查网络或脚本资源", Duration = 5, }) return end local Options = Library.Options local Toggles = Library.Toggles local Players = game:GetService("Players") local ReplicatedStorage = game:GetService("ReplicatedStorage") local Workspace = game:GetService("Workspace") local RunService = game:GetService("RunService") local player = Players.LocalPlayer local Window = Library:CreateWindow({ Title = "圣奥里", Footer = "恐拜大帝 制作", Icon = 131153193945220, NotifySide = "Right", ShowCustomCursor = true, }) Library:Notify({ Title = "圣奥里", Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功", Time = 5, }) local Tabs = { Notice = Window:AddTab("通知", "info"), Main = Window:AddTab("主要", "target"), Teleports = Window:AddTab("传送点", "map-pin"), Settings = Window:AddTab("设置", "settings"), } local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息") NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本') NoticeGroup:AddLabel('创作者：恐拜大帝')
 
-local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui")
-local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui")
-local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui")
-
-if not Library then
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "错误",
-        Text = "UI 库加载失败，请检查网络或脚本资源",
-        Duration = 5,
-    })
-    return
-end
-
-local Options = Library.Options
-local Toggles = Library.Toggles
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local player = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
-local draggableFolder = Workspace:WaitForChild("DraggableFolder")
-
-local Window = Library:CreateWindow({
-    Title = "死亡避难所",
-    Footer = "恐拜大帝 制作",
-    Icon = 131153193945220,
-    NotifySide = "Right",
-    ShowCustomCursor = true,
-})
-
-Library:Notify({
-    Title = "死亡避难所",
-    Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功",
-    Time = 5,
-})
-
-local Tabs = {
-    Notice = Window:AddTab("通知", "info"),
-    Main = Window:AddTab("主要", "info"),
-    Settings = Window:AddTab("设置", "settings"),
+local Settings = {
+    HoldTime = 0,
+    Distance = 25,
+    HitboxEnabled = false,
+    HitboxSize = 10,
+    WhitelistEnabled = false,
+    TeleportEnabled = false,
+    NoclipEnabled = false,
+    AimEnabled = false,
+    AimSmoothness = 5,
+    AimMaxDistance = 200,
+    AimCheckWall = true,
+    ESPEnabled = false,
+    ESPShowName = true,
+    ESPShowJob = true,
 }
 
-local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息")
-NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本')
-NoticeGroup:AddLabel('创作者：恐拜大帝')
+local Whitelist = {}
+local affectedHeads = {}
+local frameCount = 0
+local isDestroyed = false
+local connections = {}
+local noclipConnections = {}
 
-local ESPGroup = Tabs.Main:AddLeftGroupbox("物资透视")
-local PullGroup = Tabs.Main:AddRightGroupbox("物资拉取")
-local AimGroup = Tabs.Main:AddLeftGroupbox("子弹追踪")
+local MAX_DISTANCE = 300
+local FIRE_INTERVAL = 0.1
+local USE_WALL_CHECK = true
+local HIT_PART = "Head"
+local DAMAGE_AMOUNT = 1
+local autoFireEnabled = false
 
-local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理")
-UnloadGroup:AddButton("卸载脚本", function()
-    Library:Unload()
-end)
-
-if ThemeManager then
-    ThemeManager:SetLibrary(Library)
-    ThemeManager:SetFolder("MyScriptTheme")
-    ThemeManager:ApplyToTab(Tabs.Settings)
-end
-
-if SaveManager then
-    SaveManager:SetLibrary(Library)
-    SaveManager:IgnoreThemeSettings()
-    SaveManager:SetFolder("MyScriptConfig")
-    SaveManager:BuildConfigSection(Tabs.Settings)
-end
-
-local espScreen = Instance.new("ScreenGui")
-espScreen.Name = "ItemESP"
-espScreen.ResetOnSpawn = false
-espScreen.Parent = player:WaitForChild("PlayerGui")
-
-local espContainer = Instance.new("Frame")
-espContainer.Size = UDim2.new(1, 0, 1, 0)
-espContainer.BackgroundTransparency = 1
-espContainer.Parent = espScreen
-
-local labelPool = {}
-local allEspItems = {}
-local itemLabelMap = {}
-local highlights = {}
-
-local function getLabel()
-    if #labelPool > 0 then
-        local lbl = table.remove(labelPool)
-        lbl.Visible = false
-        return lbl
-    end
-    local lbl = Instance.new("TextLabel")
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.SourceSansBold
-    lbl.TextStrokeTransparency = 0
-    lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    lbl.Parent = espContainer
-    return lbl
-end
-
-local function recycleLabel(lbl)
-    if lbl then
-        lbl.Visible = false
-        table.insert(labelPool, lbl)
-    end
-end
-
-local function getPrimaryPart(item)
-    if not item:IsA("Model") then return nil end
-    if item:FindFirstChild("Primary") and item.Primary:IsA("BasePart") then
-        return item.Primary
-    end
-    for _, child in ipairs(item:GetDescendants()) do
-        if child:IsA("BasePart") then
-            return child
-        end
-    end
-    return nil
-end
-
-local function refreshEspList()
-    for _, data in ipairs(allEspItems) do
-        if data.hl then
-            data.hl:Destroy()
-        end
-    end
-    allEspItems = {}
-    if not draggableFolder then return end
-    for _, item in ipairs(draggableFolder:GetChildren()) do
-        if item:IsA("Model") then
-            local part = getPrimaryPart(item)
-            if part then
-                local hl = Instance.new("Highlight")
-                hl.Name = "ItemHighlight"
-                hl.Adornee = item
-                hl.OutlineColor = Color3.fromRGB(255, 255, 0)
-                hl.FillColor = Color3.fromRGB(255, 255, 0)
-                hl.OutlineTransparency = 1
-                hl.FillTransparency = 1
-                hl.Parent = item
-                table.insert(allEspItems, {item = item, part = part, hl = hl})
-            end
-        end
-    end
-end
-
-local function updateEsp()
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = player.Character.HumanoidRootPart
-    local nameOn = Toggles.NameESP and Toggles.NameESP.Value
-    local distOn = Toggles.DistESP and Toggles.DistESP.Value
-
-    for item, ld in pairs(itemLabelMap) do
-        recycleLabel(ld.nl)
-        recycleLabel(ld.dl)
-    end
-    itemLabelMap = {}
-
-    for _, data in ipairs(allEspItems) do
-        if not data.item or not data.item.Parent or not data.part or not data.part.Parent then
-            if data.hl then
-                data.hl:Destroy()
-            end
-            continue
-        end
-
-        local outlineOn = Toggles.OutlineESP and Toggles.OutlineESP.Value
-        local fillOn = Toggles.FillESP and Toggles.FillESP.Value
-        if data.hl then
-            data.hl.OutlineTransparency = outlineOn and 0 or 1
-            data.hl.FillTransparency = fillOn and 0.7 or 1
-        end
-
-        local pos = data.part.Position + Vector3.new(0, 2.5, 0)
-        local screenPos, onScreen = camera:WorldToViewportPoint(pos)
-        if onScreen and screenPos.Z > 0 then
-            local dist = (hrp.Position - data.part.Position).Magnitude
-            local ld = {}
-            if nameOn then
-                local nl = getLabel()
-                nl.Text = data.item.Name
-                nl.TextColor3 = Color3.fromRGB(255, 255, 0)
-                nl.TextSize = 12
-                nl.Position = UDim2.new(0, screenPos.X - 100, 0, screenPos.Y - 20)
-                nl.Visible = true
-                ld.nl = nl
-            end
-            if distOn then
-                local dl = getLabel()
-                dl.Text = string.format("%.1fm", dist)
-                dl.TextColor3 = Color3.fromRGB(0, 255, 255)
-                dl.TextSize = 11
-                dl.Position = UDim2.new(0, screenPos.X - 100, 0, screenPos.Y - 8)
-                dl.Visible = true
-                ld.dl = dl
-            end
-            if ld.nl or ld.dl then
-                itemLabelMap[data.item] = ld
-            end
-        end
-    end
-end
-
-local espEnabled = false
-local espRunning = false
-
-local function espLoop()
-    if espRunning then return end
-    espRunning = true
-    task.spawn(function()
-        while espEnabled do
-            updateEsp()
-            task.wait(0.2)
-        end
-        for item, ld in pairs(itemLabelMap) do
-            recycleLabel(ld.nl)
-            recycleLabel(ld.dl)
-        end
-        itemLabelMap = {}
-        espRunning = false
-    end)
-end
-
-ESPGroup:AddToggle("ItemESP", {
-    Text = "物资透视总开关",
-    Default = false,
-    Callback = function(Value)
-        espEnabled = Value
-        if espEnabled then
-            refreshEspList()
-            espLoop()
-        else
-            for _, data in ipairs(allEspItems) do
-                if data.hl then
-                    data.hl:Destroy()
-                end
-            end
-            allEspItems = {}
-        end
-    end
-})
-
-ESPGroup:AddToggle("NameESP", {
-    Text = "透视名字",
-    Default = true,
-    Callback = function() end
-})
-
-ESPGroup:AddToggle("DistESP", {
-    Text = "透视距离",
-    Default = true,
-    Callback = function() end
-})
-
-ESPGroup:AddToggle("OutlineESP", {
-    Text = "透视轮廓",
-    Default = false,
-    Callback = function() end
-})
-
-ESPGroup:AddToggle("FillESP", {
-    Text = "透视内填充",
-    Default = false,
-    Callback = function() end
-})
-
-ESPGroup:AddButton("刷新透视", function()
-    if espEnabled then
-        refreshEspList()
-    end
-end)
-
-local categoryMap = {
-    ["全部物资"] = nil,
-    ["医疗物品"] = {"Bandage", "Defibrillator"},
-    ["枪械物品"] = {"Glock", "Pistol Ammo", "Shotgun Ammo", "Rifle Ammo", "Katana", "Spiked Bat", "Repair Hammer", "Molotov", "Dynamite"},
-    ["珍贵物品"] = {"Gold Bar", "Silver Bar", "Silver Painting", "Silver Vase", "Laptop", "Wood Painting"},
+local JobColors = {
+    ["警察"] = Color3.fromRGB(0, 100, 255),
+    ["医生"] = Color3.fromRGB(0, 200, 0),
+    ["消防员"] = Color3.fromRGB(255, 50, 0),
+    ["军人"] = Color3.fromRGB(50, 150, 50),
+    ["黑帮"] = Color3.fromRGB(150, 0, 150),
+    ["平民"] = Color3.fromRGB(200, 200, 200),
+    ["圣奥里公民"] = Color3.fromRGB(200, 200, 200),
+    ["银行家"] = Color3.fromRGB(0, 200, 200),
+    ["市长"] = Color3.fromRGB(255, 200, 0),
+    ["记者"] = Color3.fromRGB(255, 150, 0),
+    ["律师"] = Color3.fromRGB(150, 100, 200),
+    ["囚犯"] = Color3.fromRGB(255, 150, 0),
+    ["狱警"] = Color3.fromRGB(0, 150, 255),
+    ["司机"] = Color3.fromRGB(100, 200, 255),
+    ["厨师"] = Color3.fromRGB(255, 100, 0),
+    ["建筑工"] = Color3.fromRGB(255, 200, 50),
+    ["农民"] = Color3.fromRGB(50, 200, 50),
+    ["矿工"] = Color3.fromRGB(200, 150, 100),
+    ["渔夫"] = Color3.fromRGB(0, 150, 200),
+    ["商人"] = Color3.fromRGB(255, 150, 200),
+    ["学生"] = Color3.fromRGB(100, 100, 255),
+    ["老师"] = Color3.fromRGB(200, 100, 50),
+    ["工程师"] = Color3.fromRGB(255, 100, 100),
+    ["科学家"] = Color3.fromRGB(0, 255, 150),
+    ["飞行员"] = Color3.fromRGB(50, 200, 255),
+    ["快递员"] = Color3.fromRGB(255, 180, 0),
+    ["公交车司机"] = Color3.fromRGB(0, 180, 255),
+    ["送货"] = Color3.fromRGB(255, 100, 50),
+    ["转运"] = Color3.fromRGB(0, 200, 150),
+    ["货物"] = Color3.fromRGB(150, 100, 0),
+    ["医疗服务工作人员"] = Color3.fromRGB(0, 220, 100),
 }
 
-local selectedCategory = "全部物资"
+local espBillboards = {}
+local espConnections = {}
 
-PullGroup:AddDropdown("CategoryDropdown", {
-    Text = "选择分类",
-    Default = 1,
-    Values = {"全部物资", "医疗物品", "枪械物品", "珍贵物品"},
-    Callback = function(Value)
-        selectedCategory = Value
+local function GetPlayerTeamColor(p)
+    local team = p.Team
+    if team then
+        return team.TeamColor.Color
     end
-})
+    return Color3.fromRGB(255, 255, 255)
+end
 
-local function pullItems(category)
-    local char = player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then
-        Library:Notify({Title = "拉取", Description = "角色未加载", Time = 3})
+local function GetPlayerJob(p)
+    if p.Team then
+        return p.Team.Name
+    end
+    return "平民"
+end
+
+local function GetJobColor(jobName)
+    return JobColors[jobName] or Color3.fromRGB(200, 200, 200)
+end
+
+local function RemoveESP(userId)
+    local data = espBillboards[userId]
+    if data then
+        if data.Billboard then
+            data.Billboard:Destroy()
+        end
+        espBillboards[userId] = nil
+    end
+end
+
+local function CreateESP(p)
+    if isDestroyed then return end
+    if not p.Character then return end
+    if p == player then return end
+    local head = p.Character:FindFirstChild("Head")
+    if not head then return end
+    if espBillboards[p.UserId] then return end
+    local name = p.Name
+    local job = GetPlayerJob(p)
+    local teamColor = GetPlayerTeamColor(p)
+    local jobColor = GetJobColor(job)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_" .. p.UserId
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 300, 0, 60)
+    billboard.StudsOffset = Vector3.new(0, 2.8, 0)
+    billboard.MaxDistance = 500
+    billboard.AlwaysOnTop = true
+    billboard.Parent = head
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    frame.Parent = billboard
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0, 26)
+    nameLabel.Position = UDim2.new(0, 0, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = name
+    nameLabel.TextColor3 = teamColor
+    nameLabel.TextSize = 18
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+    nameLabel.TextYAlignment = Enum.TextYAlignment.Center
+    nameLabel.Parent = frame
+    local jobLabel = Instance.new("TextLabel")
+    jobLabel.Size = UDim2.new(1, 0, 0, 22)
+    jobLabel.Position = UDim2.new(0, 0, 0, 28)
+    jobLabel.BackgroundTransparency = 1
+    jobLabel.Text = job
+    jobLabel.TextColor3 = jobColor
+    jobLabel.TextSize = 16
+    jobLabel.Font = Enum.Font.GothamBold
+    jobLabel.TextXAlignment = Enum.TextXAlignment.Center
+    jobLabel.TextYAlignment = Enum.TextYAlignment.Center
+    jobLabel.Parent = frame
+    espBillboards[p.UserId] = {
+        Billboard = billboard,
+        Frame = frame,
+        NameLabel = nameLabel,
+        JobLabel = jobLabel,
+    }
+    local con
+    con = p.AncestryChanged:Connect(function()
+        if not p.Parent or not p.Character then
+            RemoveESP(p.UserId)
+            if con then
+                con:Disconnect()
+            end
+        end
+    end)
+    table.insert(espConnections, con)
+end
+
+local function UpdateESPVisibility()
+    for userId, data in pairs(espBillboards) do
+        if data.NameLabel then
+            data.NameLabel.Visible = Settings.ESPShowName
+        end
+        if data.JobLabel then
+            data.JobLabel.Visible = Settings.ESPShowJob
+        end
+        if data.Billboard then
+            data.Billboard.Enabled = Settings.ESPEnabled
+        end
+    end
+end
+
+local function UpdateAllESP()
+    if not Settings.ESPEnabled then
+        for userId, data in pairs(espBillboards) do
+            if data.Billboard then
+                data.Billboard.Enabled = false
+            end
+        end
         return
     end
-    local hrp = char.HumanoidRootPart
-    local names = categoryMap[category]
-    local items = {}
-    if draggableFolder then
-        for _, item in ipairs(draggableFolder:GetChildren()) do
-            if item:IsA("Model") then
-                if not names then
-                    table.insert(items, item)
-                else
-                    for _, n in ipairs(names) do
-                        if item.Name == n then
-                            table.insert(items, item)
-                            break
-                        end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            if not espBillboards[p.UserId] then
+                CreateESP(p)
+            else
+                local data = espBillboards[p.UserId]
+                local job = GetPlayerJob(p)
+                if data.NameLabel then
+                    data.NameLabel.Text = p.Name
+                    data.NameLabel.TextColor3 = GetPlayerTeamColor(p)
+                end
+                if data.JobLabel then
+                    data.JobLabel.Text = job
+                    data.JobLabel.TextColor3 = GetJobColor(job)
+                end
+                if data.Billboard then
+                    data.Billboard.Enabled = true
+                end
+            end
+        end
+    end
+end
+
+local function GetTeleportData()
+    return {
+        {n = "车辆经销商", p = Vector3.new(3719.9501953125, 3.018573522567749, -333.3118591308594), region = "圣奥里"},
+        {n = "医院", p = Vector3.new(3980.091064453125, 2.876060724258423, -138.79454040527344), region = "圣奥里"},
+        {n = "警察局", p = Vector3.new(3364.273193359375, 3.9188079834, -394.7233581542969), region = "圣奥里"},
+        {n = "圣奥里修车店", p = Vector3.new(2782.46875, 2.630995750427246, -418.59930419921875), region = "圣奥里"},
+        {n = "圣奥里银行", p = Vector3.new(3134.05419921875, 6.116048336029053, -171.36976623535156), region = "圣奥里"},
+        {n = "圣奥里服装店", p = Vector3.new(3617.91259765625, 3.1072206497192383, -452.8206481933594), region = "圣奥里"},
+        {n = "圣奥里平民重生", p = Vector3.new(3741.114990234375, 3.720573663711548, -438.1059875488281), region = "圣奥里"},
+        {n = "圣奥里码头", p = Vector3.new(4527.65625, -23.968238830566406, -280.59356689453125), region = "圣奥里"},
+        {n = "圣奥里餐饮店", p = Vector3.new(3182.416748046875, 3.01859188079834, 426.5179138183594), region = "圣奥里"},
+        {n = "消防部门", p = Vector3.new(3578.676025390625, 8.408823013305664, 579.6567993164062), region = "圣奥里"},
+        {n = "宠物店", p = Vector3.new(3678.237305, 3.017920, 693.114624), region = "圣奥里"},
+        {n = "圣奥里大码头", p = Vector3.new(2736.307617, 2.630299, -1120.333008), region = "圣奥里"},
+        {n = "圣奥里海滩桥下(消星点)", p = Vector3.new(3964.504395, -25.068211, -854.057251), region = "圣奥里"},
+        {n = "大景超级超市", p = Vector3.new(3936.582764, 3.038293, 1136.326416), region = "大景"},
+        {n = "转镜中心", p = Vector3.new(4152.919922, 2.631675, 941.446045), region = "大景"},
+        {n = "道路服务", p = Vector3.new(4271.332520, 2.628108, 1200.086914), region = "大景"},
+        {n = "大景餐饮店", p = Vector3.new(4476.997559, 3.037825, 906.802979), region = "大景"},
+        {n = "送货中心(美团外卖)", p = Vector3.new(4399.419434, 3.038999, 1609.455933), region = "大景"},
+        {n = "大景卖车店", p = Vector3.new(3434.377441, 42.931786, 2687.997070), region = "大景"},
+        {n = "莱斯维尔餐饮店", p = Vector3.new(753.757812, 3.039824, 998.132996), region = "莱斯维尔"},
+        {n = "莱斯维尔服装店", p = Vector3.new(820.745117, 2.766988, 1047.445679), region = "莱斯维尔"},
+        {n = "莱斯维尔自由广场", p = Vector3.new(926.523376, 2.630995, 865.764771), region = "莱斯维尔"},
+        {n = "莱斯维尔码头(游艇)", p = Vector3.new(947.840210, -22.529087, 1216.085693), region = "莱斯维尔"},
+        {n = "米尔顿左上加油站", p = Vector3.new(1145.635742, 2.630916, -864.273682), region = "米尔顿"},
+        {n = "米尔顿右下加油站", p = Vector3.new(-1646.802734, 2.630164, 1812.894653), region = "米尔顿"},
+        {n = "米尔顿上方加油站", p = Vector3.new(-900.701660, 2.630927, 1124.683105), region = "米尔顿"},
+        {n = "米尔顿居民区", p = Vector3.new(-528.565552, 2.630996, 1331.981689), region = "米尔顿"},
+        {n = "约克镇小银行", p = Vector3.new(-668.217224, 2.630995, -65.347839), region = "约克镇"},
+        {n = "约克镇修车厂", p = Vector3.new(-407.163025, 3.076807, -6.098211), region = "约克镇"},
+        {n = "约克镇枪店", p = Vector3.new(-323.869293, 3.037825, 37.149670), region = "约克镇"},
+        {n = "约克镇重生点", p = Vector3.new(-219.560318, 3.039824, -85.725433), region = "约克镇"},
+        {n = "约克镇当铺", p = Vector3.new(-168.513733, 3.039000, -106.926529), region = "约克镇"},
+        {n = "约克镇卫星车", p = Vector3.new(-302.093567, 3.037825, -167.621017), region = "约克镇"},
+        {n = "约克镇中心点", p = Vector3.new(-275.995209, 2.630996, -139.985352), region = "约克镇"},
+        {n = "黑色市场", p = Vector3.new(1038.969849, -22.732950, 895.430237), region = "其他"},
+        {n = "鱼夫码头", p = Vector3.new(-50.147552, -24.555279, 1462.145996), region = "其他"},
+        {n = "农场", p = Vector3.new(-1268.339233, 2.572412, 2560.060303), region = "其他"},
+        {n = "监狱门口", p = Vector3.new(-1697.931885, 2.630666, 1284.567383), region = "其他"},
+        {n = "监狱广场", p = Vector3.new(-1600.602417, 2.631028, 1268.060059), region = "其他"},
+        {n = "代尔山", p = Vector3.new(847.062988, 194.115753, -326.212708), region = "其他"},
+        {n = "水帘洞(消星点)", p = Vector3.new(3040.956055, 109.688538, 2711.069336), region = "其他"},
+        {n = "大桥", p = Vector3.new(949.014954, 25.215754, 2897.654785), region = "其他"},
+        {n = "地图右下(消星点)", p = Vector3.new(-1651.385010, 2.414712, 3225.278320), region = "其他"},
+        {n = "下部加油站", p = Vector3.new(2270.378174, 2.630927, 154.161484), region = "其他"},
+        {n = "游戏厅", p = Vector3.new(2934.893799, 2.956458, 1693.660034), region = "其他"},
+        {n = "高尔夫", p = Vector3.new(2280.767090, 3.037836, 1982.357300), region = "其他"},
+        {n = "修船厂", p = Vector3.new(4096.405273, -30.401447, 2865.045166), region = "其他"},
+    }
+end
+local FIXED_TELEPORTS = GetTeleportData()
+
+local function TeleportTo(pos)
+    if not Settings.TeleportEnabled or isDestroyed then return end
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    pcall(function()
+        root.CFrame = CFrame.new(pos)
+    end)
+end
+
+local function ApplyNoclip()
+    if isDestroyed or not Settings.NoclipEnabled then return end
+    local char = player.Character
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+local function ToggleNoclip(state)
+    Settings.NoclipEnabled = state
+    if state then
+        ApplyNoclip()
+    else
+        local char = player.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+local function IsPlayerVisible(targetHead)
+    if not Settings.AimCheckWall then return true end
+    local camera = workspace.CurrentCamera
+    if not camera then return true end
+    local origin = camera.CFrame.Position
+    local direction = (targetHead.Position - origin).Unit
+    local distance = (targetHead.Position - origin).Magnitude
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {player.Character}
+    local result = workspace:Raycast(origin, direction * distance, raycastParams)
+    if result then
+        local hitPart = result.Instance
+        if hitPart and hitPart:IsDescendantOf(targetHead.Parent) then
+            return true
+        else
+            return false
+        end
+    end
+    return true
+end
+
+local function DoAim()
+    if not Settings.AimEnabled or isDestroyed then return end
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+    local char = player.Character
+    if not char then return end
+    local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+    local circleRadius = 200
+    local maxDistance = Settings.AimMaxDistance
+    local bestTarget = nil
+    local bestDist = math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == player then continue end
+        if not p.Character then continue end
+        local head = p.Character:FindFirstChild("Head")
+        if not head then continue end
+        local distance = (head.Position - camera.CFrame.Position).Magnitude
+        if distance > maxDistance then continue end
+        local pos, onScreen = camera:WorldToScreenPoint(head.Position)
+        if not onScreen then continue end
+        if not IsPlayerVisible(head) then continue end
+        local screenPos = Vector2.new(pos.X, pos.Y)
+        local dist = (screenPos - screenCenter).Magnitude
+        if dist <= circleRadius and dist < bestDist then
+            bestDist = dist
+            bestTarget = head
+        end
+    end
+    if bestTarget then
+        local targetPos = bestTarget.Position
+        local targetCFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
+        local smoothFactor = 1 / (Settings.AimSmoothness + 1)
+        local newCFrame = camera.CFrame:Lerp(targetCFrame, smoothFactor)
+        camera.CFrame = newCFrame
+    end
+end
+
+local function ApplyHitbox()
+    if isDestroyed or not Settings.HitboxEnabled then return end
+    local players = Players:GetPlayers()
+    local newAffected = {}
+    for i = 1, #players do
+        local p = players[i]
+        if p ~= player and p.Character then
+            if Settings.WhitelistEnabled and Whitelist[p.UserId] then
+            else
+                local char = p.Character
+                local head = char:FindFirstChild("Head")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 and head then
+                    head.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+                    head.Transparency = 1
+                    head.Color = Color3.fromRGB(255, 215, 0)
+                    head.Material = Enum.Material.Neon
+                    head.CanCollide = false
+                    newAffected[head] = true
+                end
+            end
+        end
+    end
+    for head, _ in pairs(affectedHeads) do
+        if not newAffected[head] and head and head.Parent then
+            head.Size = Vector3.new(2, 1, 1)
+            head.Transparency = 0
+            head.CanCollide = true
+            head.Color = Color3.new(1, 1, 1)
+            head.Material = Enum.Material.Plastic
+        end
+    end
+    affectedHeads = newAffected
+end
+
+local function ResetHitbox()
+    for head, _ in pairs(affectedHeads) do
+        if head and head.Parent then
+            head.Size = Vector3.new(2, 1, 1)
+            head.Transparency = 0
+            head.CanCollide = true
+            head.Color = Color3.new(1, 1, 1)
+            head.Material = Enum.Material.Plastic
+        end
+    end
+    affectedHeads = {}
+end
+
+local function UpdateWhitelist()
+    if isDestroyed then return end
+    Whitelist = {}
+    local players = Players:GetPlayers()
+    for i = 1, #players do
+        local p = players[i]
+        if p ~= player then
+            pcall(function()
+                if p:IsFriendsWith(player.UserId) then
+                    Whitelist[p.UserId] = true
+                end
+            end)
+        end
+    end
+end
+
+local function fireIsVisible(targetHead)
+    local char = player.Character
+    if not char then return false end
+    local myHead = char:FindFirstChild("Head")
+    if not myHead then return false end
+    local direction = targetHead.Position - myHead.Position
+    local distance = direction.Magnitude
+    if distance < 0.1 then return true end
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {char, targetHead.Parent}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    return Workspace:Raycast(myHead.Position, direction.Unit * distance, rayParams) == nil
+end
+
+local function getNearestEnemy()
+    local char = player.Character
+    if not char then return nil end
+    local myHead = char:FindFirstChild("Head")
+    if not myHead then return nil end
+    local bestPlayer, bestDist = nil, MAX_DISTANCE
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local targetChar = p.Character
+            local hum = targetChar:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                local head = targetChar:FindFirstChild("Head")
+                if head then
+                    local dist = (head.Position - myHead.Position).Magnitude
+                    if dist < bestDist and (not USE_WALL_CHECK or fireIsVisible(head)) then
+                        bestDist = dist
+                        bestPlayer = p
                     end
                 end
             end
         end
     end
-    if #items == 0 then
-        Library:Notify({Title = "拉取", Description = "没有物资", Time = 3})
-        return
-    end
-    Library:Notify({Title = "拉取", Description = "已找到，正在拉取 " .. #items .. " 个物资", Time = 3})
-    task.spawn(function()
-        for i, item in ipairs(items) do
-            pcall(function()
-                local angle = (i - 1) * (math.pi * 2 / math.max(#items, 1))
-                local ring = math.floor((i - 1) / 12)
-                local dist = 4 + ring * 4
-                local offset = CFrame.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
-                item:PivotTo(hrp.CFrame * offset)
-            end)
-            if i % 10 == 0 then
-                RunService.Heartbeat:Wait()
-            end
-        end
-    end)
+    return bestPlayer
 end
 
-PullGroup:AddButton("拉取选定分类", function()
-    pullItems(selectedCategory)
-end)
-
-PullGroup:AddButton("拉取全部物资", function()
-    pullItems("全部物资")
-end)
-
-local bulletAimEnabled = false
-local enemyCache = {}
-local lastCacheTime = 0
-
-local function refreshEnemyCache()
-    enemyCache = {}
-    for _, model in ipairs(Workspace:GetDescendants()) do
-        if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") then
-            local isPlayer = false
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr.Character == model then
-                    isPlayer = true
-                    break
-                end
-            end
-            if not isPlayer then
-                table.insert(enemyCache, model)
-            end
-        end
-    end
-    lastCacheTime = tick()
-end
-
-local function getEnemies()
-    if tick() - lastCacheTime > 1 then
-        refreshEnemyCache()
-    end
-    return enemyCache
-end
-
-local function getNearestEnemyPart(fromPos)
-    local enemies = getEnemies()
-    local nearest = nil
-    local minDist = math.huge
-    for _, enemy in ipairs(enemies) do
-        local part = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head") or enemy:FindFirstChildWhichIsA("BasePart")
-        if part then
-            local d = (part.Position - fromPos).Magnitude
-            if d < minDist then
-                minDist = d
-                nearest = part
-            end
-        end
-    end
-    return nearest
-end
-
-local trackedBullets = {}
-local lastScan = 0
-
-RunService.Heartbeat:Connect(function()
-    if not bulletAimEnabled then
-        for i = #trackedBullets, 1, -1 do
-            trackedBullets[i] = nil
-        end
-        return
-    end
-
-    local now = tick()
-    if now - lastScan >= 0.15 then
-        lastScan = now
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and not obj:GetAttribute("BulletTracked") then
-                local vel = obj.Velocity.Magnitude
-                if vel > 40 and vel < 600 then
-                    obj:SetAttribute("BulletTracked", true)
-                    pcall(function()
-                        obj.Size = obj.Size * 4
-                    end)
-                    table.insert(trackedBullets, obj)
-                end
-            end
-        end
-    end
-
-    for i = #trackedBullets, 1, -1 do
-        if not trackedBullets[i] or not trackedBullets[i].Parent then
-            table.remove(trackedBullets, i)
-        end
-    end
-
-    if #trackedBullets == 0 then return end
-
-    local target = getNearestEnemyPart(player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position or Vector3.new())
-    if not target then return end
-
-    for _, bullet in ipairs(trackedBullets) do
-        pcall(function()
-            bullet.CFrame = CFrame.new(bullet.Position, target.Position)
-            bullet.Velocity = (target.Position - bullet.Position).Unit * math.max(bullet.Velocity.Magnitude, 200)
-        end)
-    end
-end)
-
-AimGroup:AddToggle("BulletAim", {
-    Text = "子弹追踪",
-    Default = false,
-    Callback = function(Value)
-        bulletAimEnabled = Value
-        if Value then
-            Library:Notify({Title = "子弹追踪", Description = "已开启", Time = 3})
-        else
-            for i = #trackedBullets, 1, -1 do
-                trackedBullets[i] = nil
+local mainLeftGroup = Tabs.Main:AddLeftGroupbox("交互设置", "hand")
+mainLeftGroup:AddSlider("HoldTime", {
+    Text = "按住时间",
+    Default = 0,
+    Min = 0,
+    Max = 10,
+    Rounding = 0,
+    Suffix = "秒",
+    Callback = function(value)
+        Settings.HoldTime = value
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                obj.HoldDuration = value
             end
         end
     end
 })
+mainLeftGroup:AddSlider("Distance", {
+    Text = "触发距离",
+    Default = 25,
+    Min = 5,
+    Max = 150,
+    Rounding = 0,
+    Suffix = "单位",
+    Callback = function(value)
+        Settings.Distance = value
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                obj.MaxActivationDistance = value
+            end
+        end
+    end
+})
+mainLeftGroup:AddDivider()
+mainLeftGroup:AddToggle("NoclipToggle", {
+    Text = "启用人物穿墙",
+    Default = false,
+    Callback = function(value)
+        ToggleNoclip(value)
+    end
+})
 
-if draggableFolder then
-    draggableFolder.ChildAdded:Connect(function(child)
-        if espEnabled and child:IsA("Model") then
-            task.wait(0.3)
-            local part = getPrimaryPart(child)
-            if part then
-                local hl = Instance.new("Highlight")
-                hl.Name = "ItemHighlight"
-                hl.Adornee = child
-                hl.OutlineColor = Color3.fromRGB(255, 255, 0)
-                hl.FillColor = Color3.fromRGB(255, 255, 0)
-                hl.OutlineTransparency = 1
-                hl.FillTransparency = 1
-                hl.Parent = child
-                table.insert(allEspItems, {item = child, part = part, hl = hl})
-            end
-        end
-    end)
-    draggableFolder.ChildRemoved:Connect(function(child)
-        for i = #allEspItems, 1, -1 do
-            if allEspItems[i].item == child then
-                if allEspItems[i].hl then
-                    allEspItems[i].hl:Destroy()
+local espGroup = Tabs.Main:AddLeftGroupbox("透视", "eye")
+espGroup:AddToggle("ESPEnabled", {
+    Text = "启用透视",
+    Default = false,
+    Callback = function(value)
+        Settings.ESPEnabled = value
+        if value then
+            UpdateAllESP()
+        else
+            for userId, data in pairs(espBillboards) do
+                if data.Billboard then
+                    data.Billboard.Enabled = false
                 end
-                table.remove(allEspItems, i)
-                break
             end
         end
-        if itemLabelMap[child] then
-            recycleLabel(itemLabelMap[child].nl)
-            recycleLabel(itemLabelMap[child].dl)
-            itemLabelMap[child] = nil
+    end
+})
+espGroup:AddDivider()
+espGroup:AddToggle("ESPShowName", {
+    Text = "显示名字（队伍颜色）",
+    Default = true,
+    Callback = function(value)
+        Settings.ESPShowName = value
+        UpdateESPVisibility()
+    end
+})
+espGroup:AddToggle("ESPShowJob", {
+    Text = "显示职业（职业颜色）",
+    Default = true,
+    Callback = function(value)
+        Settings.ESPShowJob = value
+        UpdateESPVisibility()
+    end
+})
+
+local mainRightGroup = Tabs.Main:AddRightGroupbox("碰撞箱扩展", "target")
+mainRightGroup:AddToggle("HitboxToggle", {
+    Text = "启用头部碰撞箱",
+    Default = false,
+    Callback = function(value)
+        Settings.HitboxEnabled = value
+        if value then ApplyHitbox() else ResetHitbox() end
+    end
+})
+mainRightGroup:AddSlider("HitboxSize", {
+    Text = "头部大小",
+    Default = 10,
+    Min = 5,
+    Max = 40,
+    Rounding = 0,
+    Suffix = "单位",
+    Callback = function(value)
+        Settings.HitboxSize = value
+        if Settings.HitboxEnabled then ApplyHitbox() end
+    end
+})
+mainRightGroup:AddToggle("WhitelistToggle", {
+    Text = "好友检测 (白名单)",
+    Default = false,
+    Callback = function(value)
+        Settings.WhitelistEnabled = value
+        if value then UpdateWhitelist() end
+    end
+})
+
+local aimGroup = Tabs.Main:AddRightGroupbox("自瞄功能", "crosshair")
+aimGroup:AddToggle("AimToggle", {
+    Text = "启用自瞄",
+    Default = false,
+    Callback = function(value)
+        Settings.AimEnabled = value
+    end
+})
+aimGroup:AddSlider("AimSmoothness", {
+    Text = "平滑度",
+    Default = 5,
+    Min = 1,
+    Max = 20,
+    Rounding = 0,
+    Callback = function(value)
+        Settings.AimSmoothness = value
+    end
+})
+aimGroup:AddSlider("AimMaxDistance", {
+    Text = "检测距离",
+    Default = 200,
+    Min = 50,
+    Max = 500,
+    Rounding = 0,
+    Suffix = "单位",
+    Callback = function(value)
+        Settings.AimMaxDistance = value
+    end
+})
+aimGroup:AddToggle("AimCheckWall", {
+    Text = "墙壁检测",
+    Default = true,
+    Callback = function(value)
+        Settings.AimCheckWall = value
+    end
+})
+
+local fireGroup = Tabs.Main:AddRightGroupbox("锁头攻击", "flame")
+fireGroup:AddToggle("AutoFire", {
+    Text = "自动锁头攻击",
+    Default = false,
+    Callback = function(value)
+        autoFireEnabled = value
+    end
+})
+fireGroup:AddSlider("FireInterval", {
+    Text = "攻击间隔",
+    Default = 0.1,
+    Min = 0.05,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(value)
+        FIRE_INTERVAL = value
+    end
+})
+fireGroup:AddSlider("MaxDistance", {
+    Text = "攻击范围",
+    Default = 300,
+    Min = 50,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(value)
+        MAX_DISTANCE = value
+    end
+})
+fireGroup:AddToggle("FireWallCheck", {
+    Text = "墙体检测",
+    Default = true,
+    Callback = function(value)
+        USE_WALL_CHECK = value
+    end
+})
+
+task.spawn(function()
+    while true do
+        local interval = FIRE_INTERVAL
+        if autoFireEnabled and not isDestroyed then
+            local char = player.Character
+            local myHead = char and char:FindFirstChild("Head")
+            if myHead then
+                local target = getNearestEnemy()
+                local targetHead = target and target.Character and target.Character:FindFirstChild("Head")
+                if targetHead then
+                    local origin = myHead.Position
+                    local hitPos = targetHead.Position
+                    local direction = (hitPos - origin).Unit
+                    local args = {
+                        [1] = "damage",
+                        [2] = {
+                            bodyParts = { { HIT_PART, DAMAGE_AMOUNT } },
+                            shotCode = { origin, direction },
+                            target = target,
+                            pos = hitPos
+                        }
+                    }
+                    pcall(function()
+                        ReplicatedStorage.Remote.PlayerEvent:FireServer(unpack(args))
+                    end)
+                    pcall(function()
+                        local handleShots = ReplicatedStorage:FindFirstChild("Events")
+                        handleShots = handleShots and handleShots:FindFirstChild("HandleShots")
+                        if handleShots then
+                            handleShots:FireServer("2", "Shoot")
+                        end
+                    end)
+                end
+            end
+        end
+        task.wait(interval)
+    end
+end)
+
+local teleTab = Tabs.Teleports
+local teleLeftGroup = teleTab:AddLeftGroupbox("传送控制", "navigation")
+teleLeftGroup:AddToggle("TeleportToggle", {
+    Text = "启用传送",
+    Default = false,
+    Callback = function(value)
+        Settings.TeleportEnabled = value
+    end
+})
+
+local function CreateRegionGroups()
+    local regions = {}
+    for _, data in ipairs(FIXED_TELEPORTS) do
+        if not regions[data.region] then
+            regions[data.region] = {}
+        end
+        table.insert(regions[data.region], data)
+    end
+    local regionNames = {}
+    for name, _ in pairs(regions) do
+        table.insert(regionNames, name)
+    end
+    table.sort(regionNames)
+    for i = 1, #regionNames, 2 do
+        local region1 = regionNames[i]
+        local region2 = regionNames[i + 1]
+        if region1 then
+            local group = teleTab:AddLeftGroupbox(region1, "map-pin")
+            for _, data in ipairs(regions[region1]) do
+                group:AddButton({
+                    Text = data.n,
+                    Func = function()
+                        TeleportTo(data.p)
+                        Library:Notify({
+                            Title = "传送",
+                            Description = "正在传送至: " .. data.n,
+                            Time = 2,
+                        })
+                    end,
+                })
+            end
+        end
+        if region2 then
+            local group = teleTab:AddRightGroupbox(region2, "map-pin")
+            for _, data in ipairs(regions[region2]) do
+                group:AddButton({
+                    Text = data.n,
+                    Func = function()
+                        TeleportTo(data.p)
+                        Library:Notify({
+                            Title = "传送",
+                            Description = "正在传送至: " .. data.n,
+                            Time = 2,
+                        })
+                    end,
+                })
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    task.wait(0.5)
+    if not isDestroyed then
+        CreateRegionGroups()
+    end
+end)
+
+local function onPlayerAdded(p)
+    p.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if Settings.ESPEnabled and p ~= player then
+            CreateESP(p)
+            UpdateESPVisibility()
+        end
+        if Settings.HitboxEnabled and not isDestroyed then
+            task.wait(0.5)
+            ApplyHitbox()
+        end
+        if Settings.NoclipEnabled and not isDestroyed then
+            task.wait(0.1)
+            ApplyNoclip()
         end
     end)
+    if Settings.WhitelistEnabled and not isDestroyed then
+        UpdateWhitelist()
+    end
 end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    onPlayerAdded(p)
+end
+local playerAddedCon = Players.PlayerAdded:Connect(onPlayerAdded)
+table.insert(connections, playerAddedCon)
+local playerRemovedCon = Players.PlayerRemoving:Connect(function(p)
+    RemoveESP(p.UserId)
+end)
+table.insert(connections, playerRemovedCon)
+
+local renderCon = RunService.RenderStepped:Connect(function()
+    if isDestroyed then return end
+    if Settings.HitboxEnabled then
+        frameCount = frameCount + 1
+        if frameCount % 3 == 0 then
+            ApplyHitbox()
+        end
+    end
+    if Settings.NoclipEnabled then
+        ApplyNoclip()
+    end
+    if Settings.AimEnabled then
+        DoAim()
+    end
+    if Settings.ESPEnabled then
+        for userId, data in pairs(espBillboards) do
+            local p = Players:FindFirstChild(tostring(userId))
+            if p and p.Character then
+                local job = GetPlayerJob(p)
+                if data.NameLabel then
+                    data.NameLabel.Text = p.Name
+                    data.NameLabel.TextColor3 = GetPlayerTeamColor(p)
+                end
+                if data.JobLabel then
+                    data.JobLabel.Text = job
+                    data.JobLabel.TextColor3 = GetJobColor(job)
+                end
+                if data.Billboard then
+                    data.Billboard.Enabled = true
+                end
+            end
+        end
+    end
+end)
+table.insert(connections, renderCon)
+
+task.spawn(function()
+    while not isDestroyed do
+        task.wait(10)
+        if Settings.WhitelistEnabled and not isDestroyed then
+            UpdateWhitelist()
+        end
+        if Settings.ESPEnabled then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= player and p.Character then
+                    if not espBillboards[p.UserId] then
+                        CreateESP(p)
+                        UpdateESPVisibility()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local function ScanPrompts()
+    if isDestroyed then return end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            obj.HoldDuration = Settings.HoldTime
+            obj.MaxActivationDistance = Settings.Distance
+        end
+    end
+end
+ScanPrompts()
+local descendantCon = workspace.DescendantAdded:Connect(function(obj)
+    if isDestroyed then return end
+    task.wait(0.1)
+    if obj:IsA("ProximityPrompt") then
+        obj.HoldDuration = Settings.HoldTime
+        obj.MaxActivationDistance = Settings.Distance
+    end
+end)
+table.insert(connections, descendantCon)
+
+Library:OnUnload(function()
+    if isDestroyed then return end
+    isDestroyed = true
+    ResetHitbox()
+    if Settings.NoclipEnabled then
+        ToggleNoclip(false)
+    end
+    for userId, data in pairs(espBillboards) do
+        if data.Billboard then
+            data.Billboard:Destroy()
+        end
+    end
+    espBillboards = {}
+    for _, conn in ipairs(espConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    espConnections = {}
+    for _, conn in ipairs(connections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    for _, conn in ipairs(noclipConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+end)
+
+local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理") UnloadGroup:AddButton("卸载脚本", function() Library:Unload() end) if ThemeManager then ThemeManager:SetLibrary(Library) ThemeManager:SetFolder("MyScriptTheme") ThemeManager:ApplyToTab(Tabs.Settings) end if SaveManager then SaveManager:SetLibrary(Library) SaveManager:IgnoreThemeSettings() SaveManager:SetFolder("MyScriptConfig") SaveManager:BuildConfigSection(Tabs.Settings) end
