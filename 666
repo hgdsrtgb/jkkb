@@ -2877,13 +2877,15 @@ task.spawn(function()
     end
     task.wait(0.2)
     if kbStartupSoundEnabled and kbTadaAsset then
-        local kbSound = Instance.new("Sound")
-        kbSound.SoundId = kbTadaAsset
-        kbSound.Volume = 2
-        kbSound.Parent = CoreGui
-        kbSound:Play()
-        kbSound.Ended:Connect(function()
-            kbSound:Destroy()
+        pcall(function()
+            local kbSound = Instance.new("Sound")
+            kbSound.SoundId = kbTadaAsset
+            kbSound.Volume = 2
+            kbSound.Parent = CoreGui
+            kbSound:Play()
+            kbSound.Ended:Connect(function()
+                kbSound:Destroy()
+            end)
         end)
     end
 end)
