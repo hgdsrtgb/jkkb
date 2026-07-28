@@ -2859,7 +2859,49 @@ Tabs.SettingsTab:Toggle({
     end
 })
 local kbSelectedConfig = nil
-local kbConfigDropdown = Tabs.SettingsTab:Dropdown({
+local kbConfigDropdown = nil
+local kbAutoDropdown = nil
+local kbDeleteDropdown = nil
+local function kbRefreshAllDropdowns()
+    local kbNewList = kbListConfigs()
+    if kbConfigDropdown then
+        kbConfigDropdown.Values = kbNewList
+        pcall(function() kbConfigDropdown:Refresh(kbNewList) end)
+    end
+    if kbAutoDropdown then
+        kbAutoDropdown.Values = kbNewList
+        pcall(function() kbAutoDropdown:Refresh(kbNewList) end)
+    end
+    if kbDeleteDropdown then
+        kbDeleteDropdown.Values = kbNewList
+        pcall(function() kbDeleteDropdown:Refresh(kbNewList) end)
+    end
+end
+local kbCfgSaveName = ""
+Tabs.SettingsTab:Input({
+    Title = "输入配置名字",
+    Placeholder = "配置名字",
+    Callback = function(text)
+        kbCfgSaveName = text
+    end
+})
+Tabs.SettingsTab:Button({
+    Title = "保存当前配置",
+    Callback = function()
+        if not kbCfgSaveName or kbCfgSaveName == "" then
+            WindUI:Notify({ Title = "保存当前配置", Content = "请先在上面输入配置名字", Duration = 3 })
+            return
+        end
+        local ok, err = pcall(function() kbSaveConfig(kbCfgSaveName) end)
+        if ok then
+            WindUI:Notify({ Title = "保存当前配置", Content = "已保存配置：" .. kbCfgSaveName, Duration = 3 })
+            kbRefreshAllDropdowns()
+        else
+            WindUI:Notify({ Title = "保存当前配置", Content = "保存失败：" .. tostring(err), Duration = 3 })
+        end
+    end
+})
+kbConfigDropdown = Tabs.SettingsTab:Dropdown({
     Title = "选择配置",
     Values = kbListConfigs(),
     Callback = function(v)
@@ -2889,7 +2931,7 @@ if isfile and isfile(kbAutoPath) then
     local nm = readfile(kbAutoPath)
     if nm and nm ~= "" then kbAutoLoadName = nm end
 end
-local kbAutoDropdown = Tabs.SettingsTab:Dropdown({
+kbAutoDropdown = Tabs.SettingsTab:Dropdown({
     Title = "自动加载配置",
     Values = kbListConfigs(),
     Callback = function(v)
@@ -2917,32 +2959,55 @@ kbAutoToggle = Tabs.SettingsTab:Toggle({
         end
     end
 })
-local kbCfgSaveName = ""
-Tabs.SettingsTab:Input({
-    Title = "输入配置名字",
-    Placeholder = "配置名字",
-    Callback = function(text)
-        kbCfgSaveName = text
+local kbDeleteSelected = {}
+kbDeleteDropdown = Tabs.SettingsTab:Dropdown({
+    Title = "删除配置",
+    Values = kbListConfigs(),
+    Multi = true,
+    Callback = function(v)
+        kbDeleteSelected = v
     end
 })
 Tabs.SettingsTab:Button({
-    Title = "保存当前配置",
+    Title = "删除此配置",
     Callback = function()
-        if not kbCfgSaveName or kbCfgSaveName == "" then
-            WindUI:Notify({ Title = "保存当前配置", Content = "请先在上面输入配置名字", Duration = 3 })
+        local names = {}
+        if type(kbDeleteSelected) == "table" then
+            for _, n in pairs(kbDeleteSelected) do
+                if type(n) == "table" and n.Title then
+                    table.insert(names, n.Title)
+                elseif type(n) == "string" then
+                    table.insert(names, n)
+                end
+            end
+        elseif type(kbDeleteSelected) == "string" then
+            table.insert(names, kbDeleteSelected)
+        end
+        if #names == 0 then
+            WindUI:Notify({ Title = "删除此配置", Content = "请先在上面选择一个或多个配置", Duration = 3 })
             return
         end
-        local ok, err = pcall(function() kbSaveConfig(kbCfgSaveName) end)
-        if ok then
-            WindUI:Notify({ Title = "保存当前配置", Content = "已保存配置：" .. kbCfgSaveName, Duration = 3 })
-            local kbNewList = kbListConfigs()
-            kbConfigDropdown.Values = kbNewList
-            kbAutoDropdown.Values = kbNewList
-            pcall(function() kbConfigDropdown:Refresh(kbNewList) end)
-            pcall(function() kbAutoDropdown:Refresh(kbNewList) end)
-        else
-            WindUI:Notify({ Title = "保存当前配置", Content = "保存失败：" .. tostring(err), Duration = 3 })
+        local deleted = 0
+        for _, n in ipairs(names) do
+            local p = kbCfgFolder .. "/" .. n .. ".json"
+            pcall(function()
+                if isfile(p) then
+                    delfile(p)
+                    deleted = deleted + 1
+                end
+            end)
+            if kbAutoLoadName == n then
+                kbAutoLoadName = nil
+                pcall(function()
+                    if isfile(kbAutoPath) then delfile(kbAutoPath) end
+                end)
+                pcall(function() kbAutoToggle:Set(false) end)
+            end
         end
+        WindUI:Notify({ Title = "删除此配置", Content = "已删除 " .. deleted .. " 个配置", Duration = 3 })
+        kbDeleteSelected = {}
+        pcall(function() kbDeleteDropdown:Select(nil) end)
+        kbRefreshAllDropdowns()
     end
 })
 task.spawn(function()
