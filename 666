@@ -1,16 +1,14 @@
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 local player = game:GetService("Players").LocalPlayer
 local plrId = player.UserId
+local filename = "script_count_" .. plrId .. ".txt"
 local count = 0
-(function()
-    local filename = "script_count_" .. plrId .. ".txt"
-    if pcall(function() return readfile(filename) end) then
-        local data = readfile(filename)
-        count = tonumber(data) or 0
-    end
-    count = count + 1
-    pcall(function() writefile(filename, tostring(count)) end)
-end)()
+if pcall(function() return readfile(filename) end) then
+    local data = readfile(filename)
+    count = tonumber(data) or 0
+end
+count = count + 1
+pcall(function() writefile(filename, tostring(count)) end)
 kbTadaAsset = nil
 task.spawn(function()
     local ok, data = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/TADA.WAV") end)
@@ -1344,7 +1342,6 @@ Tabs.MiscTab = Window:Tab({ Title = "杂项", Icon = "settings-2" })
 Tabs.GamesTab = Window:Tab({ Title = "支持服务器", Icon = "gamepad-2" })
 Tabs.SettingsTab = Window:Tab({ Title = "设置", Icon = "settings" })
 local kbCfgElements = {}
-(function()
 for kbTabName, kbTab in pairs(Tabs) do
     for _, kbMType in ipairs({"Toggle", "Slider", "Dropdown", "Input"}) do
         local kbOldFunc = kbTab[kbMType]
@@ -1362,7 +1359,6 @@ for kbTabName, kbTab in pairs(Tabs) do
         end
     end
 end
-end)()
 local kbCfgFolder = "恐脚本/配置"
 pcall(function()
     if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
@@ -1426,7 +1422,6 @@ Tabs.NotifyTab:Paragraph({
     Image = "rbxassetid://5107182114",
     ImageSize = 42,
 })
-(function()
 local function kbFormatDiff(mins)
     mins = math.max(0, math.floor(mins))
     return string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
@@ -1451,7 +1446,6 @@ Tabs.NotifyTab:Paragraph({
     Title = "距离一周年还有",
     Desc = kbFormatDiff((kbAnnivTime - os.time()) / 60),
 })
-end)()
 Tabs.NotifyTab:Divider()
 Tabs.NotifyTab:Button({
     Title = "ROB脚本v2",
@@ -1589,7 +1583,6 @@ Tabs.MainTab:Button({
         end)
     end
 })
-(function()
 local flyV2Enabled = false
 local flyV2Speed = 50
 local flyV2Conn = nil
@@ -1681,7 +1674,6 @@ Tabs.MainTab:Input({
         sliderReleaseActions["flyv2speed"](v)
     end
 })
-end)()
 Tabs.MainTab:Toggle({
     Title = "无限跳",
     Value = false,
@@ -2186,7 +2178,6 @@ Tabs.SecondaryTab:Button({
         end
     end
 })
-(function()
 local markerList = {}
 local markerCount = 0
 local selectedMarkers = {}
@@ -2313,7 +2304,6 @@ Tabs.SecondaryTab:Toggle({
         WindUI:Notify({ Title = "全部循环传送", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
-end)()
 local currentFollowTarget = nil
 followDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定跟随玩家",
@@ -2402,93 +2392,6 @@ Tabs.SecondaryTab:Toggle({
         if state then showFlyUI() else hideFlyUI() end
     end
 })
-(function()
-local airWalkEnabled = false
-local airWalkConn = nil
-local airWalkPlatform = nil
-local airWalkRootY = nil
-local airWalkFeetOffset = 3
-local function removeAirWalkPlatform()
-    if airWalkPlatform then
-        pcall(function() airWalkPlatform:Destroy() end)
-        airWalkPlatform = nil
-    end
-end
-local function recordAirWalkHeight()
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return false end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    local hip = hum and hum.HipHeight or 0
-    airWalkFeetOffset = math.max(3, root.Size.Y / 2 + hip)
-    airWalkRootY = root.Position.Y
-    return true
-end
-local function spawnAirWalkPlatform(root)
-    local platform = Instance.new("Part")
-    platform.Name = "AirWalkPlatform"
-    platform.Anchored = true
-    platform.CanCollide = true
-    platform.Size = Vector3.new(8, 1, 8)
-    platform.CFrame = CFrame.new(root.Position.X, airWalkRootY - airWalkFeetOffset - 0.5, root.Position.Z)
-    platform.Transparency = 0.3
-    platform.Color = Color3.fromRGB(255, 255, 255)
-    platform.Material = Enum.Material.Neon
-    platform.Parent = workspace
-    airWalkPlatform = platform
-end
-local function stopAirWalk()
-    airWalkEnabled = false
-    if airWalkConn then airWalkConn:Disconnect() airWalkConn = nil end
-    removeAirWalkPlatform()
-    airWalkRootY = nil
-end
-local function startAirWalk()
-    if airWalkConn then airWalkConn:Disconnect() airWalkConn = nil end
-    removeAirWalkPlatform()
-    if not recordAirWalkHeight() then return end
-    airWalkConn = RunService.Heartbeat:Connect(function()
-        if not airWalkEnabled or not airWalkRootY then return end
-        local char = LocalPlayer.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        if math.abs(root.Position.Y - airWalkRootY) > 2.5 then return end
-        if airWalkPlatform and airWalkPlatform.Parent then
-            local p = airWalkPlatform.Position
-            local dx = root.Position.X - p.X
-            local dz = root.Position.Z - p.Z
-            if dx * dx + dz * dz < 1 then return end
-        end
-        removeAirWalkPlatform()
-        spawnAirWalkPlatform(root)
-    end)
-end
-LocalPlayer.CharacterAdded:Connect(function(char)
-    if airWalkEnabled then
-        task.wait(0.5)
-        local root = char:WaitForChild("HumanoidRootPart", 5)
-        if root and airWalkEnabled then
-            removeAirWalkPlatform()
-            recordAirWalkHeight()
-        end
-    end
-end)
-Tabs.SecondaryTab:Toggle({
-    Title = "踏空行走",
-    Value = false,
-    Callback = function(state)
-        airWalkEnabled = state
-        if state then
-            startAirWalk()
-        else
-            stopAirWalk()
-        end
-        WindUI:Notify({ Title = "踏空行走", Content = state and "已开启，已记录当前高度" or "已关闭", Duration = 3 })
-    end
-})
-end)()
 local currentHarassTarget = nil
 harassDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定操人目标",
@@ -2551,6 +2454,85 @@ Tabs.SecondaryTab:Toggle({
         WindUI:Notify({ Title = "原地旋转", Content = state and "已开启" or "已关闭", Duration = 3 })
     end
 })
+do
+    local airWalkEnabled = false
+    local airWalkLockedY = nil
+    local airWalkPlatform = nil
+    local airWalkConn = nil
+    local airWalkLastPos = nil
+    local function destroyAirWalkPlatform()
+        if airWalkPlatform then
+            pcall(function() airWalkPlatform:Destroy() end)
+            airWalkPlatform = nil
+        end
+    end
+    local function stopAirWalk()
+        if airWalkConn then airWalkConn:Disconnect() airWalkConn = nil end
+        destroyAirWalkPlatform()
+        airWalkLockedY = nil
+        airWalkLastPos = nil
+    end
+    Tabs.SecondaryTab:Toggle({
+        Title = "踏空行走",
+        Value = false,
+        Callback = function(state)
+            airWalkEnabled = state
+            if state then
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if not root or not hum then
+                    WindUI:Notify({ Title = "踏空行走", Content = "未找到人物，开启失败", Duration = 3 })
+                    airWalkEnabled = false
+                    return
+                end
+                airWalkLockedY = root.Position.Y
+                local footOffset = (hum.HipHeight or 2) + root.Size.Y / 2
+                airWalkConn = RunService.Heartbeat:Connect(function()
+                    if not airWalkEnabled then return end
+                    local char2 = LocalPlayer.Character
+                    local root2 = char2 and char2:FindFirstChild("HumanoidRootPart")
+                    if not root2 then
+                        destroyAirWalkPlatform()
+                        airWalkLastPos = nil
+                        return
+                    end
+                    local pos = root2.Position
+                    if math.abs(pos.Y - airWalkLockedY) > 3 then
+                        destroyAirWalkPlatform()
+                        airWalkLastPos = nil
+                        return
+                    end
+                    if airWalkLastPos and (Vector2.new(pos.X, pos.Z) - Vector2.new(airWalkLastPos.X, airWalkLastPos.Z)).Magnitude < 0.5 then
+                        return
+                    end
+                    destroyAirWalkPlatform()
+                    local platform = Instance.new("Part")
+                    platform.Name = "AirWalkPlatform"
+                    platform.Size = Vector3.new(6, 1, 6)
+                    platform.Anchored = true
+                    platform.CanCollide = true
+                    platform.Transparency = 0.6
+                    platform.Color = Color3.fromRGB(120, 120, 255)
+                    platform.CFrame = CFrame.new(pos.X, airWalkLockedY - footOffset - 0.55, pos.Z)
+                    platform.Parent = workspace
+                    airWalkPlatform = platform
+                    airWalkLastPos = pos
+                end)
+                WindUI:Notify({ Title = "踏空行走", Content = "已开启，锁定高度：" .. string.format("%.1f", airWalkLockedY), Duration = 3 })
+            else
+                stopAirWalk()
+                WindUI:Notify({ Title = "踏空行走", Content = "已关闭", Duration = 3 })
+            end
+        end
+    })
+    LocalPlayer.CharacterAdded:Connect(function()
+        if airWalkEnabled then
+            stopAirWalk()
+            airWalkEnabled = false
+        end
+    end)
+end
 Tabs.SecondaryTab:Slider({
     Title = "操人速度 (当前: 5)",
     Value = {
