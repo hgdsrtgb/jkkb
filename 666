@@ -9,18 +9,6 @@ if pcall(function() return readfile(filename) end) then
 end
 count = count + 1
 pcall(function() writefile(filename, tostring(count)) end)
-local kbTadaAsset = nil
-task.spawn(function()
-    local ok, data = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/TADA.WAV") end)
-    if ok and data then
-        pcall(function()
-            if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
-            writefile("恐脚本/TADA.WAV", data)
-        end)
-        local ok2, asset = pcall(function() return getcustomasset("恐脚本/TADA.WAV") end)
-        if ok2 and asset then kbTadaAsset = asset end
-    end
-end)
 local Player = player
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -1341,7 +1329,6 @@ Tabs.SecondaryTab = Window:Tab({ Title = "次要", Icon = "mouse-pointer-2" })
 Tabs.MiscTab = Window:Tab({ Title = "杂项", Icon = "settings" })
 Tabs.GamesTab = Window:Tab({ Title = "支持服务器", Icon = "gamepad-2" })
 Tabs.SettingsTab = Window:Tab({ Title = "设置", Icon = "settings-2" })
-local kbStartupSoundEnabled = true
 local kbCfgElements = {}
 for kbTabName, kbTab in pairs(Tabs) do
     for _, kbMType in ipairs({"Toggle", "Slider", "Dropdown", "Input"}) do
@@ -1351,7 +1338,7 @@ for kbTabName, kbTab in pairs(Tabs) do
                 local kbEl = kbOldFunc(kbSelf, kbOpt)
                 if kbOpt and kbOpt.Title then
                     local kbKey = kbTabName .. "/" .. kbOpt.Title
-                    if kbTabName ~= "SettingsTab" or kbOpt.Title == "开启启动音效" then
+                    if kbTabName ~= "SettingsTab" then
                         kbCfgElements[kbKey] = {el = kbEl, mtype = kbMType}
                     end
                 end
@@ -2768,16 +2755,7 @@ Tabs.GamesTab:Paragraph({
 })
 Window:OnClose(function()
     print("界面已关闭。")
-end)Tabs.SettingsTab:Toggle({
-    Title = "开启启动音效",
-    Desc = "需要保存配置使用",
-    Value = true,
-    Callback = function(state)
-        kbStartupSoundEnabled = state
-        WindUI:Notify({ Title = "开启启动音效", Content = state and "已开启" or "已关闭", Duration = 3 })
-    end
-})
-local kbSelectedConfig = nil
+end)local kbSelectedConfig = nil
 local kbConfigDropdown = Tabs.SettingsTab:Dropdown({
     Title = "选择配置",
     Values = kbListConfigs(),
@@ -2874,18 +2852,5 @@ task.spawn(function()
                 WindUI:Notify({ Title = "配置", Content = "已自动加载配置：" .. nm, Duration = 3 })
             end
         end
-    end
-    task.wait(0.2)
-    if kbStartupSoundEnabled and kbTadaAsset then
-        pcall(function()
-            local kbSound = Instance.new("Sound")
-            kbSound.SoundId = kbTadaAsset
-            kbSound.Volume = 2
-            kbSound.Parent = CoreGui
-            kbSound:Play()
-            kbSound.Ended:Connect(function()
-                kbSound:Destroy()
-            end)
-        end)
     end
 end)
