@@ -27,9 +27,9 @@ task.spawn(function()
     if ok and data then
         pcall(function()
             if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
-            writefile("恐脚本/DING.WAV", data)
+            writefile("恐脚本/DING2.WAV", data)
         end)
-        local ok2, asset = pcall(function() return getcustomasset("恐脚本/DING.WAV") end)
+        local ok2, asset = pcall(function() return getcustomasset("恐脚本/DING2.WAV") end)
         if ok2 and asset then kbDingAsset = asset end
     end
 end)
