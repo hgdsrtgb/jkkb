@@ -2756,6 +2756,7 @@ Tabs.GamesTab:Paragraph({
 Window:OnClose(function()
     print("界面已关闭。")
 end)
+task.spawn(function()
 local kbSelectedConfig = nil
 local kbConfigDropdown = Tabs.SettingsTab:Dropdown({
     Title = "选择配置",
@@ -2854,4 +2855,5 @@ task.spawn(function()
             end
         end
     end
+end)
 end)
