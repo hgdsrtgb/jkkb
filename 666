@@ -40,7 +40,7 @@ kbPlayDing = function()
         local kbDingSound = Instance.new("Sound")
         kbDingSound.SoundId = kbDingAsset
         kbDingSound.Volume = 2
-        kbDingSound.Parent = CoreGui
+        kbDingSound.Parent = game:GetService("CoreGui")
         kbDingSound:Play()
         kbDingSound.Ended:Connect(function()
             kbDingSound:Destroy()
