@@ -1372,7 +1372,7 @@ local Window = WindUI:CreateWindow({
     },
     SideBarWidth = 200,
     ScrollBarEnabled = true,
-    ToggleKey = Enum.KeyCode.RightControl,
+    ToggleKey = Enum.KeyCode.N,
 })
 Window:EditOpenButton({
     Title = "恐脚本--通用",
@@ -1485,7 +1485,7 @@ local function kbFormatDiff(mins)
     return string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
 end
 local kbNowDate = os.date("*t")
-local kbUpdateTime = os.time({year = kbNowDate.year, month = 7, day = 29, hour = 8, min = 30, sec = 0})
+local kbUpdateTime = os.time({year = kbNowDate.year, month = 7, day = 29, hour = 17, min = 30, sec = 0})
 local kbBirthTime = os.time({year = kbNowDate.year, month = 2, day = 9, hour = 2, min = 27, sec = 0})
 if kbBirthTime > os.time() then
     kbBirthTime = os.time({year = kbNowDate.year - 1, month = 2, day = 9, hour = 2, min = 27, sec = 0})
@@ -3038,6 +3038,10 @@ Tabs.GamesTab:Button({
         end)
     end
 })
+Tabs.GamesTab:Paragraph({
+    Title = "",
+    Desc = "根据你所在的服务器加载对应的恐脚本支持服务器",
+})
 Tabs.GamesTab:Divider()
 local serverListText = "加载中..."
 local serverListLabel = nil
@@ -3268,26 +3272,54 @@ kbApplyBackground = function(name)
         end
         return
     end
+    local kbBgUrls = {
+        ["eva背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339712342_469.jpg",
+        ["银花背景图1"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339143310_475.jpg",
+        ["银花背景图2"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339141889_101.jpg",
+        ["银花背景图3"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339140644_893.jpg",
+    }
+    local kbSetBgImage = function(asset)
+        local bg = Window.UIElements.Main.Background
+        local img = bg:FindFirstChild("KbBgImage")
+        if not img then
+            img = Instance.new("ImageLabel")
+            img.Name = "KbBgImage"
+            img.BackgroundTransparency = 1
+            img.Size = UDim2.new(1, 0, 1, 0)
+            img.ScaleType = Enum.ScaleType.Crop
+            img.ImageTransparency = 0
+            img.ZIndex = 1
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, Window.UICorner or 16)
+            corner.Parent = img
+            img.Parent = bg
+        end
+        img.Image = asset
+        img.Visible = true
+        pcall(function() Window:SetBackgroundImage(asset) end)
+    end
     if name == "恐脚本背景图" then
         local ok, err = pcall(function()
-            local bg = Window.UIElements.Main.Background
-            local img = bg:FindFirstChild("KbBgImage")
-            if not img then
-                img = Instance.new("ImageLabel")
-                img.Name = "KbBgImage"
-                img.BackgroundTransparency = 1
-                img.Size = UDim2.new(1, 0, 1, 0)
-                img.ScaleType = Enum.ScaleType.Crop
-                img.ImageTransparency = 0
-                img.ZIndex = 1
-                local corner = Instance.new("UICorner")
-                corner.CornerRadius = UDim.new(0, Window.UICorner or 16)
-                corner.Parent = img
-                img.Parent = bg
+            kbSetBgImage("rbxassetid://113517588654522")
+        end)
+        if ok then
+            kbCurrentBg = name
+            WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
+        else
+            WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
+        end
+        return
+    end
+    if kbBgUrls[name] then
+        local ok, err = pcall(function()
+            local fileName = "恐脚本/bg_" .. name .. ".jpg"
+            if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
+            if not (isfile and isfile(fileName)) then
+                local data = game:HttpGet(kbBgUrls[name])
+                writefile(fileName, data)
             end
-            img.Image = "rbxassetid://113517588654522"
-            img.Visible = true
-            pcall(function() Window:SetBackgroundImage("rbxassetid://113517588654522") end)
+            local asset = getcustomasset(fileName)
+            kbSetBgImage(asset)
         end)
         if ok then
             kbCurrentBg = name
@@ -3300,7 +3332,7 @@ end
 local kbBgSelected = nil
 local kbBgDropdown = Tabs.SettingsTab:Dropdown({
     Title = "切换背景图",
-    Values = {"默认背景图", "恐脚本背景图"},
+    Values = {"默认背景图", "恐脚本背景图", "eva背景图"},
     Callback = function(v)
         kbBgSelected = v
     end
@@ -3316,6 +3348,31 @@ Tabs.SettingsTab:Button({
         kbApplyBackground(kbBgSelected)
         kbBgSelected = nil
         pcall(function() kbBgDropdown:Select(nil) end)
+    end
+})
+Tabs.SettingsTab:Paragraph({
+    Title = "粉丝定制背景图",
+    Desc = "想要定制的进我的群找：空白大帝",
+})
+local kbFanBgSelected = nil
+local kbFanBgDropdown = Tabs.SettingsTab:Dropdown({
+    Title = "粉丝定制背景图",
+    Values = {"银花背景图1", "银花背景图2", "银花背景图3"},
+    Callback = function(v)
+        kbFanBgSelected = v
+    end
+})
+Tabs.SettingsTab:Button({
+    Title = "切换此粉丝定制背景图",
+    Callback = function()
+        kbPlayDing()
+        if not kbFanBgSelected then
+            WindUI:Notify({ Title = "切换此粉丝定制背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
+            return
+        end
+        kbApplyBackground(kbFanBgSelected)
+        kbFanBgSelected = nil
+        pcall(function() kbFanBgDropdown:Select(nil) end)
     end
 })
 task.spawn(function()
