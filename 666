@@ -3030,6 +3030,7 @@ Tabs.GamesTab:Button({
 })
 Tabs.GamesTab:Button({
     Title = "执行加载器",
+    Desc = "根据你所在的服务器加载对应的恐脚本支持服务器",
     Callback = function()
         kbPlayDing()
         WindUI:Notify({ Title = "执行加载器", Content = "正在加载中...", Duration = 5 })
@@ -3037,10 +3038,6 @@ Tabs.GamesTab:Button({
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()
         end)
     end
-})
-Tabs.GamesTab:Paragraph({
-    Title = "",
-    Desc = "根据你所在的服务器加载对应的恐脚本支持服务器",
 })
 Tabs.GamesTab:Divider()
 local serverListText = "加载中..."
@@ -3350,24 +3347,21 @@ Tabs.SettingsTab:Button({
         pcall(function() kbBgDropdown:Select(nil) end)
     end
 })
-Tabs.SettingsTab:Paragraph({
-    Title = "粉丝定制背景图",
-    Desc = "想要定制的进我的群找：空白大帝",
-})
 local kbFanBgSelected = nil
 local kbFanBgDropdown = Tabs.SettingsTab:Dropdown({
     Title = "粉丝定制背景图",
+    Desc = "想要定制的进我的群找：空白大帝",
     Values = {"银花背景图1", "银花背景图2", "银花背景图3"},
     Callback = function(v)
         kbFanBgSelected = v
     end
 })
 Tabs.SettingsTab:Button({
-    Title = "切换此粉丝定制背景图",
+    Title = "切换此定制背景图",
     Callback = function()
         kbPlayDing()
         if not kbFanBgSelected then
-            WindUI:Notify({ Title = "切换此粉丝定制背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
+            WindUI:Notify({ Title = "切换此定制背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
             return
         end
         kbApplyBackground(kbFanBgSelected)
