@@ -2295,6 +2295,28 @@ Tabs.MainTab:Button({
         WindUI:Notify({Title = "提示", Content = "已取消伪装", Type = "info"})
     end,
 })
+Tabs.MainTab:Toggle({
+    Title = "隐身",
+    Default = false,
+    Callback = function(state)
+        kbPlayDing()
+        if state then
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not hrp then
+                WindUI:Notify({Title = "隐身", Content = "角色未加载", Duration = 3})
+                return
+            end
+            char:MoveTo(hrp.Position - Vector3.new(0, 50, 0))
+            task.wait(0.4)
+            LocalPlayer.Character = nil
+            char:Destroy()
+            WindUI:Notify({Title = "隐身", Content = "已开启隐身（服务端生效），关闭后需重置角色恢复", Duration = 5})
+        else
+            WindUI:Notify({Title = "隐身", Content = "已关闭，重置角色即可恢复正常", Duration = 3})
+        end
+    end,
+})
 refreshAllDropdowns()
 Tabs.SecondaryTab:Button({
     Title = "自动翻译",
