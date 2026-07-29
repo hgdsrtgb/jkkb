@@ -2300,7 +2300,36 @@ local invisRealChar = nil
 local invisFakeChar = nil
 local invisOldFPDH = nil
 local invisRespawnConn = nil
-local function doInvisible()
+local invisMethod = 1
+local invisDeletedForever = false
+local function invisCleanupAll()
+    invisActive = false
+    if invisRespawnConn then pcall(function() invisRespawnConn:Disconnect() end) invisRespawnConn = nil end
+    pcall(function() if invisFakeChar then invisFakeChar:Destroy() end end)
+    invisFakeChar = nil
+    invisRealChar = nil
+    if invisOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = invisOldFPDH end) invisOldFPDH = nil end
+end
+local function undoInvisible()
+    local wasDeleted = invisDeletedForever
+    invisDeletedForever = false
+    local backCF = nil
+    if invisFakeChar and invisFakeChar.Parent then
+        local hrp = invisFakeChar:FindFirstChild("HumanoidRootPart")
+        if hrp then backCF = hrp.CFrame end
+    end
+    local realChar = invisRealChar
+    invisCleanupAll()
+    if wasDeleted or not realChar or not realChar.Parent then
+        WindUI:Notify({Title = "隐身", Content = "建模已被服务端删除，重置角色即可恢复", Duration = 5})
+        return
+    end
+    LocalPlayer.Character = realChar
+    if backCF then pcall(function() realChar:MoveTo(backCF.Position) end) end
+    local hum = realChar:FindFirstChildOfClass("Humanoid")
+    if hum then workspace.CurrentCamera.CameraSubject = hum end
+end
+local function doInvisible(method)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then
         WindUI:Notify({Title = "隐身", Content = "角色未加载", Duration = 3})
@@ -2312,62 +2341,79 @@ local function doInvisible()
         WindUI:Notify({Title = "隐身", Content = "克隆失败，当前注入器不支持", Duration = 3})
         return false
     end
-    invisOldFPDH = workspace.FallenPartsDestroyHeight
-    workspace.FallenPartsDestroyHeight = 0/0
-    char:MoveTo(char:GetPivot().Position - Vector3.new(0, 50, 0))
-    task.wait(0.3)
+    if method == 1 then
+        invisOldFPDH = workspace.FallenPartsDestroyHeight
+        workspace.FallenPartsDestroyHeight = 0/0
+        char:MoveTo(char:GetPivot().Position - Vector3.new(0, 50, 0))
+        task.wait(0.3)
+    elseif method == 2 then
+        char:MoveTo(Vector3.new(0, -1000000, 0))
+        task.wait(0.5)
+    end
     clone.Parent = workspace
     LocalPlayer.Character = clone
     invisRealChar = char
     invisFakeChar = clone
     invisActive = true
+    invisDeletedForever = (method == 2)
     local hum = clone:FindFirstChildOfClass("Humanoid")
     if hum then workspace.CurrentCamera.CameraSubject = hum end
     invisRespawnConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
-        if invisActive then
-            invisActive = false
-            pcall(function() if invisFakeChar then invisFakeChar:Destroy() end end)
-            invisFakeChar = nil
-            invisRealChar = nil
-            if invisOldFPDH then workspace.FallenPartsDestroyHeight = invisOldFPDH invisOldFPDH = nil end
+        local needRestore = invisActive
+        invisCleanupAll()
+        invisDeletedForever = false
+        if needRestore then
+            task.spawn(function()
+                task.wait(0.5)
+                local h = newChar and newChar:FindFirstChildOfClass("Humanoid")
+                if h then workspace.CurrentCamera.CameraSubject = h end
+                WindUI:Notify({Title = "隐身", Content = "检测到重生，隐身状态已清除", Duration = 3})
+            end)
         end
     end)
     return true
 end
-local function undoInvisible()
-    invisActive = false
-    if invisRespawnConn then pcall(function() invisRespawnConn:Disconnect() end) invisRespawnConn = nil end
-    local backCF = nil
-    if invisFakeChar and invisFakeChar.Parent then
-        local hrp = invisFakeChar:FindFirstChild("HumanoidRootPart")
-        if hrp then backCF = hrp.CFrame end
-    end
-    if invisRealChar and invisRealChar.Parent then
-        LocalPlayer.Character = invisRealChar
-        if backCF then pcall(function() invisRealChar:MoveTo(backCF.Position) end) end
-        local hum = invisRealChar:FindFirstChildOfClass("Humanoid")
-        if hum then workspace.CurrentCamera.CameraSubject = hum end
-    end
-    pcall(function() if invisFakeChar then invisFakeChar:Destroy() end end)
-    invisFakeChar = nil
-    invisRealChar = nil
-    if invisOldFPDH then workspace.FallenPartsDestroyHeight = invisOldFPDH invisOldFPDH = nil end
-end
-Tabs.MainTab:Toggle({
-    Title = "隐身",
+local invisMasterToggle = nil
+local invisSubToggles = {}
+invisMasterToggle = Tabs.MainTab:Toggle({
+    Title = "隐身总开关",
     Default = false,
     Callback = function(state)
         kbPlayDing()
         if state then
             task.spawn(function()
-                local ok = doInvisible()
+                local ok = doInvisible(invisMethod)
                 if ok then
-                    WindUI:Notify({Title = "隐身", Content = "已开启隐身（服务端生效），可以正常移动", Duration = 5})
+                    WindUI:Notify({Title = "隐身", Content = "已开启隐身（方式" .. invisMethod .. "），可以正常移动", Duration = 5})
+                else
+                    pcall(function() if invisMasterToggle then invisMasterToggle:Set(false) end end)
                 end
             end)
         else
             undoInvisible()
             WindUI:Notify({Title = "隐身", Content = "已关闭隐身", Duration = 3})
+        end
+    end,
+})
+invisSubToggles[1] = Tabs.MainTab:Toggle({
+    Title = "隐身方式1：真身下降50米",
+    Default = true,
+    Callback = function(state)
+        if state then
+            invisMethod = 1
+            pcall(function() invisSubToggles[2]:Set(false) end)
+            WindUI:Notify({Title = "隐身", Content = "已选择方式1：真身下降50米", Duration = 3})
+        end
+    end,
+})
+invisSubToggles[2] = Tabs.MainTab:Toggle({
+    Title = "隐身方式2：服务端彻底删除建模",
+    Default = false,
+    Callback = function(state)
+        if state then
+            invisMethod = 2
+            pcall(function() invisSubToggles[1]:Set(false) end)
+            WindUI:Notify({Title = "隐身", Content = "已选择方式2：服务端彻底删除建模，关闭后需重置恢复", Duration = 5})
         end
     end,
 })
