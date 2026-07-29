@@ -2222,6 +2222,176 @@ local function startImpersonate(targetName)
     WindUI:Notify({Title = "成功", Content = "已伪装成: " .. targetName .. "（仅自己可见）", Type = "success"})
 end
 local respawnPos = nil
+kbSoulOn = false
+kbInv1On = false
+kbInv2On = false
+kbInvRealChar = nil
+kbInvFakeChar = nil
+kbInvOldFPDH = nil
+kbInvRespawnConn = nil
+kbInvTrans = {}
+kbInvToggles = {}
+kbShowHalfOn = false
+function kbInvResetTrans()
+    for part, orig in pairs(kbInvTrans) do
+        pcall(function() if part and part.Parent then part.Transparency = orig end end)
+    end
+    kbInvTrans = {}
+end
+function kbInvApplyTrans(c)
+    if not c then return end
+    for _, v in ipairs(c:GetDescendants()) do
+        if v:IsA("BasePart") then
+            if kbInvTrans[v] == nil then kbInvTrans[v] = v.Transparency end
+            v.Transparency = 0.5
+        end
+    end
+end
+function kbInvResetAll()
+    kbSoulOn = false
+    kbInv1On = false
+    kbInv2On = false
+    if kbInvRespawnConn then pcall(function() kbInvRespawnConn:Disconnect() end) kbInvRespawnConn = nil end
+    kbInvResetTrans()
+    pcall(function() if kbInvFakeChar then kbInvFakeChar:Destroy() end end)
+    kbInvFakeChar = nil
+    kbInvRealChar = nil
+    if kbInvOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end) kbInvOldFPDH = nil end
+end
+function kbInvSetup()
+    if kbInvFakeChar and kbInvFakeChar.Parent then return true end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        WindUI:Notify({Title = "提示", Content = "角色未加载", Duration = 3})
+        return false
+    end
+    pcall(function() char.Archivable = true end)
+    local ok, clone = pcall(function() return char:Clone() end)
+    if not ok or not clone then
+        WindUI:Notify({Title = "提示", Content = "克隆失败，当前注入器不支持", Duration = 3})
+        return false
+    end
+    kbInvOldFPDH = workspace.FallenPartsDestroyHeight
+    workspace.FallenPartsDestroyHeight = 0/0
+    kbInvRealChar = char
+    clone.Parent = workspace
+    LocalPlayer.Character = clone
+    kbInvFakeChar = clone
+    pcall(function()
+        for _, v in ipairs(clone:GetDescendants()) do
+            if v:IsA("BasePart") or v:IsA("Decal") then
+                v.Transparency = kbShowHalfOn and 0.5 or 1
+            end
+        end
+    end)
+    local hum = clone:FindFirstChildOfClass("Humanoid")
+    if hum then workspace.CurrentCamera.CameraSubject = hum end
+    kbInvRespawnConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+        local had = kbInvFakeChar ~= nil or kbInvRealChar ~= nil
+        kbInvResetAll()
+        pcall(function() for _, t in pairs(kbInvToggles) do t:Set(false) end end)
+        if had then
+            task.spawn(function()
+                task.wait(0.5)
+                local h = newChar and newChar:FindFirstChildOfClass("Humanoid")
+                if h then workspace.CurrentCamera.CameraSubject = h end
+            end)
+        end
+    end)
+    return true
+end
+function kbInvCheckRestore()
+    if kbSoulOn or kbInv1On or kbInv2On then return end
+    local fake = kbInvFakeChar
+    local real = kbInvRealChar
+    local backCF = nil
+    if fake and fake.Parent then
+        local h = fake:FindFirstChild("HumanoidRootPart")
+        if h then backCF = h.CFrame end
+    end
+    if kbInvRespawnConn then pcall(function() kbInvRespawnConn:Disconnect() end) kbInvRespawnConn = nil end
+    kbInvResetTrans()
+    pcall(function() if fake then fake:Destroy() end end)
+    kbInvFakeChar = nil
+    kbInvRealChar = nil
+    if kbInvOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end) kbInvOldFPDH = nil end
+    if real and real.Parent ~= nil then
+        pcall(function() real.Parent = workspace end)
+        LocalPlayer.Character = real
+        if backCF then pcall(function() real:MoveTo(backCF.Position) end) end
+        local hum = real:FindFirstChildOfClass("Humanoid")
+        if hum then workspace.CurrentCamera.CameraSubject = hum end
+    end
+end
+kbInvToggles[2] = Tabs.MainTab:Toggle({
+    Title = "隐身v1",
+    Default = false,
+    Callback = function(state)
+        kbPlayDing()
+        if state then
+            if not kbInvSetup() then pcall(function() kbInvToggles[2]:Set(false) end) return end
+            kbInv1On = true
+            task.spawn(function()
+                local real = kbInvRealChar
+                if not real then return end
+                local wasCut = (real.Parent == nil)
+                if wasCut then pcall(function() real.Parent = workspace end) end
+                pcall(function() real:MoveTo(real:GetPivot().Position - Vector3.new(0, 10000, 0)) end)
+                task.wait(0.3)
+                if wasCut and kbSoulOn then pcall(function() real.Parent = nil end) end
+            end)
+            WindUI:Notify({Title = "隐身v1", Content = "已开启", Duration = 3})
+        else
+            kbInv1On = false
+            pcall(function() if kbInvRealChar then kbInvRealChar:MoveTo(kbInvRealChar:GetPivot().Position + Vector3.new(0, 10000, 0)) end end)
+            kbInvCheckRestore()
+            WindUI:Notify({Title = "隐身v1", Content = "已关闭", Duration = 3})
+        end
+    end,
+})
+kbInvToggles[3] = Tabs.MainTab:Toggle({
+    Title = "隐身v2",
+    Default = false,
+    Callback = function(state)
+        kbPlayDing()
+        if state then
+            local char = LocalPlayer.Character
+            if not char then
+                WindUI:Notify({Title = "隐身v2", Content = "角色未加载", Duration = 3})
+                pcall(function() kbInvToggles[3]:Set(false) end)
+                return
+            end
+            kbInv2On = true
+            task.spawn(function()
+                if kbInvOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end) kbInvOldFPDH = nil end
+                pcall(function() char:MoveTo(Vector3.new(0, -1000000, 0)) end)
+            end)
+            WindUI:Notify({Title = "隐身v2", Content = "已开启", Duration = 3})
+        else
+            kbInv2On = false
+            kbInvCheckRestore()
+            WindUI:Notify({Title = "隐身v2", Content = "已关闭，重置角色即可恢复", Duration = 3})
+        end
+    end,
+})
+kbInvToggles[4] = Tabs.MainTab:Toggle({
+    Title = "显示半透明",
+    Default = false,
+    Callback = function(state)
+        kbPlayDing()
+        kbShowHalfOn = state
+        pcall(function()
+            if kbInvFakeChar then
+                for _, v in ipairs(kbInvFakeChar:GetDescendants()) do
+                    if v:IsA("BasePart") or v:IsA("Decal") then
+                        v.Transparency = state and 0.5 or 1
+                    end
+                end
+            end
+        end)
+        WindUI:Notify({Title = "显示半透明", Content = state and "已开启" or "已关闭", Duration = 3})
+    end,
+})
 Tabs.MainTab:Button({
     Title = "设置重生点",
     Callback = function()
@@ -2295,175 +2465,29 @@ Tabs.MainTab:Button({
         WindUI:Notify({Title = "提示", Content = "已取消伪装", Type = "info"})
     end,
 })
-do
-local invisOn1 = false
-local invisOn2 = false
-local invisOn3 = false
-local invisRealChar = nil
-local invisFakeChar = nil
-local invisOldFPDH = nil
-local invisRespawnConn = nil
-local invisToggles = {}
-local function invisResetAll()
-    invisOn1 = false
-    invisOn2 = false
-    invisOn3 = false
-    if invisRespawnConn then pcall(function() invisRespawnConn:Disconnect() end) invisRespawnConn = nil end
-    pcall(function() if invisFakeChar then invisFakeChar:Destroy() end end)
-    invisFakeChar = nil
-    invisRealChar = nil
-    if invisOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = invisOldFPDH end) invisOldFPDH = nil end
-end
-local function invisSetup()
-    if invisFakeChar and invisFakeChar.Parent then return true end
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then
-        WindUI:Notify({Title = "隐身", Content = "角色未加载", Duration = 3})
-        return false
-    end
-    pcall(function() char.Archivable = true end)
-    local ok, clone = pcall(function() return char:Clone() end)
-    if not ok or not clone then
-        WindUI:Notify({Title = "隐身", Content = "克隆失败，当前注入器不支持", Duration = 3})
-        return false
-    end
-    invisOldFPDH = workspace.FallenPartsDestroyHeight
-    workspace.FallenPartsDestroyHeight = 0/0
-    invisRealChar = char
-    clone.Parent = workspace
-    LocalPlayer.Character = clone
-    invisFakeChar = clone
-    local hum = clone:FindFirstChildOfClass("Humanoid")
-    if hum then workspace.CurrentCamera.CameraSubject = hum end
-    invisRespawnConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
-        local had = invisFakeChar ~= nil or invisRealChar ~= nil
-        invisResetAll()
-        pcall(function() for _, t in pairs(invisToggles) do t:Set(false) end end)
-        if had then
-            task.spawn(function()
-                task.wait(0.5)
-                local h = newChar and newChar:FindFirstChildOfClass("Humanoid")
-                if h then workspace.CurrentCamera.CameraSubject = h end
-                WindUI:Notify({Title = "隐身", Content = "检测到重生，隐身状态已清除", Duration = 3})
-            end)
-        end
-    end)
-    return true
-end
-local function invisCheckRestore()
-    if invisOn1 or invisOn2 or invisOn3 then return end
-    local fake = invisFakeChar
-    local real = invisRealChar
-    local backCF = nil
-    if fake and fake.Parent then
-        local h = fake:FindFirstChild("HumanoidRootPart")
-        if h then backCF = h.CFrame end
-    end
-    if invisRespawnConn then pcall(function() invisRespawnConn:Disconnect() end) invisRespawnConn = nil end
-    pcall(function() if fake then fake:Destroy() end end)
-    invisFakeChar = nil
-    invisRealChar = nil
-    if invisOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = invisOldFPDH end) invisOldFPDH = nil end
-    if real and real.Parent ~= nil then
-        pcall(function() real.Parent = workspace end)
-        LocalPlayer.Character = real
-        if backCF then pcall(function() real:MoveTo(backCF.Position) end) end
-        local hum = real:FindFirstChildOfClass("Humanoid")
-        if hum then workspace.CurrentCamera.CameraSubject = hum end
-    else
-        WindUI:Notify({Title = "隐身", Content = "建模已被删除，重置角色即可恢复", Duration = 5})
-    end
-end
-invisToggles[1] = Tabs.MainTab:Toggle({
+refreshAllDropdowns()
+kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
     Title = "灵魂出窍",
     Desc = "留下本体在原地，别人看不到你虚体",
     Default = false,
     Callback = function(state)
         kbPlayDing()
         if state then
-            if not invisSetup() then pcall(function() invisToggles[1]:Set(false) end) return end
-            invisOn1 = true
-            pcall(function()
-                for _, c in ipairs({invisFakeChar, invisRealChar}) do
-                    if c then
-                        for _, v in ipairs(c:GetDescendants()) do
-                            if v:IsA("BasePart") then v.LocalTransparencyModifier = 0.5 end
-                        end
-                    end
-                end
-            end)
-            pcall(function() if invisRealChar then invisRealChar.Parent = nil end end)
-            WindUI:Notify({Title = "灵魂出窍", Content = "已切断建模与服务器的连接（服务端定格）", Duration = 3})
+            if not kbInvSetup() then pcall(function() kbInvToggles[1]:Set(false) end) return end
+            kbSoulOn = true
+            kbInvApplyTrans(kbInvFakeChar)
+            kbInvApplyTrans(kbInvRealChar)
+            pcall(function() if kbInvRealChar then kbInvRealChar.Parent = nil end end)
+            WindUI:Notify({Title = "灵魂出窍", Content = "已开启", Duration = 3})
         else
-            invisOn1 = false
-            pcall(function()
-                for _, c in ipairs({invisFakeChar, invisRealChar}) do
-                    if c then
-                        for _, v in ipairs(c:GetDescendants()) do
-                            if v:IsA("BasePart") then v.LocalTransparencyModifier = 0 end
-                        end
-                    end
-                end
-            end)
-            pcall(function() if invisRealChar then invisRealChar.Parent = workspace end end)
-            invisCheckRestore()
-            WindUI:Notify({Title = "灵魂出窍", Content = "已恢复连接", Duration = 3})
+            kbSoulOn = false
+            kbInvResetTrans()
+            pcall(function() if kbInvRealChar then kbInvRealChar.Parent = workspace end end)
+            kbInvCheckRestore()
+            WindUI:Notify({Title = "灵魂出窍", Content = "已关闭", Duration = 3})
         end
     end,
 })
-invisToggles[2] = Tabs.MainTab:Toggle({
-    Title = "隐身v1：建模下降1万米",
-    Default = false,
-    Callback = function(state)
-        kbPlayDing()
-        if state then
-            if not invisSetup() then pcall(function() invisToggles[2]:Set(false) end) return end
-            invisOn2 = true
-            task.spawn(function()
-                local real = invisRealChar
-                if not real then return end
-                local wasCut = (real.Parent == nil)
-                if wasCut then pcall(function() real.Parent = workspace end) end
-                pcall(function() real:MoveTo(real:GetPivot().Position - Vector3.new(0, 10000, 0)) end)
-                task.wait(0.3)
-                if wasCut and invisOn1 then pcall(function() real.Parent = nil end) end
-            end)
-            WindUI:Notify({Title = "隐身v1", Content = "建模已下降1万米（服务端），碰撞箱不受影响", Duration = 3})
-        else
-            invisOn2 = false
-            pcall(function() if invisRealChar then invisRealChar:MoveTo(invisRealChar:GetPivot().Position + Vector3.new(0, 10000, 0)) end end)
-            invisCheckRestore()
-            WindUI:Notify({Title = "隐身v1", Content = "建模已升回", Duration = 3})
-        end
-    end,
-})
-invisToggles[3] = Tabs.MainTab:Toggle({
-    Title = "隐身v2：删除建模",
-    Default = false,
-    Callback = function(state)
-        kbPlayDing()
-        if state then
-            local char = LocalPlayer.Character
-            if not char then
-                WindUI:Notify({Title = "隐身v2", Content = "角色未加载", Duration = 3})
-                pcall(function() invisToggles[3]:Set(false) end)
-                return
-            end
-            invisOn3 = true
-            task.spawn(function()
-                if invisOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = invisOldFPDH end) invisOldFPDH = nil end
-                pcall(function() char:MoveTo(Vector3.new(0, -1000000, 0)) end)
-            end)
-            WindUI:Notify({Title = "隐身v2", Content = "建模已送入虚空，服务端即将彻底删除", Duration = 3})
-        else
-            invisOn3 = false
-            invisCheckRestore()
-            WindUI:Notify({Title = "隐身v2", Content = "已关闭，若建模已被删除需重置角色恢复", Duration = 3})
-        end
-    end,
-})
-end
-refreshAllDropdowns()
 Tabs.SecondaryTab:Button({
     Title = "自动翻译",
     Callback = function()
