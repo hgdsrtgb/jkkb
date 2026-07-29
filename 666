@@ -2375,25 +2375,44 @@ local function invisCheckRestore()
     end
 end
 invisToggles[1] = Tabs.MainTab:Toggle({
-    Title = "隐身1：切断建模与服务器连接",
+    Title = "灵魂出窍",
+    Desc = "留下本体在原地，别人看不到你虚体",
     Default = false,
     Callback = function(state)
         kbPlayDing()
         if state then
             if not invisSetup() then pcall(function() invisToggles[1]:Set(false) end) return end
             invisOn1 = true
+            pcall(function()
+                for _, c in ipairs({invisFakeChar, invisRealChar}) do
+                    if c then
+                        for _, v in ipairs(c:GetDescendants()) do
+                            if v:IsA("BasePart") then v.LocalTransparencyModifier = 0.5 end
+                        end
+                    end
+                end
+            end)
             pcall(function() if invisRealChar then invisRealChar.Parent = nil end end)
-            WindUI:Notify({Title = "隐身1", Content = "已切断建模与服务器的连接（服务端定格）", Duration = 3})
+            WindUI:Notify({Title = "灵魂出窍", Content = "已切断建模与服务器的连接（服务端定格）", Duration = 3})
         else
             invisOn1 = false
+            pcall(function()
+                for _, c in ipairs({invisFakeChar, invisRealChar}) do
+                    if c then
+                        for _, v in ipairs(c:GetDescendants()) do
+                            if v:IsA("BasePart") then v.LocalTransparencyModifier = 0 end
+                        end
+                    end
+                end
+            end)
             pcall(function() if invisRealChar then invisRealChar.Parent = workspace end end)
             invisCheckRestore()
-            WindUI:Notify({Title = "隐身1", Content = "已恢复连接", Duration = 3})
+            WindUI:Notify({Title = "灵魂出窍", Content = "已恢复连接", Duration = 3})
         end
     end,
 })
 invisToggles[2] = Tabs.MainTab:Toggle({
-    Title = "隐身2：建模下降1万米",
+    Title = "隐身v1：建模下降1万米",
     Default = false,
     Callback = function(state)
         kbPlayDing()
@@ -2409,35 +2428,37 @@ invisToggles[2] = Tabs.MainTab:Toggle({
                 task.wait(0.3)
                 if wasCut and invisOn1 then pcall(function() real.Parent = nil end) end
             end)
-            WindUI:Notify({Title = "隐身2", Content = "建模已下降1万米（服务端），碰撞箱不受影响", Duration = 3})
+            WindUI:Notify({Title = "隐身v1", Content = "建模已下降1万米（服务端），碰撞箱不受影响", Duration = 3})
         else
             invisOn2 = false
             pcall(function() if invisRealChar then invisRealChar:MoveTo(invisRealChar:GetPivot().Position + Vector3.new(0, 10000, 0)) end end)
             invisCheckRestore()
-            WindUI:Notify({Title = "隐身2", Content = "建模已升回", Duration = 3})
+            WindUI:Notify({Title = "隐身v1", Content = "建模已升回", Duration = 3})
         end
     end,
 })
 invisToggles[3] = Tabs.MainTab:Toggle({
-    Title = "隐身3：删除建模",
+    Title = "隐身v2：删除建模",
     Default = false,
     Callback = function(state)
         kbPlayDing()
         if state then
-            if not invisSetup() then pcall(function() invisToggles[3]:Set(false) end) return end
+            local char = LocalPlayer.Character
+            if not char then
+                WindUI:Notify({Title = "隐身v2", Content = "角色未加载", Duration = 3})
+                pcall(function() invisToggles[3]:Set(false) end)
+                return
+            end
             invisOn3 = true
             task.spawn(function()
-                local real = invisRealChar
-                if not real then return end
                 if invisOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = invisOldFPDH end) invisOldFPDH = nil end
-                pcall(function() real.Parent = workspace end)
-                pcall(function() real:MoveTo(Vector3.new(0, -1000000, 0)) end)
+                pcall(function() char:MoveTo(Vector3.new(0, -1000000, 0)) end)
             end)
-            WindUI:Notify({Title = "隐身3", Content = "建模已送入虚空，服务端即将彻底删除", Duration = 3})
+            WindUI:Notify({Title = "隐身v2", Content = "建模已送入虚空，服务端即将彻底删除", Duration = 3})
         else
             invisOn3 = false
             invisCheckRestore()
-            WindUI:Notify({Title = "隐身3", Content = "已关闭，若建模已被删除需重置角色恢复", Duration = 3})
+            WindUI:Notify({Title = "隐身v2", Content = "已关闭，若建模已被删除需重置角色恢复", Duration = 3})
         end
     end,
 })
