@@ -35,15 +35,40 @@ task.spawn(function()
 end)
 kbPlayDing = function()
     if kbToggleSoundMuted then return end
+    if not kbDingAsset then
+        pcall(function()
+            local asset = getcustomasset("恐脚本/DING.WAV")
+            if asset then kbDingAsset = asset end
+        end)
+    end
     if not kbDingAsset then return end
     pcall(function()
         local kbDingSound = Instance.new("Sound")
         kbDingSound.SoundId = kbDingAsset
         kbDingSound.Volume = 2
-        kbDingSound.Parent = game:GetService("CoreGui")
-        kbDingSound:Play()
+        kbDingSound.Parent = game:GetService("SoundService")
+        game:GetService("SoundService"):PlayLocalSound(kbDingSound)
         kbDingSound.Ended:Connect(function()
             kbDingSound:Destroy()
+        end)
+    end)
+end
+kbPlayTada = function()
+    if not kbTadaAsset then
+        pcall(function()
+            local asset = getcustomasset("恐脚本/TADA.WAV")
+            if asset then kbTadaAsset = asset end
+        end)
+    end
+    if not kbTadaAsset then return end
+    pcall(function()
+        local kbTadaSound = Instance.new("Sound")
+        kbTadaSound.SoundId = kbTadaAsset
+        kbTadaSound.Volume = 2
+        kbTadaSound.Parent = game:GetService("SoundService")
+        game:GetService("SoundService"):PlayLocalSound(kbTadaSound)
+        kbTadaSound.Ended:Connect(function()
+            kbTadaSound:Destroy()
         end)
     end)
 end
@@ -1484,6 +1509,7 @@ Tabs.NotifyTab:Button({
     Title = "ROB脚本v2",
     Desc = "必须用gi加速器",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "ROB脚本v2", Content = "正在加载中...\n必须用gi加速器", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/Zyb150933/ROB/refs/heads/main/ROB.V2"))()
@@ -1494,36 +1520,42 @@ Tabs.NotifyTab:Divider()
 Tabs.NotifyTab:Button({
     Title = "复制作者QQ",
     Callback = function()
+        kbPlayDing()
         copyToClipboard("3999698324", "作者QQ")
     end
 })
 Tabs.NotifyTab:Button({
     Title = "复制大群: 461440703",
     Callback = function()
+        kbPlayDing()
         copyToClipboard("461440703", "大群")
     end
 })
 Tabs.NotifyTab:Button({
     Title = "复制群1: 1106203175",
     Callback = function()
+        kbPlayDing()
         copyToClipboard("1106203175", "群1")
     end
 })
 Tabs.NotifyTab:Button({
     Title = "复制群2: 1001577641",
     Callback = function()
+        kbPlayDing()
         copyToClipboard("1001577641", "群2")
     end
 })
 Tabs.NotifyTab:Button({
     Title = "复制群3: 239824789",
     Callback = function()
+        kbPlayDing()
         copyToClipboard("239824789", "群3")
     end
 })
 Tabs.NotifyTab:Button({
     Title = "复制群4: 1065927925",
     Callback = function()
+        kbPlayDing()
         copyToClipboard("1065927925", "群4")
     end
 })
@@ -1532,6 +1564,7 @@ Tabs.NotifyTab:Button({
     Title = "捐赠我",
     Desc = "你的支持为我带来动力",
     Callback = function()
+        kbPlayTada()
         task.spawn(function()
             if not kbDonateAsset then
                 local ok, result = pcall(function()
@@ -1611,6 +1644,7 @@ Tabs.MainTab:Toggle({
 Tabs.MainTab:Button({
     Title = "飞行",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "飞行脚本", Content = "正在加载中...", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
@@ -1692,6 +1726,7 @@ local flyV2SpeedSlider = Tabs.MainTab:Slider({
     end
 })
 sliderReleaseActions["flyv2speed"] = function(v)
+    kbPlayDing()
     flyV2Speed = v
     WindUI:Notify({ Title = "飞行v2速度", Content = "已设置为：" .. v, Duration = 2 })
 end
@@ -1771,18 +1806,24 @@ do
         },
         Callback = function(value)
             flyCarSpeed = value
+            pendingSliderValues["flycarspeed"] = value
         end
     })
+    sliderReleaseActions["flycarspeed"] = function(v)
+        kbPlayDing()
+    end
     Tabs.MainTab:Input({
         Title = "输入飞车速度",
         Placeholder = "10 - 200",
         Callback = function(text)
             local v = tonumber(text)
             if not v then return end
+            kbPlayDing()
             v = math.floor(v)
             if v > 200 then v = 200 end
             if v < 10 then v = 10 end
             flyCarSpeedSlider:Set(v)
+            pendingSliderValues["flycarspeed"] = nil
         end
     })
 end
@@ -1799,6 +1840,7 @@ Tabs.MainTab:Toggle({
 Tabs.MainTab:Button({
     Title = "建造方块",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "建造方块", Content = "正在加载中...", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://pastebin.com/raw/Zt4kkQG9"))()
@@ -1875,6 +1917,7 @@ local speedSlider = Tabs.MainTab:Slider({
     },
     Callback = function(value)
         speedValue = value
+        pendingSliderValues["speedvalue"] = value
         if speedToggle then
             local hum = getHumanoid()
             if hum then hum.WalkSpeed = value end
@@ -1882,16 +1925,21 @@ local speedSlider = Tabs.MainTab:Slider({
         end
     end
 })
+sliderReleaseActions["speedvalue"] = function(v)
+    kbPlayDing()
+end
 Tabs.MainTab:Input({
     Title = "输入移速数值",
     Placeholder = "5 - 1000",
     Callback = function(text)
         local v = tonumber(text)
         if not v then return end
+        kbPlayDing()
         v = math.floor(v)
         if v > 1000 then v = 1000 end
         if v < 5 then v = 5 end
         speedSlider:Set(v)
+        pendingSliderValues["speedvalue"] = nil
     end
 })
 Tabs.MainTab:Toggle({
@@ -1927,6 +1975,7 @@ Tabs.MainTab:Toggle({
 Tabs.MainTab:Button({
     Title = "偷取道具",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "偷取道具", Content = "正在偷取道具中...", Duration = 5 })
         task.spawn(function()
             local cnt = stealAllItems()
@@ -1947,6 +1996,7 @@ Tabs.MainTab:Toggle({
 Tabs.MainTab:Button({
     Title = "甩飞全部人",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "甩飞", Content = "开始甩飞所有玩家...", Duration = 3 })
         task.spawn(function()
             local count = 0
@@ -1964,6 +2014,7 @@ Tabs.MainTab:Button({
 Tabs.MainTab:Button({
     Title = "甩飞最近的人",
     Callback = function()
+        kbPlayDing()
         local nearest = nil
         local minDist = math.huge
         local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
@@ -2002,6 +2053,7 @@ flingDropdown = Tabs.MainTab:Dropdown({
 Tabs.MainTab:Button({
     Title = "确定执行甩飞",
     Callback = function()
+        kbPlayDing()
         if currentFlingTarget and currentFlingTarget.Parent then
             WindUI:Notify({ Title = "甩飞", Content = "已选定 " .. currentFlingTarget.Name .. "，开始甩飞", Duration = 3 })
             task.spawn(function() powerfulFling(currentFlingTarget) end)
@@ -2014,6 +2066,7 @@ Tabs.MainTab:Button({
 Tabs.MainTab:Button({
     Title = "祖国人汉化",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "祖国人汉化", Content = "正在加载中...", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/-/refs/heads/main/祖国人汉化"))()
@@ -2023,6 +2076,7 @@ Tabs.MainTab:Button({
 Tabs.MainTab:Button({
     Title = "自瞄",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "自瞄", Content = "正在加载中...", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/自瞄"))()
@@ -2171,6 +2225,7 @@ local respawnPos = nil
 Tabs.MainTab:Button({
     Title = "设置重生点",
     Callback = function()
+        kbPlayDing()
         local char = player.Character
         if not char then return end
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -2217,12 +2272,14 @@ end
 Tabs.MainTab:Button({
     Title = "刷新玩家列表",
     Callback = function()
+        kbPlayDing()
         refreshAllDropdowns()
     end,
 })
 Tabs.MainTab:Button({
     Title = "变身成他人（栽赃）",
     Callback = function()
+        kbPlayDing()
         if selectedImpersonateName ~= "" then
             startImpersonate(selectedImpersonateName)
         else
@@ -2233,6 +2290,7 @@ Tabs.MainTab:Button({
 Tabs.MainTab:Button({
     Title = "取消伪装",
     Callback = function()
+        kbPlayDing()
         resetImpersonate()
         WindUI:Notify({Title = "提示", Content = "已取消伪装", Type = "info"})
     end,
@@ -2241,6 +2299,7 @@ refreshAllDropdowns()
 Tabs.SecondaryTab:Button({
     Title = "自动翻译",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "自动翻译", Content = "正在加载中...", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/自动翻译"))()
@@ -2250,6 +2309,7 @@ Tabs.SecondaryTab:Button({
 Tabs.SecondaryTab:Button({
     Title = "传送最近玩家",
     Callback = function()
+        kbPlayDing()
         local nearest = nil
         local minDist = math.huge
         local myChar = LocalPlayer.Character
@@ -2289,6 +2349,7 @@ tpDropdown = Tabs.SecondaryTab:Dropdown({
 Tabs.SecondaryTab:Button({
     Title = "确定传送到此人",
     Callback = function()
+        kbPlayDing()
         if currentTpTarget and currentTpTarget.Parent and currentTpTarget.Character and currentTpTarget.Character:FindFirstChild("HumanoidRootPart") then
             teleportToPlayer(currentTpTarget)
             WindUI:Notify({ Title = "传送", Content = "已传送到 " .. currentTpTarget.Name, Duration = 3 })
@@ -2322,6 +2383,7 @@ end
 Tabs.SecondaryTab:Button({
     Title = "保存标点",
     Callback = function()
+        kbPlayDing()
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then
@@ -2382,6 +2444,7 @@ markerDropdown = Tabs.SecondaryTab:Dropdown({
 Tabs.SecondaryTab:Button({
     Title = "传送标记点",
     Callback = function()
+        kbPlayDing()
         task.spawn(function()
             local tpCount = 0
             for _, m in ipairs(markerList) do
@@ -2441,6 +2504,7 @@ followDropdown = Tabs.SecondaryTab:Dropdown({
 Tabs.SecondaryTab:Button({
     Title = "确定执行跟随",
     Callback = function()
+        kbPlayDing()
         if currentFollowTarget and currentFollowTarget.Parent then
             WindUI:Notify({ Title = "跟随", Content = "已选定 " .. currentFollowTarget.Name .. "，开始跟随", Duration = 3 })
             startFollow(currentFollowTarget)
@@ -2452,12 +2516,14 @@ Tabs.SecondaryTab:Button({
 Tabs.SecondaryTab:Button({
     Title = "停止跟随",
     Callback = function()
+        kbPlayDing()
         stopFollow()
     end
 })
 Tabs.SecondaryTab:Button({
     Title = "复制当前坐标",
     Callback = function()
+        kbPlayDing()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             local pos = char.HumanoidRootPart.Position
@@ -2473,12 +2539,15 @@ Tabs.SecondaryTab:Input({
     Title = "输入坐标 (X,Y,Z)",
     Placeholder = "例如: 100, 50, 200",
     Callback = function(v)
+        if not v or v == "" then return end
+        kbPlayDing()
         tpCoordStr = v
     end
 })
 Tabs.SecondaryTab:Button({
     Title = "执行坐标传送",
     Callback = function()
+        kbPlayDing()
         if not tpCoordStr or tpCoordStr == "" then return end
         local parts = {}
         for part in tpCoordStr:gmatch("[^,]+") do
@@ -2495,12 +2564,14 @@ Tabs.SecondaryTab:Button({
 Tabs.SecondaryTab:Button({
     Title = "爬墙",
     Callback = function()
+        kbPlayDing()
         loadstring(game:HttpGet("https://pastebin.com/raw/zXk4Rq2r"))()
     end
 })
 Tabs.SecondaryTab:Button({
     Title = "撸管",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "撸管", Content = "正在生成工具...", Duration = 3 })
         task.spawn(function() loadLuGuan() end)
     end
@@ -2532,6 +2603,7 @@ refreshAllDropdowns()
 Tabs.SecondaryTab:Button({
     Title = "确定执行操人",
     Callback = function()
+        kbPlayDing()
         if currentHarassTarget and currentHarassTarget.Parent then
             WindUI:Notify({ Title = "操人", Content = "已选定 " .. currentHarassTarget.Name .. "，开始操人", Duration = 3 })
             harassTarget = currentHarassTarget
@@ -2545,6 +2617,7 @@ Tabs.SecondaryTab:Button({
 Tabs.SecondaryTab:Button({
     Title = "停止操人",
     Callback = function()
+        kbPlayDing()
         stopHarass()
         currentHarassTarget = nil
     end
@@ -2561,12 +2634,14 @@ Tabs.SecondaryTab:Slider({
     end
 })
 sliderReleaseActions["harassspeed"] = function(speed)
+    kbPlayDing()
     harassSpeed = speed
     WindUI:Notify({ Title = "操人速度", Content = "已设置为：" .. speed .. " 次/秒", Duration = 2 })
 end
 Tabs.SecondaryTab:Button({
     Title = "操最近的人",
     Callback = function()
+        kbPlayDing()
         if harassEnabled then
             stopHarass()
         else
@@ -2685,6 +2760,7 @@ Tabs.SecondaryTab:Slider({
     end
 })
 sliderReleaseActions["spinspeed"] = function(speed)
+    kbPlayDing()
     SpinSpeed = speed
     WindUI:Notify({ Title = "旋转速度", Content = "已设置为：" .. speed .. " 度/秒", Duration = 2 })
 end
@@ -2728,12 +2804,15 @@ Tabs.MiscTab:Input({
     Title = "输入音乐ID",
     Placeholder = "输入音乐ID",
     Callback = function(v)
+        if not v or v == "" then return end
+        kbPlayDing()
         musicId = v
     end
 })
 Tabs.MiscTab:Button({
     Title = "确认播放",
     Callback = function()
+        kbPlayDing()
         local id = tostring(musicId):gsub("%D", "")
         if id == "" then
             WindUI:Notify({ Title = "音乐", Content = "请先输入音乐ID", Duration = 3 })
@@ -2760,6 +2839,7 @@ Tabs.MiscTab:Button({
 Tabs.MiscTab:Button({
     Title = "取消播放",
     Callback = function()
+        kbPlayDing()
         if musicSound then
             musicSound:Stop()
             musicSound:Destroy()
@@ -2773,6 +2853,7 @@ Tabs.MiscTab:Button({
 Tabs.MiscTab:Button({
     Title = "停止播放",
     Callback = function()
+        kbPlayDing()
         if musicSound then
             musicSound:Pause()
             WindUI:Notify({ Title = "音乐", Content = "已暂停，点确认播放继续", Duration = 3 })
@@ -2785,6 +2866,7 @@ Tabs.MiscTab:Button({
     Title = "实体动作游泳",
     Desc = "先点击此按钮一次之后点击飞，然后再点击此按钮一次",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "实体动作游泳", Content = "正在加载中...", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
@@ -2794,6 +2876,7 @@ Tabs.MiscTab:Button({
 Tabs.MiscTab:Button({
     Title = "显示时间",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "显示时间", Content = "正在加载中...", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://pastebin.com/raw/0zKLyd4W"))()
@@ -2803,6 +2886,7 @@ Tabs.MiscTab:Button({
 Tabs.MiscTab:Button({
     Title = "美化包排行榜第一",
     Callback = function()
+        kbPlayDing()
         beautifyStats()
         WindUI:Notify({ Title = "美化包", Content = "数值已修改为999（若游戏支持）", Duration = 3 })
     end
@@ -2839,6 +2923,7 @@ Tabs.MiscTab:Toggle({
 Tabs.MiscTab:Button({
     Title = "复制实例ID (JobId)",
     Callback = function()
+        kbPlayDing()
         local id = game.JobId
         copyToClipboard(id, "实例ID")
     end
@@ -2848,12 +2933,15 @@ Tabs.MiscTab:Input({
     Title = "实例ID传送",
     Placeholder = "输入实例ID (JobId)",
     Callback = function(v)
+        if not v or v == "" then return end
+        kbPlayDing()
         jobIdTpStr = v
     end
 })
 Tabs.MiscTab:Button({
     Title = "执行实例ID传送",
     Callback = function()
+        kbPlayDing()
         if not jobIdTpStr or jobIdTpStr == "" then
             WindUI:Notify({ Title = "实例ID传送", Content = "请先输入实例ID", Duration = 3 })
             return
@@ -2867,6 +2955,7 @@ Tabs.MiscTab:Button({
 Tabs.MiscTab:Button({
     Title = "复制数字ID (PlaceId)",
     Callback = function()
+        kbPlayDing()
         local id = tostring(game.PlaceId)
         copyToClipboard(id, "数字ID")
     end
@@ -2878,6 +2967,7 @@ Tabs.MiscTab:Input({
         if not v or v == "" then return end
         local placeId = tonumber(v)
         if placeId then
+            kbPlayDing()
             WindUI:Notify({ Title = "数字ID传送", Content = "正在传送到 PlaceId: " .. tostring(placeId) .. " ...", Duration = 5 })
             pcall(function()
                 game:GetService("TeleportService"):Teleport(placeId, LocalPlayer)
@@ -2892,19 +2982,20 @@ Tabs.MiscTab:Input({
     Title = "自定义踢出标题",
     Placeholder = "输入踢出标题",
     Callback = function(v)
-        if v and v ~= "" then kickTitle = v end
+        if v and v ~= "" then kickTitle = v kbPlayDing() end
     end
 })
 Tabs.MiscTab:Input({
     Title = "自定义踢出内容",
     Placeholder = "输入踢出内容",
     Callback = function(v)
-        if v and v ~= "" then kickContent = v end
+        if v and v ~= "" then kickContent = v kbPlayDing() end
     end
 })
 Tabs.MiscTab:Button({
     Title = "执行自定义踢出",
     Callback = function()
+        kbPlayDing()
         LocalPlayer:Kick(kickContent)
     end
 })
@@ -2913,31 +3004,34 @@ Tabs.MiscTab:Input({
     Title = "弹窗标题",
     Placeholder = "输入弹窗标题",
     Callback = function(v)
-        if v and v ~= "" then confirmTitle = v end
+        if v and v ~= "" then confirmTitle = v kbPlayDing() end
     end
 })
 Tabs.MiscTab:Input({
     Title = "弹窗内容",
     Placeholder = "输入弹窗内容",
     Callback = function(v)
-        if v and v ~= "" then confirmContent = v end
+        if v and v ~= "" then confirmContent = v kbPlayDing() end
     end
 })
 Tabs.MiscTab:Button({
     Title = "弹出确认窗口",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = confirmTitle, Content = confirmContent, Duration = 10 })
     end
 })
 Tabs.GamesTab:Button({
     Title = "复制加载器代码",
     Callback = function()
+        kbPlayDing()
         copyToClipboard('loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()', "加载器代码")
     end
 })
 Tabs.GamesTab:Button({
     Title = "执行加载器",
     Callback = function()
+        kbPlayDing()
         WindUI:Notify({ Title = "执行加载器", Content = "正在加载中...", Duration = 5 })
         task.spawn(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/恐脚本加载器"))()
@@ -3023,12 +3117,15 @@ Tabs.SettingsTab:Input({
     Title = "输入配置名字",
     Placeholder = "配置名字",
     Callback = function(text)
+        if not text or text == "" then return end
+        kbPlayDing()
         kbCfgSaveName = text
     end
 })
 Tabs.SettingsTab:Button({
     Title = "保存当前配置",
     Callback = function()
+        kbPlayDing()
         if not kbCfgSaveName or kbCfgSaveName == "" then
             WindUI:Notify({ Title = "保存当前配置", Content = "请先在上面输入配置名字", Duration = 3 })
             return
@@ -3052,6 +3149,7 @@ kbConfigDropdown = Tabs.SettingsTab:Dropdown({
 Tabs.SettingsTab:Button({
     Title = "加载配置",
     Callback = function()
+        kbPlayDing()
         if not kbSelectedConfig then
             WindUI:Notify({ Title = "加载配置", Content = "请先在上面选择一个配置", Duration = 3 })
             return
@@ -3114,6 +3212,7 @@ kbDeleteDropdown = Tabs.SettingsTab:Dropdown({
 Tabs.SettingsTab:Button({
     Title = "删除此配置",
     Callback = function()
+        kbPlayDing()
         local names = {}
         if type(kbDeleteSelected) == "table" then
             for _, n in pairs(kbDeleteSelected) do
@@ -3209,6 +3308,7 @@ local kbBgDropdown = Tabs.SettingsTab:Dropdown({
 Tabs.SettingsTab:Button({
     Title = "切换此背景图",
     Callback = function()
+        kbPlayDing()
         if not kbBgSelected then
             WindUI:Notify({ Title = "切换此背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
             return
