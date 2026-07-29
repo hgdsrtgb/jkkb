@@ -2295,6 +2295,7 @@ Tabs.MainTab:Button({
         WindUI:Notify({Title = "提示", Content = "已取消伪装", Type = "info"})
     end,
 })
+do
 local invisActive = false
 local invisRealChar = nil
 local invisFakeChar = nil
@@ -2417,6 +2418,7 @@ invisSubToggles[2] = Tabs.MainTab:Toggle({
         end
     end,
 })
+end
 refreshAllDropdowns()
 Tabs.SecondaryTab:Button({
     Title = "自动翻译",
