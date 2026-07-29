@@ -22,16 +22,21 @@ task.spawn(function()
     end
 end)
 kbDingAsset = nil
-kbDingUrl = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/DING.WAV"
+task.spawn(function()
+    local ok, data = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/DING.WAV") end)
+    if ok and data then
+        pcall(function()
+            if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
+            writefile("恐脚本/DING.WAV", data)
+        end)
+        local ok2, asset = pcall(function() return getcustomasset("恐脚本/DING.WAV") end)
+        if ok2 and asset then kbDingAsset = asset end
+    end
+end)
 kbPlayDing = function()
     if kbToggleSoundMuted then return end
+    if not kbDingAsset then return end
     pcall(function()
-        local kbDingData = game:HttpGet(kbDingUrl)
-        if not kbDingData or #kbDingData < 100 then return end
-        if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
-        if isfile("恐脚本/DING.WAV") then delfile("恐脚本/DING.WAV") end
-        writefile("恐脚本/DING.WAV", kbDingData)
-        kbDingAsset = getcustomasset("恐脚本/DING.WAV")
         local kbDingSound = Instance.new("Sound")
         kbDingSound.SoundId = kbDingAsset
         kbDingSound.Volume = 2
