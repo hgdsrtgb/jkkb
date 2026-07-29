@@ -2295,25 +2295,79 @@ Tabs.MainTab:Button({
         WindUI:Notify({Title = "提示", Content = "已取消伪装", Type = "info"})
     end,
 })
+local invisActive = false
+local invisRealChar = nil
+local invisFakeChar = nil
+local invisOldFPDH = nil
+local invisRespawnConn = nil
+local function doInvisible()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        WindUI:Notify({Title = "隐身", Content = "角色未加载", Duration = 3})
+        return false
+    end
+    pcall(function() char.Archivable = true end)
+    local okClone, clone = pcall(function() return char:Clone() end)
+    if not okClone or not clone then
+        WindUI:Notify({Title = "隐身", Content = "克隆失败，当前注入器不支持", Duration = 3})
+        return false
+    end
+    invisOldFPDH = workspace.FallenPartsDestroyHeight
+    workspace.FallenPartsDestroyHeight = 0/0
+    char:MoveTo(char:GetPivot().Position - Vector3.new(0, 50, 0))
+    task.wait(0.3)
+    clone.Parent = workspace
+    LocalPlayer.Character = clone
+    invisRealChar = char
+    invisFakeChar = clone
+    invisActive = true
+    local hum = clone:FindFirstChildOfClass("Humanoid")
+    if hum then workspace.CurrentCamera.CameraSubject = hum end
+    invisRespawnConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+        if invisActive then
+            invisActive = false
+            pcall(function() if invisFakeChar then invisFakeChar:Destroy() end end)
+            invisFakeChar = nil
+            invisRealChar = nil
+            if invisOldFPDH then workspace.FallenPartsDestroyHeight = invisOldFPDH invisOldFPDH = nil end
+        end
+    end)
+    return true
+end
+local function undoInvisible()
+    invisActive = false
+    if invisRespawnConn then pcall(function() invisRespawnConn:Disconnect() end) invisRespawnConn = nil end
+    local backCF = nil
+    if invisFakeChar and invisFakeChar.Parent then
+        local hrp = invisFakeChar:FindFirstChild("HumanoidRootPart")
+        if hrp then backCF = hrp.CFrame end
+    end
+    if invisRealChar and invisRealChar.Parent then
+        LocalPlayer.Character = invisRealChar
+        if backCF then pcall(function() invisRealChar:MoveTo(backCF.Position) end) end
+        local hum = invisRealChar:FindFirstChildOfClass("Humanoid")
+        if hum then workspace.CurrentCamera.CameraSubject = hum end
+    end
+    pcall(function() if invisFakeChar then invisFakeChar:Destroy() end end)
+    invisFakeChar = nil
+    invisRealChar = nil
+    if invisOldFPDH then workspace.FallenPartsDestroyHeight = invisOldFPDH invisOldFPDH = nil end
+end
 Tabs.MainTab:Toggle({
     Title = "隐身",
     Default = false,
     Callback = function(state)
         kbPlayDing()
         if state then
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if not hrp then
-                WindUI:Notify({Title = "隐身", Content = "角色未加载", Duration = 3})
-                return
-            end
-            char:MoveTo(hrp.Position - Vector3.new(0, 50, 0))
-            task.wait(0.4)
-            LocalPlayer.Character = nil
-            char:Destroy()
-            WindUI:Notify({Title = "隐身", Content = "已开启隐身（服务端生效），关闭后需重置角色恢复", Duration = 5})
+            task.spawn(function()
+                local ok = doInvisible()
+                if ok then
+                    WindUI:Notify({Title = "隐身", Content = "已开启隐身（服务端生效），可以正常移动", Duration = 5})
+                end
+            end)
         else
-            WindUI:Notify({Title = "隐身", Content = "已关闭，重置角色即可恢复正常", Duration = 3})
+            undoInvisible()
+            WindUI:Notify({Title = "隐身", Content = "已关闭隐身", Duration = 3})
         end
     end,
 })
