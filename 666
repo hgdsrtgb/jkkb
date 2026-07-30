@@ -2226,7 +2226,7 @@ local function startImpersonate(targetName)
 end
 local respawnPos = nil
 kbSoulOn = false
-kbSoulBackOrigin = false
+kbSoulNoReturn = false
 kbSoulOriginCF = nil
 kbInv1On = false
 kbInv2On = false
@@ -2502,7 +2502,7 @@ kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
                 pcall(function() if hrp then hrp.Anchored = false end end)
             end
             kbInvCheckRestore()
-            if kbSoulBackOrigin and originCF then
+            if not kbSoulNoReturn and originCF then
                 pcall(function() if real and real.Parent then real:MoveTo(originCF.Position) end end)
             end
             WindUI:Notify({Title = "灵魂出窍", Content = "已关闭", Duration = 3})
@@ -2510,13 +2510,13 @@ kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
     end,
 })
 Tabs.SecondaryTab:Toggle({
-    Title = "灵魂出窍关闭时回到原点",
-    Desc = "关闭灵魂出窍后回到出窍前的位置，默认关闭",
+    Title = "灵魂出窍关闭时不回原点",
+    Desc = "开启后，关闭灵魂出窍时留在虚体所在位置，默认关闭",
     Default = false,
     Callback = function(state)
         kbPlayDing()
-        kbSoulBackOrigin = state
-        WindUI:Notify({Title = "灵魂出窍关闭时回到原点", Content = state and "已开启" or "已关闭", Duration = 3})
+        kbSoulNoReturn = state
+        WindUI:Notify({Title = "灵魂出窍关闭时不回原点", Content = state and "已开启" or "已关闭", Duration = 3})
     end,
 })
 Tabs.SecondaryTab:Button({
@@ -2890,6 +2890,22 @@ Tabs.SecondaryTab:Toggle({
         if state then kbPlayDing() end
     end
 })
+Tabs.SecondaryTab:Slider({
+    Title = "旋转速度 (当前: 360)",
+    Value = {
+        Min = 1,
+        Max = 10000,
+        Default = 360,
+    },
+    Callback = function(value)
+        pendingSliderValues["spinspeed"] = value
+    end
+})
+sliderReleaseActions["spinspeed"] = function(speed)
+    kbPlayDing()
+    SpinSpeed = speed
+    WindUI:Notify({ Title = "旋转速度", Content = "已设置为：" .. speed .. " 度/秒", Duration = 2 })
+end
 do
     local airWalkEnabled = false
     local airWalkLockedY = nil
@@ -2970,22 +2986,6 @@ do
             airWalkEnabled = false
         end
     end)
-end
-Tabs.SecondaryTab:Slider({
-    Title = "旋转速度 (当前: 360)",
-    Value = {
-        Min = 1,
-        Max = 10000,
-        Default = 360,
-    },
-    Callback = function(value)
-        pendingSliderValues["spinspeed"] = value
-    end
-})
-sliderReleaseActions["spinspeed"] = function(speed)
-    kbPlayDing()
-    SpinSpeed = speed
-    WindUI:Notify({ Title = "旋转速度", Content = "已设置为：" .. speed .. " 度/秒", Duration = 2 })
 end
 local musicId = ""
 local musicSound = nil
