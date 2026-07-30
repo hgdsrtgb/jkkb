@@ -2456,7 +2456,7 @@ PlayerDrawGroup:AddToggle("ShowAvatar1", {
 })
 PlayerDrawGroup:AddLabel('人物画像显示在脚本界面内')
 PlayerDrawGroup:AddImage("PlayerAvatarInner", {
-    Image = "",
+    Image = "rbxassetid://131153193945220",
     Height = 150,
     Visible = false,
 })
