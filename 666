@@ -2959,6 +2959,15 @@ end
 local musicId = ""
 local musicSound = nil
 local kbOldSky = nil
+Tabs.MiscTab:Button({
+    Title = "坐下",
+    Callback = function()
+        kbPlayDing()
+        pcall(function()
+            game.Players.LocalPlayer.Character.Humanoid.Sit = true
+        end)
+    end,
+})
 Tabs.MiscTab:Toggle({
     Title = "修改天空盒子（有两秒延迟）",
     Value = false,
