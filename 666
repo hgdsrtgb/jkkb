@@ -1455,6 +1455,8 @@ function kbLoadConfig(name)
     if not isfile or not isfile(path) then return false end
     local ok, data = pcall(function() return HttpService:JSONDecode(readfile(path)) end)
     if not ok or type(data) ~= "table" then return false end
+    local kbOrigNotify = WindUI.Notify
+    WindUI.Notify = function() end
     for key, saved in pairs(data) do
         local item = kbCfgElements[key]
         if item and saved.t == item.mtype then
@@ -1467,6 +1469,7 @@ function kbLoadConfig(name)
             end)
         end
     end
+    WindUI.Notify = kbOrigNotify
     local kbSavedBg = data["SettingsTab/切换背景图"]
     if kbSavedBg and kbSavedBg.v and kbApplyBackground then
         pcall(function() kbApplyBackground(kbSavedBg.v) end)
@@ -2223,6 +2226,8 @@ local function startImpersonate(targetName)
 end
 local respawnPos = nil
 kbSoulOn = false
+kbSoulBackOrigin = false
+kbSoulOriginCF = nil
 kbInv1On = false
 kbInv2On = false
 kbInvRealChar = nil
@@ -2249,6 +2254,7 @@ function kbInvApplyTrans(c)
 end
 function kbInvResetAll()
     kbSoulOn = false
+    kbSoulOriginCF = nil
     kbInv1On = false
     kbInv2On = false
     if kbInvRespawnConn then pcall(function() kbInvRespawnConn:Disconnect() end) kbInvRespawnConn = nil end
@@ -2468,7 +2474,7 @@ Tabs.MainTab:Button({
 refreshAllDropdowns()
 kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
     Title = "灵魂出窍",
-    Desc = "留下本体在原地，别人看不到你虚体",
+    Desc = "留下本体在原地，别人看不到你虚体，别人能看到你的本体",
     Default = false,
     Callback = function(state)
         kbPlayDing()
@@ -2476,16 +2482,41 @@ kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
             if not kbInvSetup() then pcall(function() kbInvToggles[1]:Set(false) end) return end
             kbSoulOn = true
             kbInvApplyTrans(kbInvFakeChar)
-            kbInvApplyTrans(kbInvRealChar)
-            pcall(function() if kbInvRealChar then kbInvRealChar.Parent = nil end end)
+            local real = kbInvRealChar
+            if real then
+                local hrp = real:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    kbSoulOriginCF = hrp.CFrame
+                    pcall(function() hrp.Anchored = true end)
+                end
+            end
             WindUI:Notify({Title = "灵魂出窍", Content = "已开启", Duration = 3})
         else
             kbSoulOn = false
             kbInvResetTrans()
-            pcall(function() if kbInvRealChar then kbInvRealChar.Parent = workspace end end)
+            local real = kbInvRealChar
+            local originCF = kbSoulOriginCF
+            kbSoulOriginCF = nil
+            if real then
+                local hrp = real:FindFirstChild("HumanoidRootPart")
+                pcall(function() if hrp then hrp.Anchored = false end end)
+            end
             kbInvCheckRestore()
+            if kbSoulBackOrigin and originCF then
+                pcall(function() if real and real.Parent then real:MoveTo(originCF.Position) end end)
+            end
             WindUI:Notify({Title = "灵魂出窍", Content = "已关闭", Duration = 3})
         end
+    end,
+})
+Tabs.SecondaryTab:Toggle({
+    Title = "灵魂出窍关闭时回到原点",
+    Desc = "关闭灵魂出窍后回到出窍前的位置，默认关闭",
+    Default = false,
+    Callback = function(state)
+        kbPlayDing()
+        kbSoulBackOrigin = state
+        WindUI:Notify({Title = "灵魂出窍关闭时回到原点", Content = state and "已开启" or "已关闭", Duration = 3})
     end,
 })
 Tabs.SecondaryTab:Button({
@@ -3275,7 +3306,6 @@ Window:OnClose(function()
 end)
 task.spawn(function()
 local kbStartupSoundMuted = false
-local function kbBuildSettings()
 Tabs.SettingsTab:Toggle({
     Title = "关闭启动音效",
     Desc = "需要保存配置使用",
@@ -3476,6 +3506,7 @@ kbApplyBackground = function(name)
         ["银花背景图1"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339143310_475.jpg",
         ["银花背景图2"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339141889_101.jpg",
         ["银花背景图3"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339140644_893.jpg",
+        ["白子背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785395257153_996.jpg",
     }
     local kbSetBgImage = function(asset)
         local bg = Window.UIElements.Main.Background
@@ -3553,7 +3584,7 @@ local kbFanBgSelected = nil
 local kbFanBgDropdown = Tabs.SettingsTab:Dropdown({
     Title = "粉丝定制背景图",
     Desc = "想要定制的进我的群找：空白大帝",
-    Values = {"银花背景图1", "银花背景图2", "银花背景图3"},
+    Values = {"银花背景图1", "银花背景图2", "银花背景图3", "白子背景图"},
     Callback = function(v)
         kbFanBgSelected = v
     end
@@ -3597,6 +3628,3 @@ task.spawn(function()
     end
 end)
 end)
-end
-kbBuildSettings()
-
