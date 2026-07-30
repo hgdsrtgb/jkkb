@@ -2248,7 +2248,6 @@ function kbInvApplyTrans(c)
     end
 end
 function kbInvResetAll()
-    kbSoulOn = false
     kbInv1On = false
     kbInv2On = false
     if kbInvRespawnConn then pcall(function() kbInvRespawnConn:Disconnect() end) kbInvRespawnConn = nil end
@@ -2277,20 +2276,6 @@ function kbInvSetup()
     clone.Parent = workspace
     LocalPlayer.Character = clone
     kbInvFakeChar = clone
-    pcall(function()
-        for _, v in ipairs(clone:GetDescendants()) do
-            if v:IsA("BasePart") or v:IsA("Decal") then
-                v.Transparency = kbShowHalfOn and 0.5 or 1
-            end
-        end
-    end)
-    pcall(function()
-        for _, v in ipairs(clone:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.CanCollide = true
-            end
-        end
-    end)
     local hum = clone:FindFirstChildOfClass("Humanoid")
     if hum then workspace.CurrentCamera.CameraSubject = hum end
     kbInvRespawnConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
@@ -2308,7 +2293,7 @@ function kbInvSetup()
     return true
 end
 function kbInvCheckRestore()
-    if kbSoulOn or kbInv1On or kbInv2On then return end
+    if kbInv1On or kbInv2On then return end
     local fake = kbInvFakeChar
     local real = kbInvRealChar
     local backCF = nil
@@ -2329,7 +2314,11 @@ function kbInvCheckRestore()
         pcall(function()
             for _, v in ipairs(real:GetDescendants()) do
                 if v:IsA("BasePart") then
+                    v.Transparency = 0
                     v.CanCollide = true
+                end
+                if v:IsA("Decal") then
+                    v.Transparency = 0
                 end
             end
         end)
@@ -2489,15 +2478,47 @@ kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
         if state then
             if not kbInvSetup() then pcall(function() kbInvToggles[1]:Set(false) end) return end
             kbSoulOn = true
-            kbInvApplyTrans(kbInvFakeChar)
-            kbInvApplyTrans(kbInvRealChar)
             pcall(function() if kbInvRealChar then kbInvRealChar.Parent = nil end end)
+            pcall(function()
+                if kbInvFakeChar then
+                    for _, v in ipairs(kbInvFakeChar:GetDescendants()) do
+                        if v:IsA("BasePart") or v:IsA("Decal") then
+                            v.Transparency = kbShowHalfOn and 0.5 or 1
+                        end
+                    end
+                end
+            end)
+            pcall(function()
+                if kbInvFakeChar then
+                    for _, v in ipairs(kbInvFakeChar:GetDescendants()) do
+                        if v:IsA("BasePart") then
+                            v.CanCollide = true
+                        end
+                    end
+                end
+            end)
             WindUI:Notify({Title = "灵魂出窍", Content = "已开启", Duration = 3})
         else
             kbSoulOn = false
-            kbInvResetTrans()
-            pcall(function() if kbInvRealChar then kbInvRealChar.Parent = workspace end end)
-            kbInvCheckRestore()
+            pcall(function()
+                if kbInvRealChar then
+                    kbInvRealChar.Parent = workspace
+                    for _, v in ipairs(kbInvRealChar:GetDescendants()) do
+                        if v:IsA("BasePart") then
+                            v.Transparency = 0
+                            v.CanCollide = true
+                        end
+                        if v:IsA("Decal") then
+                            v.Transparency = 0
+                        end
+                    end
+                end
+            end)
+            pcall(function() if kbInvFakeChar then kbInvFakeChar:Destroy() end end)
+            kbInvFakeChar = nil
+            kbInvRealChar = nil
+            if kbInvRespawnConn then pcall(function() kbInvRespawnConn:Disconnect() end) kbInvRespawnConn = nil end
+            if kbInvOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end) kbInvOldFPDH = nil end
             WindUI:Notify({Title = "灵魂出窍", Content = "已关闭", Duration = 3})
         end
     end,
