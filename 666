@@ -2959,15 +2959,6 @@ end
 local musicId = ""
 local musicSound = nil
 local kbOldSky = nil
-Tabs.MiscTab:Button({
-    Title = "坐下",
-    Callback = function()
-        kbPlayDing()
-        pcall(function()
-            game.Players.LocalPlayer.Character.Humanoid.Sit = true
-        end)
-    end,
-})
 Tabs.MiscTab:Toggle({
     Title = "修改天空盒子（有两秒延迟）",
     Value = false,
@@ -3222,6 +3213,15 @@ Tabs.MiscTab:Button({
         WindUI:Notify({ Title = confirmTitle, Content = confirmContent, Duration = 10 })
     end
 })
+Tabs.MiscTab:Button({
+    Title = "坐下",
+    Callback = function()
+        kbPlayDing()
+        pcall(function()
+            game.Players.LocalPlayer.Character.Humanoid.Sit = true
+        end)
+    end,
+})
 Tabs.GamesTab:Button({
     Title = "复制加载器代码",
     Callback = function()
@@ -3475,6 +3475,7 @@ kbApplyBackground = function(name)
         ["银花背景图1"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339143310_475.jpg",
         ["银花背景图2"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339141889_101.jpg",
         ["银花背景图3"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339140644_893.jpg",
+        ["白子背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785395257153_996.jpg",
     }
     local kbSetBgImage = function(asset)
         local bg = Window.UIElements.Main.Background
@@ -3552,7 +3553,7 @@ local kbFanBgSelected = nil
 local kbFanBgDropdown = Tabs.SettingsTab:Dropdown({
     Title = "粉丝定制背景图",
     Desc = "想要定制的进我的群找：空白大帝",
-    Values = {"银花背景图1", "银花背景图2", "银花背景图3"},
+    Values = {"银花背景图1", "银花背景图2", "银花背景图3", "白子背景图"},
     Callback = function(v)
         kbFanBgSelected = v
     end
