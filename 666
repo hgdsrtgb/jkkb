@@ -2284,6 +2284,13 @@ function kbInvSetup()
             end
         end
     end)
+    pcall(function()
+        for _, v in ipairs(clone:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = true
+            end
+        end
+    end)
     local hum = clone:FindFirstChildOfClass("Humanoid")
     if hum then workspace.CurrentCamera.CameraSubject = hum end
     kbInvRespawnConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
@@ -2319,6 +2326,13 @@ function kbInvCheckRestore()
         pcall(function() real.Parent = workspace end)
         LocalPlayer.Character = real
         if backCF then pcall(function() real:MoveTo(backCF.Position) end) end
+        pcall(function()
+            for _, v in ipairs(real:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = true
+                end
+            end
+        end)
         local hum = real:FindFirstChildOfClass("Humanoid")
         if hum then workspace.CurrentCamera.CameraSubject = hum end
     end
