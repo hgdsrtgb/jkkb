@@ -1992,6 +1992,98 @@ local function http_get(url)
     return nil
 end
 
+local CanvasWatcher = {
+    running = false,
+    conn = nil,
+    target = nil,
+    size = nil,
+    importBuf = nil,
+    prevBuf = nil,
+    userOverlay = {},
+    bg = {255, 255, 255, 255},
+}
+
+local function stopCanvasWatcher()
+    if CanvasWatcher.conn then
+        CanvasWatcher.conn:Disconnect()
+        CanvasWatcher.conn = nil
+    end
+    CanvasWatcher.running = false
+end
+
+local function startCanvasWatcher(targetImage, importBuf, canvasSize, bgPixel)
+    stopCanvasWatcher()
+    CanvasWatcher.target = targetImage
+    CanvasWatcher.size = canvasSize
+    CanvasWatcher.importBuf = importBuf
+    CanvasWatcher.prevBuf = buffer.create(buffer.len(importBuf))
+    buffer.copy(CanvasWatcher.prevBuf, 0, importBuf, 0)
+    CanvasWatcher.userOverlay = {}
+    CanvasWatcher.bg = bgPixel
+    CanvasWatcher.running = true
+    local totalPixels = canvasSize.X * canvasSize.Y
+    local wipeThreshold = math.max(8, math.floor(totalPixels * 0.25))
+    CanvasWatcher.conn = game:GetService("RunService").Heartbeat:Connect(function()
+        if not CanvasWatcher.running then return end
+        local readOk, cur = pcall(function()
+            return targetImage:ReadPixelsBuffer(Vector2.zero, canvasSize)
+        end)
+        if not readOk or not cur then return end
+        local prev = CanvasWatcher.prevBuf
+        local imp = CanvasWatcher.importBuf
+        local bg = CanvasWatcher.bg
+        local changed = {}
+        for i = 0, totalPixels - 1 do
+            local o = i * 4
+            if buffer.readu32(cur, o) ~= buffer.readu32(prev, o) then
+                changed[#changed + 1] = o
+            end
+        end
+        if #changed == 0 then return end
+        local function isBg(o)
+            return buffer.readu8(cur, o) == bg[1]
+                and buffer.readu8(cur, o + 1) == bg[2]
+                and buffer.readu8(cur, o + 2) == bg[3]
+        end
+        if #changed > wipeThreshold then
+            for _, o in ipairs(changed) do
+                if buffer.readu32(cur, o) ~= buffer.readu32(imp, o) and not isBg(o) then
+                    CanvasWatcher.userOverlay[o] = {
+                        buffer.readu8(cur, o),
+                        buffer.readu8(cur, o + 1),
+                        buffer.readu8(cur, o + 2),
+                        buffer.readu8(cur, o + 3),
+                    }
+                end
+            end
+            local merged = buffer.create(buffer.len(imp))
+            buffer.copy(merged, 0, imp, 0)
+            for o, px in pairs(CanvasWatcher.userOverlay) do
+                buffer.writeu8(merged, o, px[1])
+                buffer.writeu8(merged, o + 1, px[2])
+                buffer.writeu8(merged, o + 2, px[3])
+                buffer.writeu8(merged, o + 3, px[4])
+            end
+            pcall(function()
+                targetImage:WritePixelsBuffer(Vector2.zero, canvasSize, merged)
+            end)
+            buffer.copy(prev, 0, merged, 0)
+        else
+            for _, o in ipairs(changed) do
+                if buffer.readu32(cur, o) ~= buffer.readu32(imp, o) and not isBg(o) then
+                    CanvasWatcher.userOverlay[o] = {
+                        buffer.readu8(cur, o),
+                        buffer.readu8(cur, o + 1),
+                        buffer.readu8(cur, o + 2),
+                        buffer.readu8(cur, o + 3),
+                    }
+                end
+            end
+            buffer.copy(prev, 0, cur, 0)
+        end
+    end)
+end
+
 local function drawImageToCanvas(fileData, fileType)
     local targetImage = canvas.get_canvas()
     if not targetImage then
@@ -2031,6 +2123,18 @@ local function drawImageToCanvas(fileData, fileType)
             pointer = pointer + 4
         end
     end
+    local bgPixel = {255, 255, 255, 255}
+    local bgOk, bgBuf = pcall(function()
+        return targetImage:ReadPixelsBuffer(Vector2.zero, Vector2.new(1, 1))
+    end)
+    if bgOk and bgBuf and buffer.len(bgBuf) >= 4 then
+        bgPixel = {
+            buffer.readu8(bgBuf, 0),
+            buffer.readu8(bgBuf, 1),
+            buffer.readu8(bgBuf, 2),
+            buffer.readu8(bgBuf, 3),
+        }
+    end
     local writeSuccess, writeErr = pcall(function()
         targetImage:WritePixelsBuffer(Vector2.zero, canvasSize, pixelBuffer)
     end)
@@ -2038,6 +2142,7 @@ local function drawImageToCanvas(fileData, fileType)
         notify("画我", "写入画布失败", 5)
         return false
     end
+    startCanvasWatcher(targetImage, pixelBuffer, canvasSize, bgPixel)
     return true
 end
 
@@ -2059,6 +2164,7 @@ local function importAndDraw()
 end
 
 local selectedPlayerName = nil
+local avatarShrunk = false
 
 local PreviewGui = Instance.new("ScreenGui")
 PreviewGui.Name = "DrawMePlayerPreview"
@@ -2071,7 +2177,8 @@ PreviewFrame.Parent = PreviewGui
 PreviewFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 37)
 PreviewFrame.BorderSizePixel = 0
 PreviewFrame.Position = UDim2.new(0.5, 260, 0.5, -110)
-PreviewFrame.Size = UDim2.new(0, 150, 0, 190)
+PreviewFrame.Size = UDim2.new(0, 150, 0, 220)
+PreviewFrame.Visible = false
 local PreviewCorner = Instance.new("UICorner"); PreviewCorner.CornerRadius = UDim.new(0, 8); PreviewCorner.Parent = PreviewFrame
 local PreviewStroke = Instance.new("UIStroke"); PreviewStroke.Color = Color3.fromRGB(69, 71, 90); PreviewStroke.Thickness = 1; PreviewStroke.Parent = PreviewFrame
 
@@ -2091,20 +2198,32 @@ PreviewImage.Parent = PreviewFrame
 PreviewImage.BackgroundColor3 = Color3.fromRGB(30, 30, 46)
 PreviewImage.BorderSizePixel = 0
 PreviewImage.Position = UDim2.new(0, 10, 0, 30)
-PreviewImage.Size = UDim2.new(1, -20, 1, -40)
+PreviewImage.Size = UDim2.new(1, -20, 1, -70)
 PreviewImage.Image = ""
 local PreviewImageCorner = Instance.new("UICorner"); PreviewImageCorner.CornerRadius = UDim.new(0, 6); PreviewImageCorner.Parent = PreviewImage
+
+local ShrinkBtn = Instance.new("TextButton")
+ShrinkBtn.Parent = PreviewFrame
+ShrinkBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+ShrinkBtn.BorderSizePixel = 0
+ShrinkBtn.Position = UDim2.new(0, 10, 1, -32)
+ShrinkBtn.Size = UDim2.new(1, -20, 0, 24)
+ShrinkBtn.Font = Enum.Font.GothamBold
+ShrinkBtn.Text = "缩小"
+ShrinkBtn.TextColor3 = Color3.fromRGB(205, 214, 244)
+ShrinkBtn.TextSize = 12
+local ShrinkCorner = Instance.new("UICorner"); ShrinkCorner.CornerRadius = UDim.new(0, 6); ShrinkCorner.Parent = ShrinkBtn
 
 do
     local UserInputService = game:GetService("UserInputService")
     local dragging, dragInput, dragStart, startPos
-    PreviewTitle.InputBegan:Connect(function(input)
+    PreviewFrame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true; dragStart = input.Position; startPos = PreviewFrame.Position
             input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
         end
     end)
-    PreviewTitle.InputChanged:Connect(function(input)
+    PreviewFrame.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
     end)
     UserInputService.InputChanged:Connect(function(input)
@@ -2115,7 +2234,83 @@ do
     end)
 end
 
-local function updatePreview()
+local function getAvatarContent(target, thumbType)
+    local ok, content = pcall(function()
+        return Players:GetUserThumbnailAsync(target.UserId, thumbType, Enum.ThumbnailSize.Size150x150)
+    end)
+    if ok then return content end
+    return nil
+end
+
+local function applyShrinkState()
+    if avatarShrunk then
+        PreviewFrame.Size = UDim2.new(0, 60, 0, 60)
+        PreviewTitle.Visible = false
+        ShrinkBtn.Visible = false
+        PreviewImage.Position = UDim2.new(0, 3, 0, 3)
+        PreviewImage.Size = UDim2.new(1, -6, 1, -6)
+    else
+        PreviewFrame.Size = UDim2.new(0, 150, 0, 220)
+        PreviewTitle.Visible = true
+        ShrinkBtn.Visible = true
+        PreviewImage.Position = UDim2.new(0, 10, 0, 30)
+        PreviewImage.Size = UDim2.new(1, -20, 1, -70)
+    end
+end
+
+ShrinkBtn.MouseButton1Click:Connect(function()
+    avatarShrunk = not avatarShrunk
+    applyShrinkState()
+    if avatarShrunk and selectedPlayerName then
+        local target = Players:FindFirstChild(selectedPlayerName)
+        if target then
+            task.spawn(function()
+                local content = getAvatarContent(target, Enum.ThumbnailType.HeadShot)
+                if content then PreviewImage.Image = content end
+            end)
+        end
+    elseif selectedPlayerName then
+        local target = Players:FindFirstChild(selectedPlayerName)
+        if target then
+            task.spawn(function()
+                local content = getAvatarContent(target, Enum.ThumbnailType.AvatarBust)
+                if content then PreviewImage.Image = content end
+            end)
+        end
+    end
+end)
+
+local function refreshInnerImage()
+    local img = Options.PlayerAvatarInner
+    if not img then return end
+    if not Toggles.ShowAvatar1 or not Toggles.ShowAvatar1.Value then
+        img:SetVisible(false)
+        return
+    end
+    if not selectedPlayerName then
+        img:SetVisible(false)
+        return
+    end
+    local target = Players:FindFirstChild(selectedPlayerName)
+    if not target then
+        img:SetVisible(false)
+        return
+    end
+    task.spawn(function()
+        local content = getAvatarContent(target, Enum.ThumbnailType.AvatarBust)
+        if content then
+            img:SetImage(content)
+            img:SetVisible(true)
+        end
+    end)
+end
+
+local function refreshOuterImage()
+    if not Toggles.ShowAvatar2 or not Toggles.ShowAvatar2.Value then
+        PreviewFrame.Visible = false
+        return
+    end
+    PreviewFrame.Visible = true
     if not selectedPlayerName then
         PreviewTitle.Text = "未选择玩家"
         PreviewImage.Image = ""
@@ -2129,13 +2324,62 @@ local function updatePreview()
     end
     PreviewTitle.Text = target.DisplayName .. " (@" .. target.Name .. ")"
     task.spawn(function()
-        local ok, content = pcall(function()
-            return Players:GetUserThumbnailAsync(target.UserId, Enum.ThumbnailType.AvatarBust, Enum.ThumbnailSize.Size150x150)
-        end)
-        if ok and content then
-            PreviewImage.Image = content
-        end
+        local thumbType = avatarShrunk and Enum.ThumbnailType.HeadShot or Enum.ThumbnailType.AvatarBust
+        local content = getAvatarContent(target, thumbType)
+        if content then PreviewImage.Image = content end
     end)
+end
+
+local NameTags = {}
+
+local function removeNameTag(plr)
+    local tag = NameTags[plr]
+    if tag then
+        tag:Destroy()
+        NameTags[plr] = nil
+    end
+end
+
+local function addNameTag(plr)
+    removeNameTag(plr)
+    local char = plr.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "DrawMeNameTag"
+    bb.Adornee = head
+    bb.Size = UDim2.new(0, 200, 0, 40)
+    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    bb.AlwaysOnTop = true
+    local tl = Instance.new("TextLabel")
+    tl.Parent = bb
+    tl.BackgroundTransparency = 1
+    tl.Size = UDim2.new(1, 0, 1, 0)
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = plr.DisplayName
+    tl.TextColor3 = Color3.new(1, 1, 1)
+    tl.TextStrokeTransparency = 0.5
+    tl.TextSize = 16
+    bb.Parent = head
+    NameTags[plr] = bb
+end
+
+local function clearAllNameTags()
+    for plr, _ in pairs(NameTags) do
+        removeNameTag(plr)
+    end
+end
+
+local function refreshAllNameTags()
+    clearAllNameTags()
+    if Toggles.ShowAllNames and Toggles.ShowAllNames.Value then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= player then
+                addNameTag(plr)
+            end
+        end
+    end
 end
 
 local function getPlayerNames()
@@ -2199,31 +2443,92 @@ PlayerDrawGroup:AddDropdown("DrawPlayerDropdown", {
     Text = "选择玩家",
     Callback = function(Value)
         selectedPlayerName = Value
-        updatePreview()
+        refreshInnerImage()
+        refreshOuterImage()
+    end,
+})
+PlayerDrawGroup:AddToggle("ShowAvatar1", {
+    Text = "显示人物画像1",
+    Default = false,
+    Callback = function()
+        refreshInnerImage()
+    end,
+})
+PlayerDrawGroup:AddLabel('人物画像显示在脚本界面内')
+PlayerDrawGroup:AddImage("PlayerAvatarInner", {
+    Image = "",
+    Height = 150,
+    Visible = false,
+})
+PlayerDrawGroup:AddToggle("ShowAvatar2", {
+    Text = "显示人物画像2",
+    Default = false,
+    Callback = function()
+        refreshOuterImage()
+    end,
+})
+PlayerDrawGroup:AddLabel('人物画像显示在脚本界面外，可拖动可缩小')
+PlayerDrawGroup:AddToggle("ShowAllNames", {
+    Text = "显示所有玩家的名字",
+    Default = false,
+    Callback = function()
+        refreshAllNameTags()
     end,
 })
 PlayerDrawGroup:AddButton("把选定的人画出来", function()
     drawSelectedPlayer()
 end)
-PlayerDrawGroup:AddLabel('选定后右边预览框会显示他的形象')
-PlayerDrawGroup:AddLabel('点按钮就会把这个人画到画布上')
 
-Players.PlayerAdded:Connect(function()
+Players.PlayerAdded:Connect(function(newPlr)
     Options.DrawPlayerDropdown:SetValues(getPlayerNames())
+    if Toggles.ShowAllNames and Toggles.ShowAllNames.Value then
+        newPlr.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            if Toggles.ShowAllNames and Toggles.ShowAllNames.Value then
+                addNameTag(newPlr)
+            end
+        end)
+        if newPlr.Character then
+            task.defer(function()
+                addNameTag(newPlr)
+            end)
+        end
+    end
 end)
 Players.PlayerRemoving:Connect(function(leaving)
+    removeNameTag(leaving)
     task.wait(0.2)
     Options.DrawPlayerDropdown:SetValues(getPlayerNames())
     if selectedPlayerName == leaving.Name then
         selectedPlayerName = nil
-        updatePreview()
+        refreshInnerImage()
+        refreshOuterImage()
     end
 end)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    if plr ~= player then
+        plr.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            if Toggles.ShowAllNames and Toggles.ShowAllNames.Value then
+                addNameTag(plr)
+            end
+        end)
+    end
+end
 
 task.defer(function()
     local names = getPlayerNames()
     if #names > 0 then
         selectedPlayerName = Options.DrawPlayerDropdown.Value or names[1]
-        updatePreview()
+        refreshInnerImage()
+        refreshOuterImage()
     end
 end)
+
+if Library.OnUnload then
+    Library:OnUnload(function()
+        stopCanvasWatcher()
+        clearAllNameTags()
+    end)
+end
