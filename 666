@@ -279,7 +279,7 @@ local function stopEspLoops()
     if espRenderConn then espRenderConn:Disconnect() espRenderConn = nil end
     espCleanupActive = false
 end
-local infiniteJumpConn = nil
+local infiniteJumpConn = nilinfiniteJumpConn = nil
 local InfiniteJumpEnabled = false
 local NightVisionEnabled = false
 local AutoTranslateEnabled = false
@@ -455,7 +455,7 @@ local function getHumanoid()
     local char = LocalPlayer.Character
     if char then return char:FindFirstChild("Humanoid") end
 end
-local infiniteJumpConn = nil
+infiniteJumpConn = nil
 local function startInfiniteJump()
     if infiniteJumpConn then return end
     infiniteJumpConn = UserInputService.JumpRequest:Connect(function()
@@ -2921,6 +2921,22 @@ Tabs.SecondaryTab:Toggle({
         if state then kbPlayDing() end
     end
 })
+Tabs.SecondaryTab:Slider({
+    Title = "旋转速度 (当前: 360)",
+    Value = {
+        Min = 1,
+        Max = 10000,
+        Default = 360,
+    },
+    Callback = function(value)
+        pendingSliderValues["spinspeed"] = value
+    end
+})
+sliderReleaseActions["spinspeed"] = function(speed)
+    kbPlayDing()
+    SpinSpeed = speed
+    WindUI:Notify({ Title = "旋转速度", Content = "已设置为：" .. speed .. " 度/秒", Duration = 2 })
+end
 do
     local airWalkEnabled = false
     local airWalkLockedY = nil
@@ -3001,22 +3017,6 @@ do
             airWalkEnabled = false
         end
     end)
-end
-Tabs.SecondaryTab:Slider({
-    Title = "旋转速度 (当前: 360)",
-    Value = {
-        Min = 1,
-        Max = 10000,
-        Default = 360,
-    },
-    Callback = function(value)
-        pendingSliderValues["spinspeed"] = value
-    end
-})
-sliderReleaseActions["spinspeed"] = function(speed)
-    kbPlayDing()
-    SpinSpeed = speed
-    WindUI:Notify({ Title = "旋转速度", Content = "已设置为：" .. speed .. " 度/秒", Duration = 2 })
 end
 local musicId = ""
 local musicSound = nil
@@ -3657,5 +3657,5 @@ task.spawn(function()
             end)
         end)
     end
-end)
+
 end)
