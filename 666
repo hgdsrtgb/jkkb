@@ -2471,14 +2471,32 @@ Tabs.MainTab:Button({
 refreshAllDropdowns()
 kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
     Title = "灵魂出窍",
-    Desc = "留下本体在原地，别人看不到你虚体",
+    Desc = "留下本体在原地，别人看不到你虚体
+别人能看到你的本体",
     Default = false,
     Callback = function(state)
         kbPlayDing()
         if state then
             if not kbInvSetup() then pcall(function() kbInvToggles[1]:Set(false) end) return end
             kbSoulOn = true
-            pcall(function() if kbInvRealChar then kbInvRealChar.Parent = nil end end)
+            pcall(function()
+                if kbInvRealChar then
+                    for _, v in ipairs(kbInvRealChar:GetDescendants()) do
+                        if v:IsA("BasePart") or v:IsA("Decal") then
+                            v.Transparency = 0
+                        end
+                    end
+                end
+            end)
+            pcall(function()
+                if kbInvRealChar then
+                    for _, v in ipairs(kbInvRealChar:GetDescendants()) do
+                        if v:IsA("BasePart") then
+                            v.CanCollide = true
+                        end
+                    end
+                end
+            end)
             pcall(function()
                 if kbInvFakeChar then
                     for _, v in ipairs(kbInvFakeChar:GetDescendants()) do
@@ -2501,6 +2519,15 @@ kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
         else
             kbSoulOn = false
             pcall(function()
+                if kbInvFakeChar and kbInvRealChar then
+                    local fakeRoot = kbInvFakeChar:FindFirstChild("HumanoidRootPart")
+                    local realRoot = kbInvRealChar:FindFirstChild("HumanoidRootPart")
+                    if fakeRoot and realRoot then
+                        realRoot.CFrame = fakeRoot.CFrame
+                    end
+                end
+            end)
+            pcall(function()
                 if kbInvRealChar then
                     kbInvRealChar.Parent = workspace
                     for _, v in ipairs(kbInvRealChar:GetDescendants()) do
@@ -2519,7 +2546,7 @@ kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
             kbInvRealChar = nil
             if kbInvRespawnConn then pcall(function() kbInvRespawnConn:Disconnect() end) kbInvRespawnConn = nil end
             if kbInvOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end) kbInvOldFPDH = nil end
-            WindUI:Notify({Title = "灵魂出窍", Content = "已关闭", Duration = 3})
+            WindUI:Notify({Title = "灵魂出窍", Content = "已关闭，已回到本体位置", Duration = 3})
         end
     end,
 })
