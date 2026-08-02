@@ -417,20 +417,26 @@ end
 Players.PlayerRemoving:Connect(function(player)
     cleanupAntiFlingForPlayer(player)
 end)
+local spinBAV = nil
 local function startSpin()
     if spinConnection then spinConnection:Disconnect() end
-    spinConnection = RunService.Heartbeat:Connect(function(dt)
-        if not SpinEnabled then return end
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local root = char.HumanoidRootPart
-        root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(SpinSpeed * dt), 0)
-    end)
+    spinConnection = nil
+    if spinBAV then pcall(function() spinBAV:Destroy() end) spinBAV = nil end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local root = char.HumanoidRootPart
+    spinBAV = Instance.new("BodyAngularVelocity")
+    spinBAV.Name = "KbSpinBAV"
+    spinBAV.Parent = root
+    spinBAV.AngularVelocity = Vector3.new(0, math.rad(SpinSpeed), 0)
+    spinBAV.MaxTorque = Vector3.new(0, 1e9, 0)
+    spinBAV.P = 10000
 end
 local function stopSpin()
     SpinEnabled = false
     if spinConnection then spinConnection:Disconnect() end
     spinConnection = nil
+    if spinBAV then pcall(function() spinBAV:Destroy() end) spinBAV = nil end
 end
 local function startAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect() end
@@ -877,19 +883,10 @@ kbTF.fling = function(target)
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myRoot then return end
-    local oldFPDH = workspace.FallenPartsDestroyHeight
-    workspace.FallenPartsDestroyHeight = 0/0
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "KbTouchFling"
-    bv.Parent = tRoot
-    bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
     local dir = (tRoot.Position - myRoot.Position).Unit
     if dir.Magnitude == 0 then dir = Vector3.new(0, 1, 0) end
-    bv.Velocity = dir * 9e7 + Vector3.new(0, 9e7 * 10, 0)
-    task.delay(2, function()
-        pcall(function() bv:Destroy() end)
-        pcall(function() workspace.FallenPartsDestroyHeight = oldFPDH end)
-    end)
+    tRoot.AssemblyLinearVelocity = dir * 9e7 + Vector3.new(0, 9e7 * 10, 0)
+    tRoot.AssemblyAngularVelocity = Vector3.new(9e8, 9e8, 9e8)
 end
 kbTF.setup = function(c)
     local h = c:FindFirstChild("HumanoidRootPart")
