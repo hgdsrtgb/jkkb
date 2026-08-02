@@ -874,6 +874,47 @@ local function powerfulFling(targetPlayer)
     Workspace.FallenPartsDestroyHeight = getgenv().FPDH
     WindUI:Notify({ Title = "甩飞完成", Content = "已完成对 " .. targetPlayer.Name .. " 的甩飞", Duration = 3 })
 end
+local TouchFlingEnabled = false
+local touchFlingConns = {}
+local function setupTouchFlingForCharacter(char)
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local conn = part.Touched:Connect(function(hit)
+                if not TouchFlingEnabled then return end
+                local targetChar = hit.Parent
+                if not targetChar then return end
+                local targetPlayer = Players:GetPlayerFromCharacter(targetChar)
+                if not targetPlayer or targetPlayer == LocalPlayer then return end
+                task.spawn(function()
+                    powerfulFling(targetPlayer)
+                end)
+            end)
+            table.insert(touchFlingConns, conn)
+        end
+    end
+end
+local function startTouchFling()
+    for _, conn in ipairs(touchFlingConns) do
+        pcall(function() conn:Disconnect() end)
+    end
+    touchFlingConns = {}
+    local char = LocalPlayer.Character
+    if char then setupTouchFlingForCharacter(char) end
+    local caConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+        task.wait(0.5)
+        if TouchFlingEnabled then
+            setupTouchFlingForCharacter(newChar)
+        end
+    end)
+    table.insert(touchFlingConns, caConn)
+end
+local function stopTouchFling()
+    for _, conn in ipairs(touchFlingConns) do
+        pcall(function() conn:Disconnect() end)
+    end
+    touchFlingConns = {}
+end
 local speedAntiPullValue = 16
 local function startSpeedAntiPull(speed)
     speedAntiPullValue = speed
@@ -1484,11 +1525,16 @@ Tabs.NotifyTab:Paragraph({
     ImageSize = 42,
 })
 local function kbFormatDiff(mins)
-    mins = math.max(0, math.floor(mins))
-    return string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
+    local sign = ""
+    mins = math.floor(mins)
+    if mins < 0 then
+        sign = "-"
+        mins = -mins
+    end
+    return sign .. string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
 end
 local kbNowDate = os.date("*t")
-local kbUpdateTime = os.time({year = kbNowDate.year, month = 7, day = 29, hour = 17, min = 30, sec = 0})
+local kbUpdateTime = os.time({year = kbNowDate.year, month = 7, day = 31, hour = 21, min = 30, sec = 0})
 local kbBirthTime = os.time({year = kbNowDate.year, month = 2, day = 9, hour = 2, min = 27, sec = 0})
 if kbBirthTime > os.time() then
     kbBirthTime = os.time({year = kbNowDate.year - 1, month = 2, day = 9, hour = 2, min = 27, sec = 0})
@@ -1509,13 +1555,13 @@ Tabs.NotifyTab:Paragraph({
 })
 Tabs.NotifyTab:Divider()
 Tabs.NotifyTab:Button({
-    Title = "ROB脚本v2",
+    Title = "ROB脚本v3",
     Desc = "必须用gi加速器",
     Callback = function()
         kbPlayDing()
-        WindUI:Notify({ Title = "ROB脚本v2", Content = "正在加载中...\n必须用gi加速器", Duration = 5 })
+        WindUI:Notify({ Title = "ROB脚本v3", Content = "正在加载中...\n必须用gi加速器", Duration = 5 })
         task.spawn(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Zyb150933/ROB/refs/heads/main/ROB.V2"))()
+            loadstring(game:HttpGet("https://raw.gitcode.com/ROB5201314/robscript/raw/main/ROB.V3"))()
         end)
     end
 })
@@ -2014,6 +2060,17 @@ Tabs.MainTab:Button({
         end)
     end
 })
+Tabs.MainTab:Toggle({
+    Title = "碰飞",
+    Value = false,
+    Callback = function(state)
+        TouchFlingEnabled = state
+        if state then startTouchFling() else stopTouchFling() end
+        WindUI:Notify({ Title = "碰飞", Content = state and "已开启，别人碰到你将被甩飞" or "已关闭", Duration = 3 })
+        if state then kbPlayDing() end
+    end
+})
+
 Tabs.MainTab:Button({
     Title = "甩飞最近的人",
     Callback = function()
@@ -2416,6 +2473,54 @@ Tabs.MainTab:Button({
             end
         end
         WindUI:Notify({ Title = "设置重生点", Content = "重生点已设置", Duration = 3 })
+    end
+})
+local autoRespawnConn = nil
+local autoRespawnLastPos = nil
+local autoRespawnDeadMarked = false
+Tabs.MainTab:Toggle({
+    Title = "原地复活",
+    Default = false,
+    Callback = function(state)
+        kbPlayDing()
+        if state then
+            autoRespawnDeadMarked = false
+            autoRespawnLastPos = nil
+            if autoRespawnConn then autoRespawnConn:Disconnect() autoRespawnConn = nil end
+            local lastCheck = 0
+            autoRespawnConn = RunService.Heartbeat:Connect(function()
+                local now = tick()
+                if now - lastCheck < 0.2 then return end
+                lastCheck = now
+                local char = player.Character
+                if not char then return end
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if not hrp or not hum then return end
+                if hum.Health > 0 then
+                    autoRespawnLastPos = hrp.Position
+                    autoRespawnDeadMarked = false
+                elseif not autoRespawnDeadMarked then
+                    autoRespawnDeadMarked = true
+                    local deathPos = autoRespawnLastPos or hrp.Position
+                    for _, obj in ipairs(Workspace:GetDescendants()) do
+                        if obj:IsA("SpawnLocation") then
+                            obj.CFrame = CFrame.new(deathPos)
+                            obj.Enabled = true
+                            obj.Neutral = true
+                            obj.CanCollide = false
+                        end
+                    end
+                    WindUI:Notify({ Title = "原地复活", Content = "检测到死亡，重生点已设置到死亡位置", Duration = 3 })
+                end
+            end)
+            WindUI:Notify({ Title = "原地复活", Content = "已开启", Duration = 3 })
+        else
+            if autoRespawnConn then autoRespawnConn:Disconnect() autoRespawnConn = nil end
+            autoRespawnDeadMarked = false
+            autoRespawnLastPos = nil
+            WindUI:Notify({ Title = "原地复活", Content = "已关闭", Duration = 3 })
+        end
     end
 })
 local ImpersonateDropdown = Tabs.MainTab:Dropdown({
