@@ -417,26 +417,25 @@ end
 Players.PlayerRemoving:Connect(function(player)
     cleanupAntiFlingForPlayer(player)
 end)
-local spinBAV = nil
 local function startSpin()
     if spinConnection then spinConnection:Disconnect() end
     spinConnection = nil
-    if spinBAV then pcall(function() spinBAV:Destroy() end) spinBAV = nil end
+    pcall(function() if getgenv().kbSpinBAV then getgenv().kbSpinBAV:Destroy() end end)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
     local root = char.HumanoidRootPart
-    spinBAV = Instance.new("BodyAngularVelocity")
-    spinBAV.Name = "KbSpinBAV"
-    spinBAV.Parent = root
-    spinBAV.AngularVelocity = Vector3.new(0, math.rad(SpinSpeed), 0)
-    spinBAV.MaxTorque = Vector3.new(0, 1e9, 0)
-    spinBAV.P = 10000
+    getgenv().kbSpinBAV = Instance.new("BodyAngularVelocity")
+    getgenv().kbSpinBAV.Name = "KbSpinBAV"
+    getgenv().kbSpinBAV.Parent = root
+    getgenv().kbSpinBAV.AngularVelocity = Vector3.new(0, math.rad(SpinSpeed), 0)
+    getgenv().kbSpinBAV.MaxTorque = Vector3.new(0, 1e9, 0)
+    getgenv().kbSpinBAV.P = 10000
 end
 local function stopSpin()
     SpinEnabled = false
     if spinConnection then spinConnection:Disconnect() end
     spinConnection = nil
-    if spinBAV then pcall(function() spinBAV:Destroy() end) spinBAV = nil end
+    pcall(function() if getgenv().kbSpinBAV then getgenv().kbSpinBAV:Destroy() end end)
 end
 local function startAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect() end
@@ -2025,68 +2024,65 @@ Tabs.MainTab:Toggle({
     Callback = function(state)
         getgenv().kbTouchFlingOn = state
         if state then
+            getgenv().kbTFConns = getgenv().kbTFConns or {}
+            for _, v in pairs(getgenv().kbTFConns) do pcall(function() v:Disconnect() end) end
+            getgenv().kbTFConns = {}
             local c = LocalPlayer.Character
             if c then
-                local h = c:FindFirstChild("HumanoidRootPart")
-                if h then
-                    getgenv().kbTouchFlingConn = h.Touched:Connect(function(hit)
-                        if not getgenv().kbTouchFlingOn then return end
-                        local tc = hit.Parent
-                        if not tc then return end
-                        local tp = Players:GetPlayerFromCharacter(tc)
-                        if not tp or tp == LocalPlayer then return end
-                        local now = tick()
-                        if getgenv().kbTFLast and now - getgenv().kbTFLast < 1 then return end
-                        getgenv().kbTFLast = now
-                        local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
-                        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                        if not tRoot or not myRoot then return end
-                        local dir = (tRoot.Position - myRoot.Position).Unit
-                        if dir.Magnitude == 0 then dir = Vector3.new(0, 1, 0) end
-                        local bv = Instance.new("BodyVelocity")
-                        bv.Name = "KbTouchFling"
-                        bv.Parent = tRoot
-                        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-                        bv.Velocity = dir * 5000 + Vector3.new(0, 5000, 0)
-                        task.delay(0.5, function()
-                            pcall(function() if bv and bv.Parent then bv:Destroy() end end)
-                        end)
-                    end)
-                end
-            end
-            getgenv().kbTouchFlingCA = LocalPlayer.CharacterAdded:Connect(function(nc)
-                task.wait(0.5)
-                if getgenv().kbTouchFlingOn then
-                    local h2 = nc:FindFirstChild("HumanoidRootPart")
-                    if h2 then
-                        getgenv().kbTouchFlingConn = h2.Touched:Connect(function(hit)
+                for _, part in ipairs(c:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        local conn = part.Touched:Connect(function(hit)
                             if not getgenv().kbTouchFlingOn then return end
                             local tc = hit.Parent
                             if not tc then return end
                             local tp = Players:GetPlayerFromCharacter(tc)
                             if not tp or tp == LocalPlayer then return end
                             local now = tick()
-                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 1 then return end
+                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 0.1 then return end
                             getgenv().kbTFLast = now
                             local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
                             local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             if not tRoot or not myRoot then return end
                             local dir = (tRoot.Position - myRoot.Position).Unit
                             if dir.Magnitude == 0 then dir = Vector3.new(0, 1, 0) end
-                            local bv = Instance.new("BodyVelocity")
-                            bv.Name = "KbTouchFling"
-                            bv.Parent = tRoot
-                            bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-                            bv.Velocity = dir * 5000 + Vector3.new(0, 5000, 0)
-                            task.delay(0.5, function()
-                                pcall(function() if bv and bv.Parent then bv:Destroy() end end)
-                            end)
+                            tRoot.AssemblyLinearVelocity = dir * 50000 + Vector3.new(0, 50000, 0)
+                            tRoot.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
                         end)
+                        table.insert(getgenv().kbTFConns, conn)
+                    end
+                end
+            end
+            getgenv().kbTouchFlingCA = LocalPlayer.CharacterAdded:Connect(function(nc)
+                task.wait(0.3)
+                if not getgenv().kbTouchFlingOn then return end
+                for _, v in pairs(getgenv().kbTFConns) do pcall(function() v:Disconnect() end) end
+                getgenv().kbTFConns = {}
+                for _, part in ipairs(nc:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        local conn = part.Touched:Connect(function(hit)
+                            if not getgenv().kbTouchFlingOn then return end
+                            local tc = hit.Parent
+                            if not tc then return end
+                            local tp = Players:GetPlayerFromCharacter(tc)
+                            if not tp or tp == LocalPlayer then return end
+                            local now = tick()
+                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 0.1 then return end
+                            getgenv().kbTFLast = now
+                            local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
+                            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            if not tRoot or not myRoot then return end
+                            local dir = (tRoot.Position - myRoot.Position).Unit
+                            if dir.Magnitude == 0 then dir = Vector3.new(0, 1, 0) end
+                            tRoot.AssemblyLinearVelocity = dir * 50000 + Vector3.new(0, 50000, 0)
+                            tRoot.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                        end)
+                        table.insert(getgenv().kbTFConns, conn)
                     end
                 end
             end)
         else
-            pcall(function() if getgenv().kbTouchFlingConn then getgenv().kbTouchFlingConn:Disconnect() end end)
+            for _, v in pairs(getgenv().kbTFConns or {}) do pcall(function() v:Disconnect() end) end
+            getgenv().kbTFConns = {}
             pcall(function() if getgenv().kbTouchFlingCA then getgenv().kbTouchFlingCA:Disconnect() end end)
         end
         WindUI:Notify({ Title = "碰飞", Content = state and "已开启，别人碰到你将被甩飞" or "已关闭", Duration = 3 })
