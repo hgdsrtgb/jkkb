@@ -2024,6 +2024,17 @@ Tabs.MainTab:Toggle({
     Callback = function(state)
         getgenv().kbTouchFlingOn = state
         if state then
+            if not getgenv().kbOldFPDH then getgenv().kbOldFPDH = workspace.FallenPartsDestroyHeight end
+            workspace.FallenPartsDestroyHeight = 0/0
+            local c = LocalPlayer.Character
+            local hrp = c and c:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                getgenv().kbTouchFlingBV = Instance.new("BodyVelocity")
+                getgenv().kbTouchFlingBV.Name = "KbTouchFlingBV"
+                getgenv().kbTouchFlingBV.Parent = hrp
+                getgenv().kbTouchFlingBV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+                getgenv().kbTouchFlingBV.Velocity = Vector3.zero
+            end
             getgenv().kbTouchFlingThread = coroutine.create(function()
                 local c, hrp, vel, movel = nil, nil, nil, 0.1
                 while getgenv().kbTouchFlingOn do
@@ -2032,7 +2043,7 @@ Tabs.MainTab:Toggle({
                     hrp = c and c:FindFirstChild("HumanoidRootPart")
                     if hrp then
                         vel = hrp.Velocity
-                        hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+                        hrp.Velocity = vel * 9e7 + Vector3.new(0, 9e7, 0)
                         RunService.RenderStepped:Wait()
                         hrp.Velocity = vel
                         RunService.Stepped:Wait()
@@ -2044,6 +2055,8 @@ Tabs.MainTab:Toggle({
             coroutine.resume(getgenv().kbTouchFlingThread)
         else
             getgenv().kbTouchFlingOn = false
+            pcall(function() workspace.FallenPartsDestroyHeight = getgenv().kbOldFPDH end)
+            pcall(function() if getgenv().kbTouchFlingBV then getgenv().kbTouchFlingBV:Destroy() end end)
         end
         WindUI:Notify({ Title = "碰飞", Content = state and "已开启，别人碰到你将被甩飞" or "已关闭", Duration = 3 })
         if state then kbPlayDing() end
