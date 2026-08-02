@@ -869,6 +869,28 @@ local function powerfulFling(targetPlayer)
     WindUI:Notify({ Title = "甩飞完成", Content = "已完成对 " .. targetPlayer.Name .. " 的甩飞", Duration = 3 })
 end
 local kbTF = {on=false, c={}}
+kbTF.fling = function(target)
+    if not target or not target.Character then return end
+    local tChar = target.Character
+    local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+    if not tRoot then return end
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+    local oldFPDH = workspace.FallenPartsDestroyHeight
+    workspace.FallenPartsDestroyHeight = 0/0
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "KbTouchFling"
+    bv.Parent = tRoot
+    bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+    local dir = (tRoot.Position - myRoot.Position).Unit
+    if dir.Magnitude == 0 then dir = Vector3.new(0, 1, 0) end
+    bv.Velocity = dir * 9e7 + Vector3.new(0, 9e7 * 10, 0)
+    task.delay(2, function()
+        pcall(function() bv:Destroy() end)
+        pcall(function() workspace.FallenPartsDestroyHeight = oldFPDH end)
+    end)
+end
 kbTF.setup = function(c)
     local h = c:FindFirstChild("HumanoidRootPart")
     if not h then return end
@@ -878,7 +900,7 @@ kbTF.setup = function(c)
         if not tc then return end
         local tp = Players:GetPlayerFromCharacter(tc)
         if tp and tp ~= LocalPlayer then
-            task.spawn(function() powerfulFling(tp) end)
+            kbTF.fling(tp)
         end
     end)
 end
