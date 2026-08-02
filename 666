@@ -419,18 +419,12 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 local function startSpin()
     if spinConnection then spinConnection:Disconnect() end
-    local lastSpin = 0
     spinConnection = RunService.Heartbeat:Connect(function(dt)
         if not SpinEnabled then return end
-        local now = tick()
-        if now - lastSpin < 0.2 then return end
-        lastSpin = now
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
         local root = char.HumanoidRootPart
-        local currentCF = root.CFrame
-        local newCF = currentCF * CFrame.Angles(0, math.rad(SpinSpeed * dt), 0)
-        root.CFrame = newCF
+        root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(SpinSpeed * dt), 0)
     end)
 end
 local function stopSpin()
@@ -874,46 +868,32 @@ local function powerfulFling(targetPlayer)
     Workspace.FallenPartsDestroyHeight = getgenv().FPDH
     WindUI:Notify({ Title = "甩飞完成", Content = "已完成对 " .. targetPlayer.Name .. " 的甩飞", Duration = 3 })
 end
-local TouchFlingEnabled = false
-local touchFlingConns = {}
-local function setupTouchFlingForCharacter(char)
-    if not char then return end
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local conn = part.Touched:Connect(function(hit)
-                if not TouchFlingEnabled then return end
-                local targetChar = hit.Parent
-                if not targetChar then return end
-                local targetPlayer = Players:GetPlayerFromCharacter(targetChar)
-                if not targetPlayer or targetPlayer == LocalPlayer then return end
-                task.spawn(function()
-                    powerfulFling(targetPlayer)
-                end)
-            end)
-            table.insert(touchFlingConns, conn)
-        end
-    end
-end
-local function startTouchFling()
-    for _, conn in ipairs(touchFlingConns) do
-        pcall(function() conn:Disconnect() end)
-    end
-    touchFlingConns = {}
-    local char = LocalPlayer.Character
-    if char then setupTouchFlingForCharacter(char) end
-    local caConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
-        task.wait(0.5)
-        if TouchFlingEnabled then
-            setupTouchFlingForCharacter(newChar)
+local kbTF = {on=false, c={}}
+kbTF.setup = function(c)
+    local h = c:FindFirstChild("HumanoidRootPart")
+    if not h then return end
+    kbTF.c[1] = h.Touched:Connect(function(hit)
+        if not kbTF.on then return end
+        local tc = hit.Parent
+        if not tc then return end
+        local tp = Players:GetPlayerFromCharacter(tc)
+        if tp and tp ~= LocalPlayer then
+            task.spawn(function() powerfulFling(tp) end)
         end
     end)
-    table.insert(touchFlingConns, caConn)
 end
-local function stopTouchFling()
-    for _, conn in ipairs(touchFlingConns) do
-        pcall(function() conn:Disconnect() end)
-    end
-    touchFlingConns = {}
+kbTF.start = function()
+    for _, v in pairs(kbTF.c) do pcall(function() v:Disconnect() end) end
+    kbTF.c = {}
+    kbTF.setup(LocalPlayer.Character)
+    kbTF.c[2] = LocalPlayer.CharacterAdded:Connect(function(nc)
+        task.wait(0.5)
+        if kbTF.on then kbTF.setup(nc) end
+    end)
+end
+kbTF.stop = function()
+    for _, v in pairs(kbTF.c) do pcall(function() v:Disconnect() end) end
+    kbTF.c = {}
 end
 local speedAntiPullValue = 16
 local function startSpeedAntiPull(speed)
@@ -2064,13 +2044,12 @@ Tabs.MainTab:Toggle({
     Title = "碰飞",
     Value = false,
     Callback = function(state)
-        TouchFlingEnabled = state
-        if state then startTouchFling() else stopTouchFling() end
+        kbTF.on = state
+        if state then kbTF.start() else kbTF.stop() end
         WindUI:Notify({ Title = "碰飞", Content = state and "已开启，别人碰到你将被甩飞" or "已关闭", Duration = 3 })
         if state then kbPlayDing() end
     end
 })
-
 Tabs.MainTab:Button({
     Title = "甩飞最近的人",
     Callback = function()
