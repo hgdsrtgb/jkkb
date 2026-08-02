@@ -2038,15 +2038,24 @@ Tabs.MainTab:Toggle({
                             local tp = Players:GetPlayerFromCharacter(tc)
                             if not tp or tp == LocalPlayer then return end
                             local now = tick()
-                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 0.1 then return end
+                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 0.5 then return end
                             getgenv().kbTFLast = now
                             local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
                             local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             if not tRoot or not myRoot then return end
+                            if not getgenv().kbTFFPDH then getgenv().kbTFFPDH = workspace.FallenPartsDestroyHeight end
+                            workspace.FallenPartsDestroyHeight = 0/0
                             local dir = (tRoot.Position - myRoot.Position).Unit
-                            if dir.Magnitude == 0 then dir = Vector3.new(0, 1, 0) end
-                            tRoot.AssemblyLinearVelocity = dir * 50000 + Vector3.new(0, 50000, 0)
-                            tRoot.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                            if dir.Magnitude == 0 then dir = Vector3.new(0, 0, 1) end
+                            local bv = Instance.new("BodyVelocity")
+                            bv.Name = "KbTouchFling"
+                            bv.Parent = myRoot
+                            bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+                            bv.Velocity = dir * 9e7
+                            task.delay(0.3, function()
+                                pcall(function() if bv and bv.Parent then bv:Destroy() end end)
+                                pcall(function() workspace.FallenPartsDestroyHeight = getgenv().kbTFFPDH end)
+                            end)
                         end)
                         table.insert(getgenv().kbTFConns, conn)
                     end
@@ -2066,15 +2075,24 @@ Tabs.MainTab:Toggle({
                             local tp = Players:GetPlayerFromCharacter(tc)
                             if not tp or tp == LocalPlayer then return end
                             local now = tick()
-                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 0.1 then return end
+                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 0.5 then return end
                             getgenv().kbTFLast = now
                             local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
                             local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             if not tRoot or not myRoot then return end
+                            if not getgenv().kbTFFPDH then getgenv().kbTFFPDH = workspace.FallenPartsDestroyHeight end
+                            workspace.FallenPartsDestroyHeight = 0/0
                             local dir = (tRoot.Position - myRoot.Position).Unit
-                            if dir.Magnitude == 0 then dir = Vector3.new(0, 1, 0) end
-                            tRoot.AssemblyLinearVelocity = dir * 50000 + Vector3.new(0, 50000, 0)
-                            tRoot.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
+                            if dir.Magnitude == 0 then dir = Vector3.new(0, 0, 1) end
+                            local bv = Instance.new("BodyVelocity")
+                            bv.Name = "KbTouchFling"
+                            bv.Parent = myRoot
+                            bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+                            bv.Velocity = dir * 9e7
+                            task.delay(0.3, function()
+                                pcall(function() if bv and bv.Parent then bv:Destroy() end end)
+                                pcall(function() workspace.FallenPartsDestroyHeight = getgenv().kbTFFPDH end)
+                            end)
                         end)
                         table.insert(getgenv().kbTFConns, conn)
                     end
