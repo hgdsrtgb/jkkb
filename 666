@@ -2024,84 +2024,26 @@ Tabs.MainTab:Toggle({
     Callback = function(state)
         getgenv().kbTouchFlingOn = state
         if state then
-            getgenv().kbTFConns = getgenv().kbTFConns or {}
-            for _, v in pairs(getgenv().kbTFConns) do pcall(function() v:Disconnect() end) end
-            getgenv().kbTFConns = {}
-            local c = LocalPlayer.Character
-            if c then
-                for _, part in ipairs(c:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        local conn = part.Touched:Connect(function(hit)
-                            if not getgenv().kbTouchFlingOn then return end
-                            local tc = hit.Parent
-                            if not tc then return end
-                            local tp = Players:GetPlayerFromCharacter(tc)
-                            if not tp or tp == LocalPlayer then return end
-                            local now = tick()
-                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 0.5 then return end
-                            getgenv().kbTFLast = now
-                            local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
-                            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            if not tRoot or not myRoot then return end
-                            if not getgenv().kbTFFPDH then getgenv().kbTFFPDH = workspace.FallenPartsDestroyHeight end
-                            workspace.FallenPartsDestroyHeight = 0/0
-                            local dir = (tRoot.Position - myRoot.Position).Unit
-                            if dir.Magnitude == 0 then dir = Vector3.new(0, 0, 1) end
-                            local bv = Instance.new("BodyVelocity")
-                            bv.Name = "KbTouchFling"
-                            bv.Parent = myRoot
-                            bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
-                            bv.Velocity = dir * 9e7
-                            task.delay(0.3, function()
-                                pcall(function() if bv and bv.Parent then bv:Destroy() end end)
-                                pcall(function() workspace.FallenPartsDestroyHeight = getgenv().kbTFFPDH end)
-                            end)
-                        end)
-                        table.insert(getgenv().kbTFConns, conn)
-                    end
-                end
-            end
-            getgenv().kbTouchFlingCA = LocalPlayer.CharacterAdded:Connect(function(nc)
-                task.wait(0.3)
-                if not getgenv().kbTouchFlingOn then return end
-                for _, v in pairs(getgenv().kbTFConns) do pcall(function() v:Disconnect() end) end
-                getgenv().kbTFConns = {}
-                for _, part in ipairs(nc:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        local conn = part.Touched:Connect(function(hit)
-                            if not getgenv().kbTouchFlingOn then return end
-                            local tc = hit.Parent
-                            if not tc then return end
-                            local tp = Players:GetPlayerFromCharacter(tc)
-                            if not tp or tp == LocalPlayer then return end
-                            local now = tick()
-                            if getgenv().kbTFLast and now - getgenv().kbTFLast < 0.5 then return end
-                            getgenv().kbTFLast = now
-                            local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
-                            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            if not tRoot or not myRoot then return end
-                            if not getgenv().kbTFFPDH then getgenv().kbTFFPDH = workspace.FallenPartsDestroyHeight end
-                            workspace.FallenPartsDestroyHeight = 0/0
-                            local dir = (tRoot.Position - myRoot.Position).Unit
-                            if dir.Magnitude == 0 then dir = Vector3.new(0, 0, 1) end
-                            local bv = Instance.new("BodyVelocity")
-                            bv.Name = "KbTouchFling"
-                            bv.Parent = myRoot
-                            bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
-                            bv.Velocity = dir * 9e7
-                            task.delay(0.3, function()
-                                pcall(function() if bv and bv.Parent then bv:Destroy() end end)
-                                pcall(function() workspace.FallenPartsDestroyHeight = getgenv().kbTFFPDH end)
-                            end)
-                        end)
-                        table.insert(getgenv().kbTFConns, conn)
+            getgenv().kbTouchFlingThread = coroutine.create(function()
+                local c, hrp, vel, movel = nil, nil, nil, 0.1
+                while getgenv().kbTouchFlingOn do
+                    RunService.Heartbeat:Wait()
+                    c = LocalPlayer.Character
+                    hrp = c and c:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        vel = hrp.Velocity
+                        hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+                        RunService.RenderStepped:Wait()
+                        hrp.Velocity = vel
+                        RunService.Stepped:Wait()
+                        hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                        movel = -movel
                     end
                 end
             end)
+            coroutine.resume(getgenv().kbTouchFlingThread)
         else
-            for _, v in pairs(getgenv().kbTFConns or {}) do pcall(function() v:Disconnect() end) end
-            getgenv().kbTFConns = {}
-            pcall(function() if getgenv().kbTouchFlingCA then getgenv().kbTouchFlingCA:Disconnect() end end)
+            getgenv().kbTouchFlingOn = false
         end
         WindUI:Notify({ Title = "碰飞", Content = state and "已开启，别人碰到你将被甩飞" or "已关闭", Duration = 3 })
         if state then kbPlayDing() end
