@@ -56963,8 +56963,7 @@ if SaveManager then
 end
 ]===]
 
-ServerScripts["疯狂电梯"] = [===[
-local function safeLoad(url)
+ServerScripts["疯狂电梯"] = [===local function safeLoad(url)
     local success, result = pcall(function()
         return loadstring(game:HttpGet(url))()
     end)
