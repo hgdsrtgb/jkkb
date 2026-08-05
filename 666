@@ -1492,7 +1492,7 @@ local function kbFormatDiff(mins)
     return sign .. string.format("%d天%d小时%d分钟", math.floor(mins / 1440), math.floor((mins % 1440) / 60), mins % 60)
 end
 local kbNowDate = os.date("*t")
-local kbUpdateTime = os.time({year = kbNowDate.year, month = 7, day = 31, hour = 21, min = 30, sec = 0})
+local kbUpdateTime = os.time({year = kbNowDate.year, month = 8, day = 3, hour = 9, min = 40, sec = 0})
 local kbBirthTime = os.time({year = kbNowDate.year, month = 2, day = 9, hour = 2, min = 27, sec = 0})
 if kbBirthTime > os.time() then
     kbBirthTime = os.time({year = kbNowDate.year - 1, month = 2, day = 9, hour = 2, min = 27, sec = 0})
@@ -2035,28 +2035,68 @@ Tabs.MainTab:Toggle({
                 getgenv().kbTouchFlingBV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
                 getgenv().kbTouchFlingBV.Velocity = Vector3.zero
             end
+            getgenv().kbTFConns = getgenv().kbTFConns or {}
+            for _, v in pairs(getgenv().kbTFConns) do pcall(function() v:Disconnect() end) end
+            getgenv().kbTFConns = {}
+            if c then
+                for _, part in ipairs(c:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        local conn = part.Touched:Connect(function(hit)
+                            if not getgenv().kbTouchFlingOn then return end
+                            local tc = hit.Parent
+                            if not tc then return end
+                            local tp = Players:GetPlayerFromCharacter(tc)
+                            if not tp or tp == LocalPlayer then return end
+                            local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
+                            if not tRoot then return end
+                            tRoot.Velocity = Vector3.new(9e7, 9e7, 9e7)
+                            tRoot.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+                        end)
+                        table.insert(getgenv().kbTFConns, conn)
+                    end
+                end
+            end
+            getgenv().kbTouchFlingCA = LocalPlayer.CharacterAdded:Connect(function(nc)
+                task.wait(0.3)
+                if not getgenv().kbTouchFlingOn then return end
+                for _, v in pairs(getgenv().kbTFConns) do pcall(function() v:Disconnect() end) end
+                getgenv().kbTFConns = {}
+                for _, part in ipairs(nc:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        local conn = part.Touched:Connect(function(hit)
+                            if not getgenv().kbTouchFlingOn then return end
+                            local tc = hit.Parent
+                            if not tc then return end
+                            local tp = Players:GetPlayerFromCharacter(tc)
+                            if not tp or tp == LocalPlayer then return end
+                            local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
+                            if not tRoot then return end
+                            tRoot.Velocity = Vector3.new(9e7, 9e7, 9e7)
+                            tRoot.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+                        end)
+                        table.insert(getgenv().kbTFConns, conn)
+                    end
+                end
+            end)
             getgenv().kbTouchFlingThread = coroutine.create(function()
-                local c, hrp, vel, movel = nil, nil, nil, 0.1
                 while getgenv().kbTouchFlingOn do
-                    RunService.Heartbeat:Wait()
-                    c = LocalPlayer.Character
-                    hrp = c and c:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        vel = hrp.Velocity
-                        hrp.Velocity = vel * 9e7 + Vector3.new(0, 9e7, 0)
-                        RunService.RenderStepped:Wait()
-                        hrp.Velocity = vel
-                        RunService.Stepped:Wait()
-                        hrp.Velocity = vel + Vector3.new(0, movel, 0)
-                        movel = -movel
+                    task.wait(0.005)
+                    local c2 = LocalPlayer.Character
+                    local hrp2 = c2 and c2:FindFirstChild("HumanoidRootPart")
+                    if hrp2 then
+                        hrp2.Velocity = Vector3.new(9e7, 9e7, 9e7)
+                        hrp2.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
                     end
                 end
             end)
             coroutine.resume(getgenv().kbTouchFlingThread)
         else
             getgenv().kbTouchFlingOn = false
-            pcall(function() workspace.FallenPartsDestroyHeight = getgenv().kbOldFPDH end)
+            for _, v in pairs(getgenv().kbTFConns or {}) do pcall(function() v:Disconnect() end) end
+            getgenv().kbTFConns = {}
+            pcall(function() if getgenv().kbTouchFlingCA then getgenv().kbTouchFlingCA:Disconnect() end end)
             pcall(function() if getgenv().kbTouchFlingBV then getgenv().kbTouchFlingBV:Destroy() end end)
+            pcall(function() workspace.FallenPartsDestroyHeight = getgenv().kbOldFPDH end)
         end
         WindUI:Notify({ Title = "碰飞", Content = state and "已开启，别人碰到你将被甩飞" or "已关闭", Duration = 3 })
         if state then kbPlayDing() end
@@ -2467,50 +2507,60 @@ Tabs.MainTab:Button({
         WindUI:Notify({ Title = "设置重生点", Content = "重生点已设置", Duration = 3 })
     end
 })
-local autoRespawnConn = nil
-local autoRespawnLastPos = nil
-local autoRespawnDeadMarked = false
+local kbRespawnEnabled = false
+local kbRespawnDeathPos = nil
+local kbRespawnConn = nil
+local kbRespawnCharConn = nil
+local kbRespawnLastHealth = nil
+local kbRespawnDead = false
 Tabs.MainTab:Toggle({
     Title = "原地复活",
     Default = false,
     Callback = function(state)
         kbPlayDing()
+        kbRespawnEnabled = state
         if state then
-            autoRespawnDeadMarked = false
-            autoRespawnLastPos = nil
-            if autoRespawnConn then autoRespawnConn:Disconnect() autoRespawnConn = nil end
-            local lastCheck = 0
-            autoRespawnConn = RunService.Heartbeat:Connect(function()
-                local now = tick()
-                if now - lastCheck < 0.2 then return end
-                lastCheck = now
+            kbRespawnDeathPos = nil
+            kbRespawnLastHealth = nil
+            kbRespawnDead = false
+            if kbRespawnConn then kbRespawnConn:Disconnect() kbRespawnConn = nil end
+            if kbRespawnCharConn then kbRespawnCharConn:Disconnect() kbRespawnCharConn = nil end
+            kbRespawnConn = RunService.Heartbeat:Connect(function()
+                if not kbRespawnEnabled then return end
                 local char = player.Character
                 if not char then return end
-                local hrp = char:FindFirstChild("HumanoidRootPart")
                 local hum = char:FindFirstChildOfClass("Humanoid")
-                if not hrp or not hum then return end
-                if hum.Health > 0 then
-                    autoRespawnLastPos = hrp.Position
-                    autoRespawnDeadMarked = false
-                elseif not autoRespawnDeadMarked then
-                    autoRespawnDeadMarked = true
-                    local deathPos = autoRespawnLastPos or hrp.Position
-                    for _, obj in ipairs(Workspace:GetDescendants()) do
-                        if obj:IsA("SpawnLocation") then
-                            obj.CFrame = CFrame.new(deathPos)
-                            obj.Enabled = true
-                            obj.Neutral = true
-                            obj.CanCollide = false
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hum or not hrp then return end
+                local health = hum.Health
+                if kbRespawnLastHealth and kbRespawnLastHealth > 0 and health <= 0 and not kbRespawnDead then
+                    kbRespawnDead = true
+                    kbRespawnDeathPos = hrp.Position
+                end
+                if health > 0 then
+                    kbRespawnDead = false
+                end
+                kbRespawnLastHealth = health
+            end)
+            kbRespawnCharConn = player.CharacterAdded:Connect(function(newChar)
+                if not kbRespawnEnabled then return end
+                if kbRespawnDeathPos then
+                    task.spawn(function()
+                        local hrp = newChar:WaitForChild("HumanoidRootPart", 3)
+                        if hrp then
+                            hrp.CFrame = CFrame.new(kbRespawnDeathPos)
                         end
-                    end
-                    WindUI:Notify({ Title = "原地复活", Content = "检测到死亡，重生点已设置到死亡位置", Duration = 3 })
+                        kbRespawnDeathPos = nil
+                    end)
                 end
             end)
             WindUI:Notify({ Title = "原地复活", Content = "已开启", Duration = 3 })
         else
-            if autoRespawnConn then autoRespawnConn:Disconnect() autoRespawnConn = nil end
-            autoRespawnDeadMarked = false
-            autoRespawnLastPos = nil
+            if kbRespawnConn then kbRespawnConn:Disconnect() kbRespawnConn = nil end
+            if kbRespawnCharConn then kbRespawnCharConn:Disconnect() kbRespawnCharConn = nil end
+            kbRespawnDeathPos = nil
+            kbRespawnLastHealth = nil
+            kbRespawnDead = false
             WindUI:Notify({ Title = "原地复活", Content = "已关闭", Duration = 3 })
         end
     end
@@ -3604,6 +3654,7 @@ kbApplyBackground = function(name)
         ["银花背景图2"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339141889_101.jpg",
         ["银花背景图3"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339140644_893.jpg",
         ["白子背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785395257153_996.jpg",
+        ["新背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785866305554_326.jpg",
     }
     local kbSetBgImage = function(asset)
         local bg = Window.UIElements.Main.Background
@@ -3659,7 +3710,7 @@ end
 local kbBgSelected = nil
 local kbBgDropdown = Tabs.SettingsTab:Dropdown({
     Title = "切换背景图",
-    Values = {"默认背景图", "恐脚本背景图", "eva背景图"},
+    Values = {"默认背景图", "恐脚本背景图", "eva背景图", "新背景图"},
     Callback = function(v)
         kbBgSelected = v
     end
