@@ -74,9 +74,9 @@ local ServerList = {
     { Name = "国人电梯", Ids = { 73399811400782 } },
     { Name = "烤或死", Ids = { 79327754502290, 86479448397834 } },
     { Name = "血腥的游乐场", Ids = { 18879239467 } },
-    { Name = "疯狂电梯", Ids = { 4104106043 } },
     { Name = "决斗场", Ids = { 100484168444874, 94217045453265 } },
     { Name = "中国人能飞", Ids = { 131156668298877 } },
+    { Name = "疯狂电梯", Ids = { 4104106043 } },
 }
 
 local matchedName = nil
@@ -56963,1258 +56963,6 @@ if SaveManager then
 end
 ]===]
 
-ServerScripts["疯狂电梯"] = [===local function safeLoad(url)
-    local success, result = pcall(function()
-        return loadstring(game:HttpGet(url))()
-    end)
-    if not success then
-        warn("加载失败: " .. url)
-        return nil
-    end
-    return result
-end
-
-local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui")
-local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui")
-local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui")
-
-if not Library then
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "错误",
-        Text = "UI 库加载失败，请检查网络或脚本资源",
-        Duration = 5,
-    })
-    return
-end
-
-local Options = Library.Options
-local Toggles = Library.Toggles
-
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-local HttpService = game:GetService("HttpService")
-local Workspace = game:GetService("Workspace")
-local CoreGui = game:GetService("CoreGui")
-local player = Players.LocalPlayer
-
-local translatedCache = {}
-local monsterNameCache = {}
-
-local function translateText(text)
-    if not text or text == "" or #text < 2 then
-        return nil
-    end
-    if translatedCache[text] then
-        return translatedCache[text]
-    end
-    local success, result = pcall(function()
-        local url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=" .. HttpService:UrlEncode(text)
-        local response = game:HttpGet(url)
-        local decoded = HttpService:JSONDecode(response)
-        if decoded and decoded[1] and decoded[1][1] and decoded[1][1][1] then
-            return decoded[1][1][1]
-        end
-        return nil
-    end)
-    if success and result then
-        translatedCache[text] = result
-        return result
-    end
-    return nil
-end
-
-local function getTranslatedName(enName)
-    if not enName or enName == "" then
-        return enName
-    end
-    if monsterNameCache[enName] then
-        return monsterNameCache[enName]
-    end
-    local zh = translateText(enName)
-    if zh then
-        monsterNameCache[enName] = zh
-        return zh
-    end
-    return enName
-end
-
-local Window = Library:CreateWindow({
-    Title = "疯狂电梯",
-    Footer = "恐拜大帝 制作",
-    Icon = 131153193945220,
-    NotifySide = "Right",
-    ShowCustomCursor = true,
-})
-
-Library:Notify("疯狂电梯脚本已加载 - 创作者：恐拜大帝 | QQ：3999698324", 5)
-
-local Tabs = {
-    Notice = Window:AddTab("通知", "info"),
-    Obtain = Window:AddTab("获取类", "download"),
-    Kill = Window:AddTab("杀戮类", "sword"),
-    God = Window:AddTab("无敌类", "shield"),
-    Teleport = Window:AddTab("传送类", "map-pin"),
-    General = Window:AddTab("通用", "settings"),
-    Settings = Window:AddTab("设置", "settings"),
-}
-
-local states = {}
-states.godMode = false
-states.noclip = false
-states.autoRespawn = false
-states.espEnabled = false
-states.permanentGod = false
-states.godConn = nil
-states.noclipConn = nil
-states.respawnConn = nil
-states.espConn = nil
-states.permanentGodConn = nil
-states.speedEnabled = false
-states.speedValue = 16
-states.speedConn = nil
-states.godSpamThread = nil
-states.godCharConn = nil
-
-local function getHRP()
-    local char = player.Character
-    if char then
-        return char:FindFirstChild("HumanoidRootPart")
-    end
-    return nil
-end
-
-local function getHumanoid()
-    local char = player.Character
-    if char then
-        return char:FindFirstChildOfClass("Humanoid")
-    end
-    return nil
-end
-
-local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息")
-NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本')
-NoticeGroup:AddLabel('创作者：恐拜大帝')
-
-local ObtainLeft = Tabs.Obtain:AddLeftGroupbox("商店道具")
-local ObtainRight = Tabs.Obtain:AddRightGroupbox("道具获取")
-
-local function stealTool(toolName)
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player then
-            local bp = plr:FindFirstChild("Backpack")
-            if bp then
-                for _, tool in ipairs(bp:GetChildren()) do
-                    if tool:IsA("Tool") and tool.Name:lower() == toolName:lower() then
-                        return tool
-                    end
-                end
-            end
-            if plr.Character then
-                for _, tool in ipairs(plr.Character:GetChildren()) do
-                    if tool:IsA("Tool") and tool.Name:lower() == toolName:lower() then
-                        return tool
-                    end
-                end
-            end
-        end
-    end
-    return nil
-end
-
-local function copyTool(toolName)
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Tool") and obj.Name:lower() == toolName:lower() then
-            return obj
-        end
-    end
-    return nil
-end
-
-local function createFreezeGun()
-    local tool = Instance.new("Tool")
-    tool.Name = "freeze gun"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 0.1
-    handle.Color = Color3.fromRGB(0, 150, 255)
-    handle.Material = Enum.Material.Neon
-    handle.Parent = tool
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Brick
-    mesh.Scale = Vector3.new(0.3, 0.3, 2)
-    mesh.Parent = handle
-    return tool
-end
-
-local function createVipCoil()
-    local tool = Instance.new("Tool")
-    tool.Name = "vip coil"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 0.1
-    handle.Color = Color3.fromRGB(255, 215, 0)
-    handle.Material = Enum.Material.Neon
-    handle.Parent = tool
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Sphere
-    mesh.Scale = Vector3.new(0.8, 0.2, 0.8)
-    mesh.Parent = handle
-    return tool
-end
-
-local function createRadio()
-    local tool = Instance.new("Tool")
-    tool.Name = "radio"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 0.1
-    handle.Color = Color3.fromRGB(80, 80, 80)
-    handle.Material = Enum.Material.Metal
-    handle.Parent = tool
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Brick
-    mesh.Scale = Vector3.new(0.8, 0.5, 0.3)
-    mesh.Parent = handle
-    return tool
-end
-
-local function createRainbowFlashlight()
-    local tool = Instance.new("Tool")
-    tool.Name = "rainbow flashlight"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 0.1
-    handle.Color = Color3.fromRGB(255, 255, 255)
-    handle.Material = Enum.Material.SmoothPlastic
-    handle.Parent = tool
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Cylinder
-    mesh.Scale = Vector3.new(0.3, 0.3, 2)
-    mesh.Parent = handle
-    return tool
-end
-
-local function createJetpack()
-    local tool = Instance.new("Tool")
-    tool.Name = "Jetpack"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 0.1
-    handle.Color = Color3.fromRGB(200, 50, 50)
-    handle.Material = Enum.Material.Metal
-    handle.Parent = tool
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Brick
-    mesh.Scale = Vector3.new(1.2, 0.8, 0.4)
-    mesh.Parent = handle
-    return tool
-end
-
-local function createInsanityCoil()
-    local tool = Instance.new("Tool")
-    tool.Name = "Insanity Coil"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 0.1
-    handle.Color = Color3.fromRGB(128, 0, 128)
-    handle.Material = Enum.Material.Neon
-    handle.Parent = tool
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Sphere
-    mesh.Scale = Vector3.new(0.8, 0.2, 0.8)
-    mesh.Parent = handle
-    return tool
-end
-
-local function createGuestsGrimoire()
-    local tool = Instance.new("Tool")
-    tool.Name = "Guest's Grimoire"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 0.1
-    handle.Color = Color3.fromRGB(80, 0, 0)
-    handle.Material = Enum.Material.SmoothPlastic
-    handle.Parent = tool
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Brick
-    mesh.Scale = Vector3.new(0.8, 1.2, 0.2)
-    mesh.Parent = handle
-    return tool
-end
-
-local function createSecondChance()
-    local tool = Instance.new("Tool")
-    tool.Name = "Second Chance"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = true
-    local handle = Instance.new("MeshPart")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 0.1
-    handle.Color = Color3.fromRGB(255, 255, 255)
-    handle.Material = Enum.Material.Glass
-    handle.Parent = tool
-    return tool
-end
-
-local function createGodMode()
-    local tool = Instance.new("Tool")
-    tool.Name = "God Mode"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = false
-    local handle = Instance.new("MeshPart")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 1
-    handle.Parent = tool
-    return tool
-end
-
-local itemCreators = {
-    ["freeze gun"] = createFreezeGun,
-    ["vip coil"] = createVipCoil,
-    ["radio"] = createRadio,
-    ["rainbow flashlight"] = createRainbowFlashlight,
-    ["Jetpack"] = createJetpack,
-    ["Insanity Coil"] = createInsanityCoil,
-    ["Guest's Grimoire"] = createGuestsGrimoire,
-    ["Second Chance"] = createSecondChance,
-    ["God Mode"] = createGodMode,
-}
-
-local function getItem(itemName)
-    local stolen = stealTool(itemName)
-    if stolen then
-        local clone = stolen:Clone()
-        clone.Parent = player.Backpack
-        return
-    end
-    local copied = copyTool(itemName)
-    if copied then
-        local clone = copied:Clone()
-        clone.Parent = player.Backpack
-        return
-    end
-    local creator = itemCreators[itemName]
-    if creator then
-        local tool = creator()
-        tool.Parent = player.Backpack
-        return
-    end
-    local basic = Instance.new("Tool")
-    basic.Name = itemName
-    basic.RequiresHandle = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Parent = basic
-    basic.Parent = player.Backpack
-end
-
-local function buyItem(itemName)
-    local hrp = getHRP()
-    if not hrp then return end
-    local shop = Workspace:FindFirstChild("shopTouchPrompts")
-    if shop then
-        for _, item in ipairs(shop:GetChildren()) do
-            if item:IsA("BasePart") and item.Name == itemName and item:FindFirstChild("TouchInterest") then
-                pcall(function()
-                    firetouchinterest(hrp, item, 0)
-                    firetouchinterest(hrp, item, 1)
-                end)
-                return
-            end
-        end
-    end
-    local vipGivers = Workspace:FindFirstChild("VIP Givers")
-    if vipGivers then
-        for _, item in ipairs(vipGivers:GetChildren()) do
-            if item.Name == itemName and item:FindFirstChild("TouchInterest") then
-                pcall(function()
-                    firetouchinterest(hrp, item, 0)
-                    firetouchinterest(hrp, item, 1)
-                end)
-                return
-            end
-        end
-    end
-end
-
-local shop = Workspace:FindFirstChild("shopTouchPrompts")
-local shopItems = {}
-local shopItemMap = {}
-if shop then
-    for _, item in ipairs(shop:GetChildren()) do
-        if item:IsA("BasePart") and item:FindFirstChild("TouchInterest") then
-            local zhName = getTranslatedName(item.Name)
-            table.insert(shopItems, zhName)
-            shopItemMap[zhName] = item.Name
-        end
-    end
-end
-
-local selectedShopItems = {}
-
-if #shopItems > 0 then
-    ObtainLeft:AddDropdown("商店道具选择", {
-        Values = shopItems,
-        Default = 1,
-        Multi = true,
-        Text = "选择商店道具(可多选)",
-        Callback = function(value)
-            selectedShopItems = {}
-            for k, v in pairs(value) do
-                local zhName = nil
-                if type(k) == "string" then
-                    zhName = k
-                elseif type(v) == "string" then
-                    zhName = v
-                end
-                if zhName and shopItemMap[zhName] then
-                    table.insert(selectedShopItems, shopItemMap[zhName])
-                end
-            end
-        end
-    })
-else
-    ObtainLeft:AddLabel("未找到商店道具")
-end
-
-ObtainLeft:AddButton("购买选中道具", function()
-    local hrp = getHRP()
-    if not hrp or not shop then return end
-    if #selectedShopItems == 0 then return end
-    for _, enName in ipairs(selectedShopItems) do
-        for _, item in ipairs(shop:GetChildren()) do
-            if item:IsA("BasePart") and item.Name == enName and item:FindFirstChild("TouchInterest") then
-                pcall(function()
-                    firetouchinterest(hrp, item, 0)
-                    firetouchinterest(hrp, item, 1)
-                end)
-            end
-        end
-    end
-    selectedShopItems = {}
-    pcall(function()
-        Options["商店道具选择"]:SetValue({})
-    end)
-end)
-
-ObtainLeft:AddButton("免费获取选中道具", function()
-    if #selectedShopItems == 0 then return end
-    for _, enName in ipairs(selectedShopItems) do
-        getItem(enName)
-    end
-    selectedShopItems = {}
-    pcall(function()
-        Options["商店道具选择"]:SetValue({})
-    end)
-end)
-
-ObtainLeft:AddButton("购买全部商店道具", function()
-    local hrp = getHRP()
-    if not hrp or not shop then return end
-    for _, item in ipairs(shop:GetChildren()) do
-        if item:IsA("BasePart") and item:FindFirstChild("TouchInterest") then
-            pcall(function()
-                firetouchinterest(hrp, item, 0)
-                firetouchinterest(hrp, item, 1)
-            end)
-        end
-    end
-end)
-
-ObtainLeft:AddButton("免费获取全部商店道具", function()
-    if not shop then return end
-    for _, item in ipairs(shop:GetChildren()) do
-        if item:IsA("BasePart") and item:FindFirstChild("TouchInterest") then
-            getItem(item.Name)
-        end
-    end
-end)
-
-local vipGroup = Tabs.Obtain:AddLeftGroupbox("VIP道具")
-local paidGroup = Tabs.Obtain:AddRightGroupbox("付费道具")
-
-local vipItems = {
-    {en = "freeze gun", zh = "冰冻枪"},
-    {en = "vip coil", zh = "VIP线圈"},
-    {en = "radio", zh = "收音机"},
-    {en = "rainbow flashlight", zh = "彩虹手电筒"},
-}
-
-local paidItems = {
-    {en = "Jetpack", zh = "喷气背包"},
-    {en = "Insanity Coil", zh = "疯狂线圈"},
-    {en = "Guest's Grimoire", zh = "魔法书"},
-    {en = "Second Chance", zh = "复活十字架"},
-    {en = "God Mode", zh = "无敌球"},
-}
-
-local selectedVipItems = {}
-local selectedPaidItems = {}
-
-local vipValues = {}
-for _, v in ipairs(vipItems) do
-    table.insert(vipValues, v.zh)
-end
-
-local paidValues = {}
-for _, v in ipairs(paidItems) do
-    table.insert(paidValues, v.zh)
-end
-
-vipGroup:AddDropdown("VIP道具选择", {
-    Values = vipValues,
-    Default = 1,
-    Multi = true,
-    Text = "选择VIP道具(可多选)",
-    Callback = function(value)
-        selectedVipItems = {}
-        for k, v in pairs(value) do
-            local zhName = nil
-            if type(k) == "string" then
-                zhName = k
-            elseif type(v) == "string" then
-                zhName = v
-            end
-            for _, item in ipairs(vipItems) do
-                if item.zh == zhName then
-                    table.insert(selectedVipItems, item.en)
-                    break
-                end
-            end
-        end
-    end
-})
-
-vipGroup:AddButton("获取选中VIP道具", function()
-    if #selectedVipItems == 0 then return end
-    for _, enName in ipairs(selectedVipItems) do
-        getItem(enName)
-    end
-    selectedVipItems = {}
-    pcall(function()
-        Options["VIP道具选择"]:SetValue({})
-    end)
-end)
-
-vipGroup:AddButton("获取全部VIP道具", function()
-    for _, item in ipairs(vipItems) do
-        getItem(item.en)
-    end
-end)
-
-vipGroup:AddButton("购买选中VIP道具", function()
-    if #selectedVipItems == 0 then return end
-    for _, enName in ipairs(selectedVipItems) do
-        buyItem(enName)
-    end
-    selectedVipItems = {}
-    pcall(function()
-        Options["VIP道具选择"]:SetValue({})
-    end)
-end)
-
-paidGroup:AddDropdown("付费道具选择", {
-    Values = paidValues,
-    Default = 1,
-    Multi = true,
-    Text = "选择付费道具(可多选)",
-    Callback = function(value)
-        selectedPaidItems = {}
-        for k, v in pairs(value) do
-            local zhName = nil
-            if type(k) == "string" then
-                zhName = k
-            elseif type(v) == "string" then
-                zhName = v
-            end
-            for _, item in ipairs(paidItems) do
-                if item.zh == zhName then
-                    table.insert(selectedPaidItems, item.en)
-                    break
-                end
-            end
-        end
-    end
-})
-
-paidGroup:AddButton("获取选中付费道具", function()
-    if #selectedPaidItems == 0 then return end
-    for _, enName in ipairs(selectedPaidItems) do
-        getItem(enName)
-    end
-    selectedPaidItems = {}
-    pcall(function()
-        Options["付费道具选择"]:SetValue({})
-    end)
-end)
-
-paidGroup:AddButton("获取全部付费道具", function()
-    for _, item in ipairs(paidItems) do
-        getItem(item.en)
-    end
-end)
-
-paidGroup:AddButton("购买选中付费道具", function()
-    if #selectedPaidItems == 0 then return end
-    for _, enName in ipairs(selectedPaidItems) do
-        buyItem(enName)
-    end
-    selectedPaidItems = {}
-    pcall(function()
-        Options["付费道具选择"]:SetValue({})
-    end)
-end)
-
-ObtainRight:AddButton("获取地图全部工具", function()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Tool") and obj.Parent ~= player.Backpack and obj.Parent ~= player.Character then
-            local clone = obj:Clone()
-            clone.Parent = player.Backpack
-        end
-    end
-end)
-
-ObtainRight:AddButton("全部道具获取", function()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Tool") then
-            local clone = obj:Clone()
-            clone.Parent = player.Backpack
-        end
-    end
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player then
-            local bp = plr:FindFirstChild("Backpack")
-            if bp then
-                for _, tool in ipairs(bp:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        local clone = tool:Clone()
-                        clone.Parent = player.Backpack
-                    end
-                end
-            end
-            if plr.Character then
-                for _, tool in ipairs(plr.Character:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        local clone = tool:Clone()
-                        clone.Parent = player.Backpack
-                    end
-                end
-            end
-        end
-    end
-end)
-
-ObtainRight:AddButton("偷别人道具", function()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player then
-            local bp = plr:FindFirstChild("Backpack")
-            if bp then
-                for _, tool in ipairs(bp:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        local clone = tool:Clone()
-                        clone.Parent = player.Backpack
-                    end
-                end
-            end
-            if plr.Character then
-                for _, tool in ipairs(plr.Character:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        local clone = tool:Clone()
-                        clone.Parent = player.Backpack
-                    end
-                end
-            end
-        end
-    end
-end)
-
-local KillGroup = Tabs.Kill:AddLeftGroupbox("杀戮功能")
-
-local function killAllMonsters()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Parent then
-            local model = obj.Parent
-            local isPlayer = false
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr.Character == model then
-                    isPlayer = true
-                    break
-                end
-            end
-            if not isPlayer then
-                pcall(function()
-                    obj.Health = 0
-                end)
-                task.delay(0.2, function()
-                    pcall(function()
-                        if model and model.Parent then
-                            model:Destroy()
-                        end
-                    end)
-                end)
-            end
-        end
-    end
-end
-
-KillGroup:AddButton("杀戮全部怪物", function()
-    killAllMonsters()
-end)
-
-KillGroup:AddButton("删除全部怪物", function()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Parent then
-            local model = obj.Parent
-            local isPlayer = false
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr.Character == model then
-                    isPlayer = true
-                    break
-                end
-            end
-            if not isPlayer then
-                pcall(function()
-                    model:Destroy()
-                end)
-            end
-        end
-    end
-end)
-
-KillGroup:AddButton("杀死其他玩家", function()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character then
-            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                pcall(function()
-                    hum.Health = 0
-                end)
-            end
-        end
-    end
-end)
-
-local monsterBillboards = {}
-
-local function clearESP()
-    for _, bb in ipairs(monsterBillboards) do
-        pcall(function() bb:Destroy() end)
-    end
-    monsterBillboards = {}
-end
-
-local function updateESP()
-    local hrp = getHRP()
-    if not hrp then return end
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Parent then
-            local model = obj.Parent
-            local isPlayer = false
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr.Character == model then
-                    isPlayer = true
-                    break
-                end
-            end
-            if not isPlayer then
-                local head = model:FindFirstChild("Head") or model:FindFirstChildWhichIsA("BasePart")
-                if head then
-                    local bb = head:FindFirstChild("恐脚本透视")
-                    if not bb then
-                        bb = Instance.new("BillboardGui")
-                        bb.Name = "恐脚本透视"
-                        bb.Size = UDim2.new(0, 120, 0, 40)
-                        bb.AlwaysOnTop = true
-                        bb.StudsOffset = Vector3.new(0, 3, 0)
-                        bb.Parent = player.PlayerGui
-                        bb.Adornee = head
-                        local tl = Instance.new("TextLabel")
-                        tl.Size = UDim2.new(1, 0, 1, 0)
-                        tl.BackgroundTransparency = 1
-                        tl.TextColor3 = Color3.fromRGB(255, 0, 0)
-                        tl.Font = Enum.Font.GothamBold
-                        tl.TextSize = 12
-                        tl.Parent = bb
-                        table.insert(monsterBillboards, bb)
-                    end
-                    local dist = math.floor((hrp.Position - head.Position).Magnitude)
-                    local tl = bb:FindFirstChildOfClass("TextLabel")
-                    if tl then
-                        local displayName = getTranslatedName(model.Name)
-                        tl.Text = displayName .. "
-" .. dist .. "m"
-                    end
-                end
-            end
-        end
-    end
-end
-
-KillGroup:AddToggle("怪物透视", {
-    Text = "开启/关闭怪物透视",
-    Default = false,
-    Callback = function(value)
-        states.espEnabled = value
-        if states.espEnabled then
-            if states.espConn then states.espConn:Disconnect() end
-            states.espConn = RunService.RenderStepped:Connect(function()
-                if states.espEnabled then
-                    updateESP()
-                end
-            end)
-        else
-            if states.espConn then states.espConn:Disconnect() states.espConn = nil end
-            clearESP()
-        end
-    end
-})
-
-local GodGroup = Tabs.God:AddLeftGroupbox("无敌功能")
-
-GodGroup:AddToggle("普通无敌", {
-    Text = "开启/关闭无敌",
-    Default = false,
-    Callback = function(value)
-        states.godMode = value
-        if states.godMode then
-            local function applyGod(char)
-                local hum = char:WaitForChild("Humanoid", 3)
-                if not hum then return end
-                local ff = Instance.new("ForceField")
-                ff.Name = "恐脚本无敌"
-                ff.Parent = char
-                hum.HealthChanged:Connect(function()
-                    if states.godMode then
-                        hum.Health = hum.MaxHealth
-                    end
-                end)
-            end
-            if player.Character then
-                applyGod(player.Character)
-            end
-            if states.godConn then states.godConn:Disconnect() end
-            states.godConn = player.CharacterAdded:Connect(applyGod)
-        else
-            if states.godConn then states.godConn:Disconnect() states.godConn = nil end
-            if player.Character then
-                for _, ff in ipairs(player.Character:GetChildren()) do
-                    if ff.Name == "恐脚本无敌" and ff:IsA("ForceField") then
-                        ff:Destroy()
-                    end
-                end
-            end
-        end
-    end
-})
-
-local function clearGodMode()
-    if states.godSpamThread then
-        pcall(function() task.cancel(states.godSpamThread) end)
-        states.godSpamThread = nil
-    end
-    if states.godCharConn then
-        pcall(function() states.godCharConn:Disconnect() end)
-        states.godCharConn = nil
-    end
-end
-
-local function findGodMode()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player then
-            local bp = plr:FindFirstChild("Backpack")
-            if bp then
-                for _, t in ipairs(bp:GetChildren()) do
-                    if t:IsA("Tool") and t.Name == "God Mode" then
-                        return t
-                    end
-                end
-            end
-            if plr.Character then
-                for _, t in ipairs(plr.Character:GetChildren()) do
-                    if t:IsA("Tool") and t.Name == "God Mode" then
-                        return t
-                    end
-                end
-            end
-        end
-    end
-    return nil
-end
-
-local function createFakeGodMode()
-    local tool = Instance.new("Tool")
-    tool.Name = "God Mode"
-    tool.RequiresHandle = true
-    tool.CanBeDropped = false
-    local handle = Instance.new("MeshPart")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1, 1, 1)
-    handle.CanCollide = false
-    handle.Transparency = 1
-    handle.Parent = tool
-    return tool
-end
-
-local function applyGodMode(char)
-    local hum = char:WaitForChild("Humanoid", 3)
-    if not hum then return end
-    local ff = char:FindFirstChild("恐脚本GodMode")
-    if not ff then
-        ff = Instance.new("ForceField")
-        ff.Name = "恐脚本GodMode"
-        ff.Parent = char
-    end
-    local tool = findGodMode()
-    if tool then
-        tool = tool:Clone()
-    else
-        tool = createFakeGodMode()
-    end
-    tool.Parent = player.Backpack
-    task.wait(0.1)
-    pcall(function() hum:EquipTool(tool) end)
-    states.godSpamThread = task.spawn(function()
-        while states.permanentGod do
-            pcall(function()
-                if tool and tool.Parent then
-                    tool:Activate()
-                end
-            end)
-            task.wait(0.15)
-        end
-    end)
-    pcall(function()
-        tool.Unequipped:Connect(function()
-            if states.permanentGod then
-                task.wait(0.1)
-                pcall(function() hum:EquipTool(tool) end)
-            end
-        end)
-    end)
-    hum.HealthChanged:Connect(function()
-        if states.permanentGod then
-            hum.Health = hum.MaxHealth
-        end
-    end)
-end
-
-GodGroup:AddToggle("永久无敌", {
-    Text = "永久无敌护盾(God Mode)",
-    Default = false,
-    Callback = function(value)
-        states.permanentGod = value
-        if states.permanentGod then
-            if player.Character then
-                applyGodMode(player.Character)
-            end
-            if states.godCharConn then states.godCharConn:Disconnect() end
-            states.godCharConn = player.CharacterAdded:Connect(function(char)
-                if states.permanentGod then
-                    task.wait(0.3)
-                    applyGodMode(char)
-                end
-            end)
-        else
-            clearGodMode()
-            if player.Character then
-                for _, ff in ipairs(player.Character:GetChildren()) do
-                    if ff.Name == "恐脚本GodMode" and ff:IsA("ForceField") then
-                        ff:Destroy()
-                    end
-                end
-            end
-        end
-    end
-})
-
-local TeleportGroup = Tabs.Teleport:AddLeftGroupbox("传送功能")
-
-TeleportGroup:AddButton("传送出生点", function()
-    local spawns = Workspace:FindFirstChild("Lobby") and Workspace.Lobby:FindFirstChild("Spawns")
-    if spawns then
-        local spawnLoc = spawns:FindFirstChildOfClass("SpawnLocation")
-        if spawnLoc then
-            local hrp = getHRP()
-            if hrp then
-                hrp.CFrame = spawnLoc.CFrame + Vector3.new(0, 5, 0)
-            end
-        end
-    end
-end)
-
-TeleportGroup:AddButton("传送到电梯", function()
-    local elevator = Workspace:FindFirstChild("Elevator")
-    if not elevator then return end
-    local tp = elevator:FindFirstChild("TP")
-    if not tp then return end
-    local char = player.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    hrp.CFrame = tp.CFrame + Vector3.new(0, 3, 0)
-end)
-
-TeleportGroup:AddButton("传送到VIP房间", function()
-    local char = player.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        char.HumanoidRootPart.CFrame = CFrame.new(-1866.1, -394.9, 912.9)
-    end
-end)
-
-if Workspace:FindFirstChild("VIP Door") then
-    TeleportGroup:AddButton("传送到VIP门", function()
-        local vipDoor = Workspace:FindFirstChild("VIP Door")
-        if vipDoor then
-            local hrp = getHRP()
-            if hrp then
-                hrp.CFrame = vipDoor.CFrame + Vector3.new(0, 5, 0)
-            end
-        end
-    end)
-end
-
-local GeneralLeft = Tabs.General:AddLeftGroupbox("实用功能")
-local GeneralRight = Tabs.General:AddRightGroupbox("辅助功能")
-
-GeneralLeft:AddToggle("穿墙开关", {
-    Text = "开启/关闭穿墙",
-    Default = false,
-    Callback = function(value)
-        states.noclip = value
-        if states.noclip then
-            if states.noclipConn then states.noclipConn:Disconnect() end
-            states.noclipConn = RunService.Stepped:Connect(function()
-                if not states.noclip then return end
-                local char = player.Character
-                if not char then return end
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end)
-        else
-            if states.noclipConn then states.noclipConn:Disconnect() states.noclipConn = nil end
-        end
-    end
-})
-
-GeneralLeft:AddToggle("自动复活开关", {
-    Text = "开启/关闭自动复活",
-    Default = false,
-    Callback = function(value)
-        states.autoRespawn = value
-        if states.autoRespawn then
-            local function setupRespawn(char)
-                local hum = char:WaitForChild("Humanoid")
-                hum.Died:Connect(function()
-                    if states.autoRespawn then
-                        task.wait(0.5)
-                        player:LoadCharacter()
-                    end
-                end)
-            end
-            if player.Character then
-                setupRespawn(player.Character)
-            end
-            if states.respawnConn then states.respawnConn:Disconnect() end
-            states.respawnConn = player.CharacterAdded:Connect(setupRespawn)
-        else
-            if states.respawnConn then states.respawnConn:Disconnect() states.respawnConn = nil end
-        end
-    end
-})
-
-GeneralLeft:AddButton("瞬间复活", function()
-    local hum = getHumanoid()
-    if hum and hum.Health <= 0 then
-        player:LoadCharacter()
-    elseif hum then
-        hum.Health = hum.MaxHealth
-    end
-end)
-
-GeneralLeft:AddButton("全图交互", function()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") then
-            pcall(function()
-                fireproximityprompt(obj)
-            end)
-        end
-    end
-end)
-
-GeneralRight:AddButton("全图亮灯", function()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-            obj.Brightness = 20
-            obj.Range = 200
-        end
-    end
-    Lighting.Brightness = 10
-    Lighting.GlobalShadows = false
-    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-end)
-
-GeneralRight:AddButton("清除全部特效伤害", function()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Fire") or obj:IsA("ParticleEmitter") or obj:IsA("Sparkles") then
-            if obj.Parent and obj.Parent.Parent then
-                local isPlayer = false
-                for _, plr in ipairs(Players:GetPlayers()) do
-                    if plr.Character and (obj.Parent:IsDescendantOf(plr.Character) or obj.Parent == plr.Character) then
-                        isPlayer = true
-                        break
-                    end
-                end
-                if not isPlayer then
-                    pcall(function() obj:Destroy() end)
-                end
-            end
-        end
-    end
-end)
-
-GeneralRight:AddButton("启用飞行脚本", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
-end)
-
-GeneralRight:AddToggle("移速修改开关", {
-    Text = "开启/关闭移速修改",
-    Default = false,
-    Callback = function(value)
-        states.speedEnabled = value
-        if states.speedEnabled then
-            if states.speedConn then states.speedConn:Disconnect() end
-            states.speedConn = RunService.Heartbeat:Connect(function()
-                if not states.speedEnabled then return end
-                local hum = getHumanoid()
-                if hum and hum.WalkSpeed ~= states.speedValue then
-                    hum.WalkSpeed = states.speedValue
-                end
-            end)
-        else
-            if states.speedConn then states.speedConn:Disconnect() states.speedConn = nil end
-            local hum = getHumanoid()
-            if hum then
-                hum.WalkSpeed = 16
-            end
-        end
-    end
-})
-
-GeneralRight:AddSlider("移速数值", {
-    Text = "移速调整",
-    Default = 16,
-    Min = 16,
-    Max = 250,
-    Rounding = 0,
-    Callback = function(value)
-        states.speedValue = value
-        if states.speedEnabled then
-            local hum = getHumanoid()
-            if hum then
-                hum.WalkSpeed = value
-            end
-        end
-    end
-})
-
-if Workspace:FindFirstChild("Gamepass giver") or Workspace:FindFirstChild("VIP Door") then
-    GeneralLeft:AddButton("解锁VIP权限", function()
-        local vipGiver = Workspace:FindFirstChild("Gamepass giver")
-        if vipGiver then
-            local vipModel = vipGiver:FindFirstChild("VIP")
-            if vipModel then
-                local touch = vipModel:FindFirstChild("Touch")
-                if touch and touch:FindFirstChild("TouchInterest") then
-                    local hrp = getHRP()
-                    if hrp then
-                        pcall(function()
-                            firetouchinterest(hrp, touch, 0)
-                            firetouchinterest(hrp, touch, 1)
-                        end)
-                    end
-                end
-            end
-        end
-        local vipDoor = Workspace:FindFirstChild("VIP Door")
-        if vipDoor and vipDoor:FindFirstChild("TouchInterest") then
-            local hrp = getHRP()
-            if hrp then
-                pcall(function()
-                    firetouchinterest(hrp, vipDoor, 0)
-                    firetouchinterest(hrp, vipDoor, 1)
-                end)
-            end
-        end
-    end)
-end
-
-local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理")
-UnloadGroup:AddButton("卸载脚本", function()
-    if states.godConn then states.godConn:Disconnect() end
-    if states.noclipConn then states.noclipConn:Disconnect() end
-    if states.respawnConn then states.respawnConn:Disconnect() end
-    if states.espConn then states.espConn:Disconnect() end
-    if states.godCharConn then states.godCharConn:Disconnect() end
-    if states.speedConn then states.speedConn:Disconnect() end
-    clearGodMode()
-    clearESP()
-    Library:Unload()
-end)
-
-if ThemeManager then
-    ThemeManager:SetLibrary(Library)
-    ThemeManager:SetFolder("MyScriptTheme")
-    ThemeManager:ApplyToTab(Tabs.Settings)
-end
-
-if SaveManager then
-    SaveManager:SetLibrary(Library)
-    SaveManager:IgnoreThemeSettings()
-    SaveManager:SetFolder("MyScriptConfig")
-    SaveManager:BuildConfigSection(Tabs.Settings)
-end
-]===]
-
 ServerScripts["决斗场"] = [===[
 local function safeLoad(url)
     local success, result = pcall(function() return loadstring(game:HttpGet(url))() end)
@@ -58973,6 +57721,1883 @@ if SaveManager then
     SaveManager:BuildConfigSection(Tabs.Settings)
 end
 
+]===]
+
+ServerScripts["疯狂电梯"] = [===[
+local function safeLoad(url)
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet(url))()
+    end)
+    if not success then
+        warn("加载失败: " .. url)
+        return nil
+    end
+    return result
+end
+
+local Library = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/黑曜石主库.ui")
+local ThemeManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/主题管理.ui")
+local SaveManager = safeLoad("https://raw.githubusercontent.com/kongbaNB/ui/refs/heads/main/配置管理.ui")
+
+if not Library then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "错误",
+        Text = "UI 库加载失败，请检查网络或脚本资源",
+        Duration = 5,
+    })
+    return
+end
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local player = Players.LocalPlayer
+
+local translatedCache = {}
+local monsterNameCache = {}
+
+local function translateText(text)
+    if not text or text == "" or #text < 2 then
+        return nil
+    end
+    if translatedCache[text] then
+        return translatedCache[text]
+    end
+    local success, result = pcall(function()
+        local url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=" .. HttpService:UrlEncode(text)
+        local response = game:HttpGet(url)
+        local decoded = HttpService:JSONDecode(response)
+        if decoded and decoded[1] and decoded[1][1] and decoded[1][1][1] then
+            return decoded[1][1][1]
+        end
+        return nil
+    end)
+    if success and result then
+        translatedCache[text] = result
+        return result
+    end
+    return nil
+end
+
+local function getTranslatedName(enName)
+    if not enName or enName == "" then
+        return enName
+    end
+    if monsterNameCache[enName] then
+        return monsterNameCache[enName]
+    end
+    local zh = translateText(enName)
+    if zh then
+        monsterNameCache[enName] = zh
+        return zh
+    end
+    return enName
+end
+
+local Window = Library:CreateWindow({
+    Title = "疯狂电梯",
+    Footer = "恐拜大帝 制作",
+    Icon = 131153193945220,
+    NotifySide = "Right",
+    ShowCustomCursor = true,
+})
+
+Library:Notify({
+    Title = "疯狂电梯",
+    Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功",
+    Time = 5,
+})
+
+local Tabs = {
+    Notice = Window:AddTab("通知", "info"),
+    Obtain = Window:AddTab("获取类", "download"),
+    Kill = Window:AddTab("杀戮类", "sword"),
+    God = Window:AddTab("无敌类", "shield"),
+    Teleport = Window:AddTab("传送类", "map-pin"),
+    General = Window:AddTab("通用", "settings"),
+    Settings = Window:AddTab("设置", "settings"),
+}
+
+local states = {}
+states.godMode = false
+states.noclip = false
+states.autoRespawn = false
+states.espEnabled = false
+states.permanentGod = false
+states.godConn = nil
+states.noclipConn = nil
+states.respawnConn = nil
+states.espConn = nil
+states.permanentGodConn = nil
+states.speedEnabled = false
+states.speedValue = 16
+states.speedConn = nil
+states.godSpamThread = nil
+states.godCharConn = nil
+
+local function getHRP()
+    local char = player.Character
+    if char then
+        return char:FindFirstChild("HumanoidRootPart")
+    end
+    return nil
+end
+
+local function getHumanoid()
+    local char = player.Character
+    if char then
+        return char:FindFirstChildOfClass("Humanoid")
+    end
+    return nil
+end
+
+local NoticeGroup = Tabs.Notice:AddLeftGroupbox("作者消息")
+NoticeGroup:AddLabel('恐拜大帝将持续更新此脚本')
+NoticeGroup:AddLabel('创作者：恐拜大帝')
+
+local ObtainLeft = Tabs.Obtain:AddLeftGroupbox("商店道具")
+local ObtainRight = Tabs.Obtain:AddRightGroupbox("道具获取")
+
+local function stealTool(toolName)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local bp = plr:FindFirstChild("Backpack")
+            if bp then
+                for _, tool in ipairs(bp:GetChildren()) do
+                    if tool:IsA("Tool") and tool.Name:lower() == toolName:lower() then
+                        return tool
+                    end
+                end
+            end
+            if plr.Character then
+                for _, tool in ipairs(plr.Character:GetChildren()) do
+                    if tool:IsA("Tool") and tool.Name:lower() == toolName:lower() then
+                        return tool
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function copyTool(toolName)
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Tool") and obj.Name:lower() == toolName:lower() then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function createFreezeGun()
+    local tool = Instance.new("Tool")
+    tool.Name = "freeze gun"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = true
+
+    local ls1 = Instance.new("LocalScript")
+    ls1.Name = "LocalScript"
+    ls1.Parent = tool
+
+    local ls2 = Instance.new("LocalScript")
+    ls2.Name = "Client"
+    ls2.Parent = tool
+
+    local s = Instance.new("Script")
+    s.Name = "Server"
+    s.Parent = tool
+
+    local lf = Instance.new("ModuleScript")
+    lf.Name = "LightningFunctions"
+    lf.Source = "return {}"
+    lf.Parent = s
+
+    local ss = Instance.new("Script")
+    ss.Name = "StunScript"
+    ss.Parent = s
+
+    local cc = Instance.new("RemoteFunction")
+    cc.Name = "ClientControl"
+    cc.Parent = tool
+
+    local sc = Instance.new("RemoteFunction")
+    sc.Name = "ServerControl"
+    sc.Parent = tool
+
+    local vip = Instance.new("IntValue")
+    vip.Name = "vip"
+    vip.Value = 1
+    vip.Parent = tool
+
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 0.1
+    handle.Color = Color3.fromRGB(0, 150, 255)
+    handle.Material = Enum.Material.Neon
+    handle.Parent = tool
+
+    local fire = Instance.new("Sound")
+    fire.Name = "Fire"
+    fire.SoundId = "rbxassetid://9113083740"
+    fire.Parent = handle
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Brick
+    mesh.Scale = Vector3.new(0.3, 0.3, 2)
+    mesh.Parent = handle
+
+    return tool
+end
+
+local function createVipCoil()
+    local tool = Instance.new("Tool")
+    tool.Name = "vip coil"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = true
+
+    local s = Instance.new("Script")
+    s.Name = "Server"
+    s.Parent = tool
+
+    local ls = Instance.new("LocalScript")
+    ls.Name = "LocalScript"
+    ls.Parent = tool
+
+    local re = Instance.new("RemoteEvent")
+    re.Name = "RemoteEvent"
+    re.Parent = tool
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "coins"
+    bb.Size = UDim2.new(0, 60, 0, 30)
+    bb.StudsOffset = Vector3.new(0, 3, 0)
+    bb.Parent = tool
+
+    local tl = Instance.new("TextLabel")
+    tl.Size = UDim2.new(1, 0, 1, 0)
+    tl.BackgroundTransparency = 1
+    tl.Text = "VIP"
+    tl.TextColor3 = Color3.fromRGB(255, 215, 0)
+    tl.Font = Enum.Font.GothamBold
+    tl.TextSize = 14
+    tl.Parent = bb
+
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 0.1
+    handle.Color = Color3.fromRGB(255, 215, 0)
+    handle.Material = Enum.Material.Neon
+    handle.Parent = tool
+
+    local pop = Instance.new("Sound")
+    pop.Name = "Pop"
+    pop.SoundId = "rbxassetid://9113083740"
+    pop.Parent = handle
+
+    local cs = Instance.new("Sound")
+    cs.Name = "CoilSound"
+    cs.SoundId = "rbxassetid://9113083740"
+    cs.Looped = true
+    cs.Parent = handle
+
+    local sp = Instance.new("Sparkles")
+    sp.Name = "Sparkles"
+    sp.SparkleColor = Color3.fromRGB(255, 215, 0)
+    sp.Parent = handle
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Sphere
+    mesh.Scale = Vector3.new(0.8, 0.2, 0.8)
+    mesh.Parent = handle
+
+    local rga = Instance.new("Attachment")
+    rga.Name = "RightGripAttachment"
+    rga.Parent = handle
+
+    return tool
+end
+
+local function createRadio()
+    local tool = Instance.new("Tool")
+    tool.Name = "radio"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = true
+
+    local cls = Instance.new("LocalScript")
+    cls.Name = "Client"
+    cls.Parent = tool
+
+    local ss = Instance.new("Script")
+    ss.Name = "Server"
+    ss.Parent = tool
+
+    local s = Instance.new("Script")
+    s.Name = "Script"
+    s.Parent = tool
+
+    local re = Instance.new("RemoteEvent")
+    re.Name = "Remote"
+    re.Parent = tool
+
+    local vip = Instance.new("IntValue")
+    vip.Name = "vip"
+    vip.Value = 1
+    vip.Parent = tool
+
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 0.1
+    handle.Color = Color3.fromRGB(80, 80, 80)
+    handle.Material = Enum.Material.Metal
+    handle.Parent = tool
+
+    local snd = Instance.new("Sound")
+    snd.Name = "Sound"
+    snd.SoundId = "rbxassetid://9113083740"
+    snd.Parent = handle
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Brick
+    mesh.Scale = Vector3.new(0.8, 0.5, 0.3)
+    mesh.Parent = handle
+
+    local pp = Instance.new("ProximityPrompt")
+    pp.Name = "ProximityPrompt"
+    pp.ActionText = "播放"
+    pp.ObjectText = "收音机"
+    pp.MaxActivationDistance = 5
+    pp.Parent = handle
+
+    return tool
+end
+
+local function createRainbowFlashlight()
+    local tool = Instance.new("Tool")
+    tool.Name = "rainbow flashlight"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = true
+
+    local s = Instance.new("Script")
+    s.Name = "Script"
+    s.Parent = tool
+
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 0.1
+    handle.Color = Color3.fromRGB(255, 255, 255)
+    handle.Material = Enum.Material.SmoothPlastic
+    handle.Parent = tool
+
+    local snd = Instance.new("Sound")
+    snd.Name = "Sound"
+    snd.SoundId = "rbxassetid://9113083740"
+    snd.Parent = handle
+
+    local sl = Instance.new("SpotLight")
+    sl.Name = "SpotLight"
+    sl.Brightness = 10
+    sl.Range = 30
+    sl.Color = Color3.fromRGB(255, 0, 0)
+    sl.Parent = handle
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Cylinder
+    mesh.Scale = Vector3.new(0.3, 0.3, 2)
+    mesh.Parent = handle
+
+    return tool
+end
+
+local function createJetpack()
+    local tool = Instance.new("Tool")
+    tool.Name = "Jetpack"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = true
+
+    local s = Instance.new("Script")
+    s.Name = "Script"
+    s.Parent = tool
+
+    local cfg = Instance.new("Configuration")
+    cfg.Name = "Configuration"
+    cfg.Parent = tool
+
+    local cd = Instance.new("NumberValue")
+    cd.Name = "Cooldown"
+    cd.Value = 0.5
+    cd.Parent = cfg
+
+    local pw = Instance.new("NumberValue")
+    pw.Name = "Power"
+    pw.Value = 100
+    pw.Parent = cfg
+
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 0.1
+    handle.Color = Color3.fromRGB(200, 50, 50)
+    handle.Material = Enum.Material.Metal
+    handle.Parent = tool
+
+    local att0 = Instance.new("Attachment")
+    att0.Name = "Attachment0"
+    att0.Parent = handle
+
+    local vf = Instance.new("VectorForce")
+    vf.Name = "VectorForce"
+    vf.Force = Vector3.new(0, 500, 0)
+    vf.Attachment0 = att0
+    vf.Parent = handle
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Brick
+    mesh.Scale = Vector3.new(1.2, 0.8, 0.4)
+    mesh.Parent = handle
+
+    local att = Instance.new("Attachment")
+    att.Name = "Attachment"
+    att.Parent = handle
+
+    local pe1 = Instance.new("ParticleEmitter")
+    pe1.Name = "Fire"
+    pe1.Color = ColorSequence.new(Color3.fromRGB(255, 100, 0))
+    pe1.Size = NumberSequence.new(0.5)
+    pe1.Lifetime = NumberRange.new(0.5)
+    pe1.Rate = 50
+    pe1.Parent = att
+
+    local pe2 = Instance.new("ParticleEmitter")
+    pe2.Name = "Smoke"
+    pe2.Color = ColorSequence.new(Color3.fromRGB(100, 100, 100))
+    pe2.Size = NumberSequence.new(0.3)
+    pe2.Lifetime = NumberRange.new(1)
+    pe2.Rate = 30
+    pe2.Parent = att
+
+    local wc = Instance.new("WeldConstraint")
+    wc.Name = "WeldConstraint"
+    wc.Part0 = handle
+    wc.Part1 = handle
+    wc.Parent = handle
+
+    return tool
+end
+
+local function createInsanityCoil()
+    local tool = Instance.new("Tool")
+    tool.Name = "Insanity Coil"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = true
+
+    local cls = Instance.new("LocalScript")
+    cls.Name = "Client"
+    cls.Parent = tool
+
+    local ss = Instance.new("Script")
+    ss.Name = "Server"
+    ss.Parent = tool
+
+    local beamFolder = Instance.new("Folder")
+    beamFolder.Name = "Beam"
+    beamFolder.Parent = tool
+
+    local att1 = Instance.new("Attachment")
+    att1.Name = "att1"
+    att1.Parent = beamFolder
+
+    local ib = Instance.new("Beam")
+    ib.Name = "innerBeam"
+    ib.Attachment0 = att1
+    ib.Attachment1 = att1
+    ib.Color = ColorSequence.new(Color3.fromRGB(128, 0, 128))
+    ib.Width0 = 0.2
+    ib.Width1 = 0.2
+    ib.Parent = beamFolder
+
+    local ob = Instance.new("Beam")
+    ob.Name = "outerBeam"
+    ob.Attachment0 = att1
+    ob.Attachment1 = att1
+    ob.Color = ColorSequence.new(Color3.fromRGB(255, 0, 255))
+    ob.Width0 = 0.5
+    ob.Width1 = 0.5
+    ob.Parent = beamFolder
+
+    local aura = Instance.new("ParticleEmitter")
+    aura.Name = "Aura"
+    aura.Color = ColorSequence.new(Color3.fromRGB(128, 0, 128))
+    aura.Size = NumberSequence.new(1)
+    aura.Lifetime = NumberRange.new(2)
+    aura.Rate = 20
+    aura.Parent = tool
+
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "ScreenGui"
+    sg.Parent = tool
+
+    local il = Instance.new("ImageLabel")
+    il.Name = "ImageLabel"
+    il.Size = UDim2.new(0, 100, 0, 100)
+    il.BackgroundTransparency = 1
+    il.Image = "rbxassetid://0"
+    il.Parent = sg
+
+    local runAnim = Instance.new("Animation")
+    runAnim.Name = "Run"
+    runAnim.Parent = tool
+
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 0.1
+    handle.Color = Color3.fromRGB(128, 0, 128)
+    handle.Material = Enum.Material.Neon
+    handle.Parent = tool
+
+    local ls = Instance.new("Sound")
+    ls.Name = "lightning_strike"
+    ls.SoundId = "rbxassetid://9113083740"
+    ls.Parent = handle
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Sphere
+    mesh.Scale = Vector3.new(0.8, 0.2, 0.8)
+    mesh.Parent = handle
+
+    local aps = Instance.new("StringValue")
+    aps.Name = "AvatarPartScaleType"
+    aps.Value = "Classic"
+    aps.Parent = handle
+
+    local pe = Instance.new("ParticleEmitter")
+    pe.Name = "ParticleEmitter"
+    pe.Color = ColorSequence.new(Color3.fromRGB(255, 0, 255))
+    pe.Size = NumberSequence.new(0.5)
+    pe.Lifetime = NumberRange.new(1)
+    pe.Rate = 30
+    pe.Parent = handle
+
+    local att2 = Instance.new("Attachment")
+    att2.Name = "att2"
+    att2.Parent = handle
+
+    local pl = Instance.new("PointLight")
+    pl.Name = "PointLight"
+    pl.Color = Color3.fromRGB(128, 0, 128)
+    pl.Brightness = 5
+    pl.Range = 5
+    pl.Parent = handle
+
+    return tool
+end
+
+local function createGuestsGrimoire()
+    local tool = Instance.new("Tool")
+    tool.Name = "Guest's Grimoire"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = true
+
+    local s1 = Instance.new("Script")
+    s1.Name = "Script1"
+    s1.Parent = tool
+
+    local s2 = Instance.new("Script")
+    s2.Name = "Script2"
+    s2.Parent = tool
+
+    local ls1 = Instance.new("LocalScript")
+    ls1.Name = "LocalScript1"
+    ls1.Parent = tool
+
+    local ls2 = Instance.new("LocalScript")
+    ls2.Name = "LocalScript2"
+    ls2.Parent = tool
+
+    local open = Instance.new("Sound")
+    open.Name = "Open"
+    open.SoundId = "rbxassetid://9113083740"
+    open.Parent = tool
+
+    local cc = Instance.new("ColorCorrectionEffect")
+    cc.Name = "ColorCorrection"
+    cc.TintColor = Color3.fromRGB(255, 0, 0)
+    cc.Brightness = 0.1
+    cc.Contrast = 0.2
+    cc.Parent = tool
+
+    local re1 = Instance.new("RemoteEvent")
+    re1.Name = "RemoteEvent1"
+    re1.Parent = tool
+
+    local re2 = Instance.new("RemoteEvent")
+    re2.Name = "RemoteEvent2"
+    re2.Parent = tool
+
+    local pl = Instance.new("PointLight")
+    pl.Name = "PointLight"
+    pl.Color = Color3.fromRGB(255, 0, 0)
+    pl.Brightness = 10
+    pl.Range = 10
+    pl.Parent = tool
+
+    local beam = Instance.new("Beam")
+    beam.Name = "Beam"
+    beam.Parent = tool
+
+    local ln = Instance.new("ParticleEmitter")
+    ln.Name = "Lightning"
+    ln.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0))
+    ln.Size = NumberSequence.new(0.2)
+    ln.Lifetime = NumberRange.new(0.3)
+    ln.Rate = 50
+    ln.Parent = tool
+
+    local smoke = Instance.new("ParticleEmitter")
+    smoke.Name = "Smoke"
+    smoke.Color = ColorSequence.new(Color3.fromRGB(50, 50, 50))
+    smoke.Size = NumberSequence.new(1)
+    smoke.Lifetime = NumberRange.new(2)
+    smoke.Rate = 20
+    smoke.Parent = tool
+
+    local act = Instance.new("Animation")
+    act.Name = "activate"
+    act.Parent = tool
+
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "ScreenGui"
+    sg.Parent = tool
+
+    local il = Instance.new("ImageLabel")
+    il.Name = "ImageLabel"
+    il.Size = UDim2.new(1, 0, 1, 0)
+    il.BackgroundTransparency = 1
+    il.Image = "rbxassetid://0"
+    il.Parent = sg
+
+    local anim = Instance.new("Animation")
+    anim.Name = "Animation"
+    anim.Parent = tool
+
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 0.1
+    handle.Color = Color3.fromRGB(80, 0, 0)
+    handle.Material = Enum.Material.SmoothPlastic
+    handle.Parent = tool
+
+    local snd = Instance.new("Sound")
+    snd.Name = "Sound"
+    snd.SoundId = "rbxassetid://9113083740"
+    snd.Parent = handle
+
+    local glow = Instance.new("ParticleEmitter")
+    glow.Name = "Glow"
+    glow.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+    glow.Size = NumberSequence.new(1)
+    glow.Lifetime = NumberRange.new(1)
+    glow.Rate = 20
+    glow.Parent = handle
+
+    local d1 = Instance.new("Decal")
+    d1.Name = "Pentagram"
+    d1.Texture = "rbxassetid://0"
+    d1.Parent = handle
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Brick
+    mesh.Scale = Vector3.new(0.8, 1.2, 0.2)
+    mesh.Parent = handle
+
+    for i = 1, 4 do
+        local p = Instance.new("Part")
+        p.Name = "Part" .. i
+        p.Size = Vector3.new(0.2, 0.2, 0.05)
+        p.CanCollide = false
+        p.Transparency = 0.3
+        p.Color = Color3.fromRGB(255, 0, 0)
+        p.Parent = handle
+
+        local w = Instance.new("WeldConstraint")
+        w.Name = "Weld" .. i
+        w.Part0 = handle
+        w.Part1 = p
+        w.Parent = p
+
+        local sg2 = Instance.new("SurfaceGui")
+        sg2.Name = "SurfaceGui" .. i
+        sg2.Parent = p
+
+        local tl = Instance.new("TextLabel")
+        tl.Name = "Text"
+        tl.Size = UDim2.new(1, 0, 1, 0)
+        tl.BackgroundTransparency = 1
+        tl.Text = "DEMON"
+        tl.TextColor3 = Color3.fromRGB(255, 0, 0)
+        tl.Font = Enum.Font.GothamBold
+        tl.TextSize = 8
+        tl.Parent = sg2
+    end
+
+    local rc = Instance.new("Decal")
+    rc.Name = "RedCross"
+    rc.Texture = "rbxassetid://0"
+    rc.Parent = handle
+
+    return tool
+end
+
+local function createSecondChance()
+    local tool = Instance.new("Tool")
+    tool.Name = "Second Chance"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = true
+
+    local ls = Instance.new("LocalScript")
+    ls.Name = "LocalScript"
+    ls.Parent = tool
+
+    local s = Instance.new("Script")
+    s.Name = "Script"
+    s.Parent = tool
+
+    local auraFolder = Instance.new("Folder")
+    auraFolder.Name = "Aura"
+    auraFolder.Parent = tool
+
+    local a1 = Instance.new("ParticleEmitter")
+    a1.Name = "secondChanceAura1"
+    a1.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+    a1.Size = NumberSequence.new(1)
+    a1.Lifetime = NumberRange.new(2)
+    a1.Rate = 20
+    a1.Parent = auraFolder
+
+    local a2 = Instance.new("ParticleEmitter")
+    a2.Name = "secondChanceAura2"
+    a2.Color = ColorSequence.new(Color3.fromRGB(200, 200, 255))
+    a2.Size = NumberSequence.new(0.5)
+    a2.Lifetime = NumberRange.new(1.5)
+    a2.Rate = 15
+    a2.Parent = auraFolder
+
+    local act = Instance.new("Animation")
+    act.Name = "activate"
+    act.Parent = tool
+
+    local cui = Instance.new("RemoteEvent")
+    cui.Name = "clientUI"
+    cui.Parent = tool
+
+    local handle = Instance.new("MeshPart")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 0.1
+    handle.Color = Color3.fromRGB(255, 255, 255)
+    handle.Material = Enum.Material.Glass
+    handle.Parent = tool
+
+    local shatter = Instance.new("Sound")
+    shatter.Name = "shatter"
+    shatter.SoundId = "rbxassetid://9113083740"
+    shatter.Parent = handle
+
+    local charge = Instance.new("Sound")
+    charge.Name = "charge"
+    charge.SoundId = "rbxassetid://9113083740"
+    charge.Looped = true
+    charge.Parent = handle
+
+    local hl = Instance.new("Highlight")
+    hl.Name = "Highlight"
+    hl.FillColor = Color3.fromRGB(255, 255, 255)
+    hl.OutlineColor = Color3.fromRGB(200, 200, 255)
+    hl.Parent = handle
+
+    local gs = Instance.new("ParticleEmitter")
+    gs.Name = "GlassShatter"
+    gs.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+    gs.Size = NumberSequence.new(0.3)
+    gs.Lifetime = NumberRange.new(1)
+    gs.Rate = 0
+    gs.Parent = handle
+
+    local glare = Instance.new("ParticleEmitter")
+    glare.Name = "glare"
+    glare.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+    glare.Size = NumberSequence.new(2)
+    glare.Lifetime = NumberRange.new(0.5)
+    glare.Rate = 0
+    glare.Parent = handle
+
+    return tool
+end
+
+local function createGodMode()
+    local tool = Instance.new("Tool")
+    tool.Name = "God Mode"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = false
+
+    local s = Instance.new("Script")
+    s.Name = "Script"
+    s.Parent = tool
+
+    local ls = Instance.new("LocalScript")
+    ls.Name = "LocalScript"
+    ls.Parent = tool
+
+    local anims = Instance.new("Folder")
+    anims.Name = "Animations"
+    anims.Parent = ls
+
+    local a1 = Instance.new("Animation")
+    a1.Name = "activate"
+    a1.Parent = anims
+
+    local a2 = Instance.new("Animation")
+    a2.Name = "cast"
+    a2.Parent = anims
+
+    local a3 = Instance.new("Animation")
+    a3.Name = "idle"
+    a3.Parent = anims
+
+    local theme = Instance.new("Sound")
+    theme.Name = "Theme"
+    theme.SoundId = "rbxassetid://9113083740"
+    theme.Looped = true
+    theme.Parent = ls
+
+    local funcs = Instance.new("ModuleScript")
+    funcs.Name = "Functions"
+    funcs.Source = "return {}"
+    funcs.Parent = tool
+
+    local handle = Instance.new("MeshPart")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 1
+    handle.Parent = tool
+
+    local equip = Instance.new("Sound")
+    equip.Name = "Equip"
+    equip.SoundId = "rbxassetid://9113083740"
+    equip.Parent = handle
+
+    local choir = Instance.new("Sound")
+    choir.Name = "choir"
+    choir.SoundId = "rbxassetid://9113083740"
+    choir.Parent = handle
+
+    local heal = Instance.new("Sound")
+    heal.Name = "heal"
+    heal.SoundId = "rbxassetid://9113083740"
+    heal.Parent = handle
+
+    local sb = Instance.new("Sound")
+    sb.Name = "startBeam"
+    sb.SoundId = "rbxassetid://9113083740"
+    sb.Parent = handle
+
+    local pss = Instance.new("PitchShiftSoundEffect")
+    pss.Name = "PitchShift"
+    pss.Octave = 1.5
+    pss.Parent = sb
+
+    local att = Instance.new("Attachment")
+    att.Name = "Attachment"
+    att.Parent = handle
+
+    local re = Instance.new("RemoteEvent")
+    re.Name = "Replication"
+    re.Parent = tool
+
+    return tool
+end
+
+local itemCreators = {
+    ["freeze gun"] = createFreezeGun,
+    ["vip coil"] = createVipCoil,
+    ["radio"] = createRadio,
+    ["rainbow flashlight"] = createRainbowFlashlight,
+    ["Jetpack"] = createJetpack,
+    ["Insanity Coil"] = createInsanityCoil,
+    ["Guest's Grimoire"] = createGuestsGrimoire,
+    ["Second Chance"] = createSecondChance,
+    ["God Mode"] = createGodMode,
+}
+
+local function getItem(itemName)
+    local stolen = stealTool(itemName)
+    if stolen then
+        local clone = stolen:Clone()
+        clone.Parent = player.Backpack
+        return
+    end
+    local copied = copyTool(itemName)
+    if copied then
+        local clone = copied:Clone()
+        clone.Parent = player.Backpack
+        return
+    end
+    local creator = itemCreators[itemName]
+    if creator then
+        local tool = creator()
+        tool.Parent = player.Backpack
+        return
+    end
+    local basic = Instance.new("Tool")
+    basic.Name = itemName
+    basic.RequiresHandle = true
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Parent = basic
+    basic.Parent = player.Backpack
+end
+
+local function buyItem(itemName)
+    local hrp = getHRP()
+    if not hrp then return end
+    local shop = Workspace:FindFirstChild("shopTouchPrompts")
+    if shop then
+        for _, item in ipairs(shop:GetChildren()) do
+            if item:IsA("BasePart") and item.Name == itemName and item:FindFirstChild("TouchInterest") then
+                pcall(function()
+                    firetouchinterest(hrp, item, 0)
+                    firetouchinterest(hrp, item, 1)
+                end)
+                return
+            end
+        end
+    end
+    local vipGivers = Workspace:FindFirstChild("VIP Givers")
+    if vipGivers then
+        for _, item in ipairs(vipGivers:GetChildren()) do
+            if item.Name == itemName and item:FindFirstChild("TouchInterest") then
+                pcall(function()
+                    firetouchinterest(hrp, item, 0)
+                    firetouchinterest(hrp, item, 1)
+                end)
+                return
+            end
+        end
+    end
+end
+
+local shop = Workspace:FindFirstChild("shopTouchPrompts")
+local shopItems = {}
+local shopItemMap = {}
+if shop then
+    for _, item in ipairs(shop:GetChildren()) do
+        if item:IsA("BasePart") and item:FindFirstChild("TouchInterest") then
+            local zhName = getTranslatedName(item.Name)
+            table.insert(shopItems, zhName)
+            shopItemMap[zhName] = item.Name
+        end
+    end
+end
+
+local selectedShopItems = {}
+
+if #shopItems > 0 then
+    ObtainLeft:AddDropdown("商店道具选择", {
+        Values = shopItems,
+        Default = 1,
+        Multi = true,
+        Text = "选择商店道具(可多选)",
+        Callback = function(value)
+            selectedShopItems = {}
+            for k, v in pairs(value) do
+                local zhName = nil
+                if type(k) == "string" then
+                    zhName = k
+                elseif type(v) == "string" then
+                    zhName = v
+                end
+                if zhName and shopItemMap[zhName] then
+                    table.insert(selectedShopItems, shopItemMap[zhName])
+                end
+            end
+        end
+    })
+else
+    ObtainLeft:AddLabel("未找到商店道具")
+end
+
+ObtainLeft:AddButton("购买选中道具", function()
+    local hrp = getHRP()
+    if not hrp or not shop then return end
+    if #selectedShopItems == 0 then return end
+    for _, enName in ipairs(selectedShopItems) do
+        for _, item in ipairs(shop:GetChildren()) do
+            if item:IsA("BasePart") and item.Name == enName and item:FindFirstChild("TouchInterest") then
+                pcall(function()
+                    firetouchinterest(hrp, item, 0)
+                    firetouchinterest(hrp, item, 1)
+                end)
+            end
+        end
+    end
+    selectedShopItems = {}
+    pcall(function()
+        Options["商店道具选择"]:SetValue({})
+    end)
+end)
+
+ObtainLeft:AddButton("免费获取选中道具", function()
+    if #selectedShopItems == 0 then return end
+    for _, enName in ipairs(selectedShopItems) do
+        getItem(enName)
+    end
+    selectedShopItems = {}
+    pcall(function()
+        Options["商店道具选择"]:SetValue({})
+    end)
+end)
+
+ObtainLeft:AddButton("购买全部商店道具", function()
+    local hrp = getHRP()
+    if not hrp or not shop then return end
+    for _, item in ipairs(shop:GetChildren()) do
+        if item:IsA("BasePart") and item:FindFirstChild("TouchInterest") then
+            pcall(function()
+                firetouchinterest(hrp, item, 0)
+                firetouchinterest(hrp, item, 1)
+            end)
+        end
+    end
+end)
+
+ObtainLeft:AddButton("免费获取全部商店道具", function()
+    if not shop then return end
+    for _, item in ipairs(shop:GetChildren()) do
+        if item:IsA("BasePart") and item:FindFirstChild("TouchInterest") then
+            getItem(item.Name)
+        end
+    end
+end)
+
+local vipGroup = Tabs.Obtain:AddLeftGroupbox("VIP道具")
+local paidGroup = Tabs.Obtain:AddRightGroupbox("付费道具")
+
+local vipItems = {
+    {en = "freeze gun", zh = "冰冻枪"},
+    {en = "vip coil", zh = "VIP线圈"},
+    {en = "radio", zh = "收音机"},
+    {en = "rainbow flashlight", zh = "彩虹手电筒"},
+}
+
+local paidItems = {
+    {en = "Jetpack", zh = "喷气背包"},
+    {en = "Insanity Coil", zh = "疯狂线圈"},
+    {en = "Guest's Grimoire", zh = "魔法书"},
+    {en = "Second Chance", zh = "复活十字架"},
+    {en = "God Mode", zh = "无敌球"},
+}
+
+local selectedVipItems = {}
+local selectedPaidItems = {}
+
+local vipValues = {}
+for _, v in ipairs(vipItems) do
+    table.insert(vipValues, v.zh)
+end
+
+local paidValues = {}
+for _, v in ipairs(paidItems) do
+    table.insert(paidValues, v.zh)
+end
+
+vipGroup:AddDropdown("VIP道具选择", {
+    Values = vipValues,
+    Default = 1,
+    Multi = true,
+    Text = "选择VIP道具(可多选)",
+    Callback = function(value)
+        selectedVipItems = {}
+        for k, v in pairs(value) do
+            local zhName = nil
+            if type(k) == "string" then
+                zhName = k
+            elseif type(v) == "string" then
+                zhName = v
+            end
+            for _, item in ipairs(vipItems) do
+                if item.zh == zhName then
+                    table.insert(selectedVipItems, item.en)
+                    break
+                end
+            end
+        end
+    end
+})
+
+vipGroup:AddButton("获取选中VIP道具", function()
+    if #selectedVipItems == 0 then return end
+    for _, enName in ipairs(selectedVipItems) do
+        getItem(enName)
+    end
+    selectedVipItems = {}
+    pcall(function()
+        Options["VIP道具选择"]:SetValue({})
+    end)
+end)
+
+vipGroup:AddButton("获取全部VIP道具", function()
+    for _, item in ipairs(vipItems) do
+        getItem(item.en)
+    end
+end)
+
+vipGroup:AddButton("购买选中VIP道具", function()
+    if #selectedVipItems == 0 then return end
+    for _, enName in ipairs(selectedVipItems) do
+        buyItem(enName)
+    end
+    selectedVipItems = {}
+    pcall(function()
+        Options["VIP道具选择"]:SetValue({})
+    end)
+end)
+
+paidGroup:AddDropdown("付费道具选择", {
+    Values = paidValues,
+    Default = 1,
+    Multi = true,
+    Text = "选择付费道具(可多选)",
+    Callback = function(value)
+        selectedPaidItems = {}
+        for k, v in pairs(value) do
+            local zhName = nil
+            if type(k) == "string" then
+                zhName = k
+            elseif type(v) == "string" then
+                zhName = v
+            end
+            for _, item in ipairs(paidItems) do
+                if item.zh == zhName then
+                    table.insert(selectedPaidItems, item.en)
+                    break
+                end
+            end
+        end
+    end
+})
+
+paidGroup:AddButton("获取选中付费道具", function()
+    if #selectedPaidItems == 0 then return end
+    for _, enName in ipairs(selectedPaidItems) do
+        getItem(enName)
+    end
+    selectedPaidItems = {}
+    pcall(function()
+        Options["付费道具选择"]:SetValue({})
+    end)
+end)
+
+paidGroup:AddButton("获取全部付费道具", function()
+    for _, item in ipairs(paidItems) do
+        getItem(item.en)
+    end
+end)
+
+paidGroup:AddButton("购买选中付费道具", function()
+    if #selectedPaidItems == 0 then return end
+    for _, enName in ipairs(selectedPaidItems) do
+        buyItem(enName)
+    end
+    selectedPaidItems = {}
+    pcall(function()
+        Options["付费道具选择"]:SetValue({})
+    end)
+end)
+
+ObtainRight:AddButton("获取地图全部工具", function()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Tool") and obj.Parent ~= player.Backpack and obj.Parent ~= player.Character then
+            local clone = obj:Clone()
+            clone.Parent = player.Backpack
+        end
+    end
+end)
+
+ObtainRight:AddButton("全部道具获取", function()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Tool") then
+            local clone = obj:Clone()
+            clone.Parent = player.Backpack
+        end
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local bp = plr:FindFirstChild("Backpack")
+            if bp then
+                for _, tool in ipairs(bp:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        local clone = tool:Clone()
+                        clone.Parent = player.Backpack
+                    end
+                end
+            end
+            if plr.Character then
+                for _, tool in ipairs(plr.Character:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        local clone = tool:Clone()
+                        clone.Parent = player.Backpack
+                    end
+                end
+            end
+        end
+    end
+end)
+
+ObtainRight:AddButton("偷别人道具", function()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local bp = plr:FindFirstChild("Backpack")
+            if bp then
+                for _, tool in ipairs(bp:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        local clone = tool:Clone()
+                        clone.Parent = player.Backpack
+                    end
+                end
+            end
+            if plr.Character then
+                for _, tool in ipairs(plr.Character:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        local clone = tool:Clone()
+                        clone.Parent = player.Backpack
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local KillGroup = Tabs.Kill:AddLeftGroupbox("杀戮功能")
+
+local function killAllMonsters()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Parent then
+            local model = obj.Parent
+            local isPlayer = false
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr.Character == model then
+                    isPlayer = true
+                    break
+                end
+            end
+            if not isPlayer then
+                pcall(function()
+                    obj.Health = 0
+                end)
+                task.delay(0.2, function()
+                    pcall(function()
+                        if model and model.Parent then
+                            model:Destroy()
+                        end
+                    end)
+                end)
+            end
+        end
+    end
+end
+
+KillGroup:AddButton("杀戮全部怪物", function()
+    killAllMonsters()
+end)
+
+KillGroup:AddButton("删除全部怪物", function()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Parent then
+            local model = obj.Parent
+            local isPlayer = false
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr.Character == model then
+                    isPlayer = true
+                    break
+                end
+            end
+            if not isPlayer then
+                pcall(function()
+                    model:Destroy()
+                end)
+            end
+        end
+    end
+end)
+
+KillGroup:AddButton("杀死其他玩家", function()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character then
+            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                pcall(function()
+                    hum.Health = 0
+                end)
+            end
+        end
+    end
+end)
+
+local monsterBillboards = {}
+
+local function clearESP()
+    for _, bb in ipairs(monsterBillboards) do
+        pcall(function() bb:Destroy() end)
+    end
+    monsterBillboards = {}
+end
+
+local function updateESP()
+    local hrp = getHRP()
+    if not hrp then return end
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Parent then
+            local model = obj.Parent
+            local isPlayer = false
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr.Character == model then
+                    isPlayer = true
+                    break
+                end
+            end
+            if not isPlayer then
+                local head = model:FindFirstChild("Head") or model:FindFirstChildWhichIsA("BasePart")
+                if head then
+                    local bb = head:FindFirstChild("恐脚本透视")
+                    if not bb then
+                        bb = Instance.new("BillboardGui")
+                        bb.Name = "恐脚本透视"
+                        bb.Size = UDim2.new(0, 120, 0, 40)
+                        bb.AlwaysOnTop = true
+                        bb.StudsOffset = Vector3.new(0, 3, 0)
+                        bb.Parent = player.PlayerGui
+                        bb.Adornee = head
+                        local tl = Instance.new("TextLabel")
+                        tl.Size = UDim2.new(1, 0, 1, 0)
+                        tl.BackgroundTransparency = 1
+                        tl.TextColor3 = Color3.fromRGB(255, 0, 0)
+                        tl.Font = Enum.Font.GothamBold
+                        tl.TextSize = 12
+                        tl.Parent = bb
+                        table.insert(monsterBillboards, bb)
+                    end
+                    local dist = math.floor((hrp.Position - head.Position).Magnitude)
+                    local tl = bb:FindFirstChildOfClass("TextLabel")
+                    if tl then
+                        local displayName = getTranslatedName(model.Name)
+                        tl.Text = displayName .. "\n" .. dist .. "m"
+                    end
+                end
+            end
+        end
+    end
+end
+
+KillGroup:AddToggle("怪物透视", {
+    Text = "开启/关闭怪物透视",
+    Default = false,
+    Callback = function(value)
+        states.espEnabled = value
+        if states.espEnabled then
+            if states.espConn then states.espConn:Disconnect() end
+            states.espConn = RunService.RenderStepped:Connect(function()
+                if states.espEnabled then
+                    updateESP()
+                end
+            end)
+        else
+            if states.espConn then states.espConn:Disconnect() states.espConn = nil end
+            clearESP()
+        end
+    end
+})
+
+local GodGroup = Tabs.God:AddLeftGroupbox("无敌功能")
+
+GodGroup:AddToggle("普通无敌", {
+    Text = "开启/关闭无敌",
+    Default = false,
+    Callback = function(value)
+        states.godMode = value
+        if states.godMode then
+            local function applyGod(char)
+                local hum = char:WaitForChild("Humanoid", 3)
+                if not hum then return end
+                local ff = Instance.new("ForceField")
+                ff.Name = "恐脚本无敌"
+                ff.Parent = char
+                hum.HealthChanged:Connect(function()
+                    if states.godMode then
+                        hum.Health = hum.MaxHealth
+                    end
+                end)
+            end
+            if player.Character then
+                applyGod(player.Character)
+            end
+            if states.godConn then states.godConn:Disconnect() end
+            states.godConn = player.CharacterAdded:Connect(applyGod)
+        else
+            if states.godConn then states.godConn:Disconnect() states.godConn = nil end
+            if player.Character then
+                for _, ff in ipairs(player.Character:GetChildren()) do
+                    if ff.Name == "恐脚本无敌" and ff:IsA("ForceField") then
+                        ff:Destroy()
+                    end
+                end
+            end
+        end
+    end
+})
+
+local function clearGodMode()
+    if states.godSpamThread then
+        pcall(function() task.cancel(states.godSpamThread) end)
+        states.godSpamThread = nil
+    end
+    if states.godCharConn then
+        pcall(function() states.godCharConn:Disconnect() end)
+        states.godCharConn = nil
+    end
+end
+
+local function findGodMode()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local bp = plr:FindFirstChild("Backpack")
+            if bp then
+                for _, t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") and t.Name == "God Mode" then
+                        return t
+                    end
+                end
+            end
+            if plr.Character then
+                for _, t in ipairs(plr.Character:GetChildren()) do
+                    if t:IsA("Tool") and t.Name == "God Mode" then
+                        return t
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function createFakeGodMode()
+    local tool = Instance.new("Tool")
+    tool.Name = "God Mode"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = false
+
+    local handle = Instance.new("MeshPart")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.CanCollide = false
+    handle.Transparency = 1
+    handle.Parent = tool
+
+    local re = Instance.new("RemoteEvent")
+    re.Name = "Replication"
+    re.Parent = tool
+
+    local funcs = Instance.new("ModuleScript")
+    funcs.Name = "Functions"
+    funcs.Source = "return {}"
+    funcs.Parent = tool
+
+    local ls = Instance.new("LocalScript")
+    ls.Name = "LocalScript"
+    ls.Parent = tool
+
+    local theme = Instance.new("Sound")
+    theme.Name = "Theme"
+    theme.Parent = ls
+
+    local anims = Instance.new("Folder")
+    anims.Name = "Animations"
+    anims.Parent = ls
+
+    local a1 = Instance.new("Animation")
+    a1.Name = "activate"
+    a1.Parent = anims
+
+    local a2 = Instance.new("Animation")
+    a2.Name = "cast"
+    a2.Parent = anims
+
+    local a3 = Instance.new("Animation")
+    a3.Name = "idle"
+    a3.Parent = anims
+
+    return tool
+end
+
+local function applyGodMode(char)
+    local hum = char:WaitForChild("Humanoid", 3)
+    if not hum then return end
+
+    local ff = char:FindFirstChild("恐脚本GodMode")
+    if not ff then
+        ff = Instance.new("ForceField")
+        ff.Name = "恐脚本GodMode"
+        ff.Parent = char
+    end
+
+    local tool = findGodMode()
+    if tool then
+        tool = tool:Clone()
+    else
+        tool = createFakeGodMode()
+    end
+
+    tool.Parent = player.Backpack
+    task.wait(0.1)
+    pcall(function() hum:EquipTool(tool) end)
+
+    local re = tool:FindFirstChild("Replication")
+    if re then
+        for i = 1, 5 do
+            pcall(function() re:FireServer() end)
+        end
+    end
+
+    states.godSpamThread = task.spawn(function()
+        while states.permanentGod do
+            pcall(function()
+                if tool and tool.Parent then
+                    if re then re:FireServer() end
+                    tool:Activate()
+                end
+            end)
+            task.wait(0.15)
+        end
+    end)
+
+    pcall(function()
+        tool.Unequipped:Connect(function()
+            if states.permanentGod then
+                task.wait(0.1)
+                pcall(function() hum:EquipTool(tool) end)
+            end
+        end)
+    end)
+
+    hum.HealthChanged:Connect(function()
+        if states.permanentGod then
+            hum.Health = hum.MaxHealth
+        end
+    end)
+end
+
+GodGroup:AddToggle("永久无敌", {
+    Text = "永久无敌护盾(God Mode)",
+    Default = false,
+    Callback = function(value)
+        states.permanentGod = value
+        if states.permanentGod then
+            if player.Character then
+                applyGodMode(player.Character)
+            end
+            if states.godCharConn then states.godCharConn:Disconnect() end
+            states.godCharConn = player.CharacterAdded:Connect(function(char)
+                if states.permanentGod then
+                    task.wait(0.3)
+                    applyGodMode(char)
+                end
+            end)
+        else
+            clearGodMode()
+            if player.Character then
+                for _, ff in ipairs(player.Character:GetChildren()) do
+                    if ff.Name == "恐脚本GodMode" and ff:IsA("ForceField") then
+                        ff:Destroy()
+                    end
+                end
+            end
+        end
+    end
+})
+
+local TeleportGroup = Tabs.Teleport:AddLeftGroupbox("传送功能")
+
+TeleportGroup:AddButton("传送出生点", function()
+    local spawns = Workspace:FindFirstChild("Lobby") and Workspace.Lobby:FindFirstChild("Spawns")
+    if spawns then
+        local spawnLoc = spawns:FindFirstChildOfClass("SpawnLocation")
+        if spawnLoc then
+            local hrp = getHRP()
+            if hrp then
+                hrp.CFrame = spawnLoc.CFrame + Vector3.new(0, 5, 0)
+            end
+        end
+    end
+end)
+
+TeleportGroup:AddButton("传送到电梯", function()
+    local elevator = Workspace:FindFirstChild("Elevator")
+    if not elevator then return end
+    local tp = elevator:FindFirstChild("TP")
+    if not tp then return end
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    hrp.CFrame = tp.CFrame + Vector3.new(0, 3, 0)
+end)
+
+TeleportGroup:AddButton("传送到VIP房间", function()
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(-1866.1, -394.9, 912.9)
+    end
+end)
+
+if Workspace:FindFirstChild("VIP Door") then
+    TeleportGroup:AddButton("传送到VIP门", function()
+        local vipDoor = Workspace:FindFirstChild("VIP Door")
+        if vipDoor then
+            local hrp = getHRP()
+            if hrp then
+                hrp.CFrame = vipDoor.CFrame + Vector3.new(0, 5, 0)
+            end
+        end
+    end)
+end
+
+local GeneralLeft = Tabs.General:AddLeftGroupbox("实用功能")
+local GeneralRight = Tabs.General:AddRightGroupbox("辅助功能")
+
+GeneralLeft:AddToggle("穿墙开关", {
+    Text = "开启/关闭穿墙",
+    Default = false,
+    Callback = function(value)
+        states.noclip = value
+        if states.noclip then
+            if states.noclipConn then states.noclipConn:Disconnect() end
+            states.noclipConn = RunService.Stepped:Connect(function()
+                if not states.noclip then return end
+                local char = player.Character
+                if not char then return end
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end)
+        else
+            if states.noclipConn then states.noclipConn:Disconnect() states.noclipConn = nil end
+        end
+    end
+})
+
+GeneralLeft:AddToggle("自动复活开关", {
+    Text = "开启/关闭自动复活",
+    Default = false,
+    Callback = function(value)
+        states.autoRespawn = value
+        if states.autoRespawn then
+            local function setupRespawn(char)
+                local hum = char:WaitForChild("Humanoid")
+                hum.Died:Connect(function()
+                    if states.autoRespawn then
+                        task.wait(0.5)
+                        player:LoadCharacter()
+                    end
+                end)
+            end
+            if player.Character then
+                setupRespawn(player.Character)
+            end
+            if states.respawnConn then states.respawnConn:Disconnect() end
+            states.respawnConn = player.CharacterAdded:Connect(setupRespawn)
+        else
+            if states.respawnConn then states.respawnConn:Disconnect() states.respawnConn = nil end
+        end
+    end
+})
+
+GeneralLeft:AddButton("瞬间复活", function()
+    local hum = getHumanoid()
+    if hum and hum.Health <= 0 then
+        player:LoadCharacter()
+    elseif hum then
+        hum.Health = hum.MaxHealth
+    end
+end)
+
+GeneralLeft:AddButton("全图交互", function()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            pcall(function()
+                fireproximityprompt(obj)
+            end)
+        end
+    end
+end)
+
+GeneralRight:AddButton("全图亮灯", function()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+            obj.Brightness = 20
+            obj.Range = 200
+        end
+    end
+    Lighting.Brightness = 10
+    Lighting.GlobalShadows = false
+    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+end)
+
+GeneralRight:AddButton("清除全部特效伤害", function()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Fire") or obj:IsA("ParticleEmitter") or obj:IsA("Sparkles") then
+            if obj.Parent and obj.Parent.Parent then
+                local isPlayer = false
+                for _, plr in ipairs(Players:GetPlayers()) do
+                    if plr.Character and (obj.Parent:IsDescendantOf(plr.Character) or obj.Parent == plr.Character) then
+                        isPlayer = true
+                        break
+                    end
+                end
+                if not isPlayer then
+                    pcall(function() obj:Destroy() end)
+                end
+            end
+        end
+    end
+end)
+
+GeneralRight:AddButton("启用飞行脚本", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/kongbaNB/9178/refs/heads/main/fly.lua"))()
+end)
+
+GeneralRight:AddToggle("移速修改开关", {
+    Text = "开启/关闭移速修改",
+    Default = false,
+    Callback = function(value)
+        states.speedEnabled = value
+        if states.speedEnabled then
+            if states.speedConn then states.speedConn:Disconnect() end
+            states.speedConn = RunService.Heartbeat:Connect(function()
+                if not states.speedEnabled then return end
+                local hum = getHumanoid()
+                if hum and hum.WalkSpeed ~= states.speedValue then
+                    hum.WalkSpeed = states.speedValue
+                end
+            end)
+        else
+            if states.speedConn then states.speedConn:Disconnect() states.speedConn = nil end
+            local hum = getHumanoid()
+            if hum then
+                hum.WalkSpeed = 16
+            end
+        end
+    end
+})
+
+GeneralRight:AddSlider("移速数值", {
+    Text = "移速调整",
+    Default = 16,
+    Min = 16,
+    Max = 250,
+    Rounding = 0,
+    Callback = function(value)
+        states.speedValue = value
+        if states.speedEnabled then
+            local hum = getHumanoid()
+            if hum then
+                hum.WalkSpeed = value
+            end
+        end
+    end
+})
+
+if Workspace:FindFirstChild("Gamepass giver") or Workspace:FindFirstChild("VIP Door") then
+    GeneralLeft:AddButton("解锁VIP权限", function()
+        local vipGiver = Workspace:FindFirstChild("Gamepass giver")
+        if vipGiver then
+            local vipModel = vipGiver:FindFirstChild("VIP")
+            if vipModel then
+                local touch = vipModel:FindFirstChild("Touch")
+                if touch and touch:FindFirstChild("TouchInterest") then
+                    local hrp = getHRP()
+                    if hrp then
+                        pcall(function()
+                            firetouchinterest(hrp, touch, 0)
+                            firetouchinterest(hrp, touch, 1)
+                        end)
+                    end
+                end
+            end
+        end
+        local vipDoor = Workspace:FindFirstChild("VIP Door")
+        if vipDoor and vipDoor:FindFirstChild("TouchInterest") then
+            local hrp = getHRP()
+            if hrp then
+                pcall(function()
+                    firetouchinterest(hrp, vipDoor, 0)
+                    firetouchinterest(hrp, vipDoor, 1)
+                end)
+            end
+        end
+    end)
+end
+
+local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理")
+UnloadGroup:AddButton("卸载脚本", function()
+    if states.godConn then states.godConn:Disconnect() end
+    if states.noclipConn then states.noclipConn:Disconnect() end
+    if states.respawnConn then states.respawnConn:Disconnect() end
+    if states.espConn then states.espConn:Disconnect() end
+    if states.godCharConn then states.godCharConn:Disconnect() end
+    if states.speedConn then states.speedConn:Disconnect() end
+    clearGodMode()
+    clearESP()
+    Library:Unload()
+end)
+
+if ThemeManager then
+    ThemeManager:SetLibrary(Library)
+    ThemeManager:SetFolder("MyScriptTheme")
+    ThemeManager:ApplyToTab(Tabs.Settings)
+end
+
+if SaveManager then
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetFolder("MyScriptConfig")
+    SaveManager:BuildConfigSection(Tabs.Settings)
+end
 ]===]
 
 
