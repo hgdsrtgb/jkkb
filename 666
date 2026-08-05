@@ -2487,7 +2487,6 @@ kbInvToggles[4] = Tabs.MainTab:Toggle({
     end,
 })
 Tabs.MainTab:Button({
- Tabs.MainTab:Button({
     Title = "设置重生点",
     Callback = function()
         kbPlayDing()
@@ -2506,7 +2505,7 @@ Tabs.MainTab:Button({
         part.CanQuery = false
         part.CanTouch = false
         part.Transparency = 1
-        part.Size = Vector3.new(1, 1, 1)
+        part.Size = Vector3.new(0.1, 0.1, 0.1)
         part.CFrame = CFrame.new(getgenv()._kbSpawnPos)
         part.Parent = workspace
         local bb = Instance.new("BillboardGui")
@@ -2551,7 +2550,7 @@ Tabs.MainTab:Button({
         if getgenv()._kbSpawnConn then pcall(function() getgenv()._kbSpawnConn:Disconnect() end) getgenv()._kbSpawnConn = nil end
         WindUI:Notify({ Title = "删除重生点", Content = "重生点已删除", Duration = 3 })
     end
-})
+})Tabs.MainTab:Dropdown({
     Title = "选择要伪装成的玩家",
     Multi = false,
     Options = {},
@@ -2718,9 +2717,8 @@ local markerList = {}
 local markerCount = 0
 local selectedMarkers = {}
 local markerLoopEnabled = false
-local cnNums = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十"}
 local function getMarkerName(n)
-    return "标点" .. (cnNums[n] or tostring(n))
+    return "标点" .. tostring(n)
 end
 local function refreshMarkerDropdown()
     if not markerDropdown then return end
