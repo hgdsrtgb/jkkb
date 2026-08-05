@@ -2313,7 +2313,6 @@ local function startImpersonate(targetName)
     end)
     WindUI:Notify({Title = "成功", Content = "已伪装成: " .. targetName .. "（仅自己可见）", Type = "success"})
 end
-local respawnPos = nil
 kbSoulOn = false
 kbSoulNoReturn = false
 kbSoulOriginCF = nil
@@ -2488,6 +2487,7 @@ kbInvToggles[4] = Tabs.MainTab:Toggle({
     end,
 })
 Tabs.MainTab:Button({
+ Tabs.MainTab:Button({
     Title = "设置重生点",
     Callback = function()
         kbPlayDing()
@@ -2495,63 +2495,63 @@ Tabs.MainTab:Button({
         if not char then return end
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-        respawnPos = hrp.Position
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("SpawnLocation") then
-                obj.CFrame = CFrame.new(respawnPos)
-                obj.Enabled = true
-                obj.Neutral = true
-                obj.CanCollide = false
-            end
+        getgenv()._kbSpawnPos = hrp.Position
+        if getgenv()._kbSpawnPart and getgenv()._kbSpawnPart.Parent then
+            getgenv()._kbSpawnPart:Destroy()
         end
+        local part = Instance.new("Part")
+        part.Name = "KbSpawnMarker"
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.Transparency = 1
+        part.Size = Vector3.new(1, 1, 1)
+        part.CFrame = CFrame.new(getgenv()._kbSpawnPos)
+        part.Parent = workspace
+        local bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.new(0, 120, 0, 40)
+        bb.StudsOffset = Vector3.new(0, 2, 0)
+        bb.AlwaysOnTop = true
+        bb.Parent = part
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = "重生点"
+        lbl.TextColor3 = Color3.fromRGB(0, 255, 0)
+        lbl.TextStrokeTransparency = 0
+        lbl.TextSize = 18
+        lbl.Font = Enum.Font.SourceSansBold
+        lbl.Parent = bb
+        getgenv()._kbSpawnPart = part
+        if getgenv()._kbSpawnConn then pcall(function() getgenv()._kbSpawnConn:Disconnect() end) end
+        getgenv()._kbSpawnConn = player.CharacterAdded:Connect(function(nc)
+            if not getgenv()._kbSpawnPos then return end
+            task.spawn(function()
+                local nr = nc:WaitForChild("HumanoidRootPart", 3)
+                if nr then
+                    task.wait(0.1)
+                    pcall(function() nr.CFrame = CFrame.new(getgenv()._kbSpawnPos) end)
+                end
+            end)
+        end)
         WindUI:Notify({ Title = "设置重生点", Content = "重生点已设置", Duration = 3 })
     end
 })
-Tabs.MainTab:Toggle({
-    Title = "原地复活",
-    Default = false,
-    Callback = function(state)
+
+Tabs.MainTab:Button({
+    Title = "删除重生点",
+    Callback = function()
         kbPlayDing()
-        if state then
-            getgenv()._kbReOn = true
-            getgenv()._kbRePos = nil
-            if getgenv()._kbReH then pcall(function() getgenv()._kbReH:Disconnect() end) end
-            if getgenv()._kbReC then pcall(function() getgenv()._kbReC:Disconnect() end) end
-            local _lastHP = nil
-            getgenv()._kbReH = RunService.Heartbeat:Connect(function()
-                if not getgenv()._kbReOn then return end
-                local c = player.Character
-                if not c then return end
-                local r = c:FindFirstChild("HumanoidRootPart")
-                local h = c:FindFirstChildOfClass("Humanoid")
-                if not r or not h then return end
-                if _lastHP and _lastHP > 0 and h.Health <= 0 then
-                    getgenv()._kbRePos = r.Position
-                end
-                _lastHP = h.Health
-            end)
-            getgenv()._kbReC = player.CharacterAdded:Connect(function(nc)
-                if not getgenv()._kbReOn then return end
-                if getgenv()._kbRePos then
-                    task.spawn(function()
-                        local nr = nc:WaitForChild("HumanoidRootPart", 3)
-                        if nr then
-                            task.wait(0.1)
-                            pcall(function() nr.CFrame = CFrame.new(getgenv()._kbRePos) end)
-                        end
-                    end)
-                end
-            end)
-            WindUI:Notify({ Title = "原地复活", Content = "已开启", Duration = 3 })
-        else
-            getgenv()._kbReOn = false
-            getgenv()._kbRePos = nil
-            if getgenv()._kbReH then pcall(function() getgenv()._kbReH:Disconnect() end) getgenv()._kbReH = nil end
-            if getgenv()._kbReC then pcall(function() getgenv()._kbReC:Disconnect() end) getgenv()._kbReC = nil end
-            WindUI:Notify({ Title = "原地复活", Content = "已关闭", Duration = 3 })
+        getgenv()._kbSpawnPos = nil
+        if getgenv()._kbSpawnPart and getgenv()._kbSpawnPart.Parent then
+            getgenv()._kbSpawnPart:Destroy()
         end
+        getgenv()._kbSpawnPart = nil
+        if getgenv()._kbSpawnConn then pcall(function() getgenv()._kbSpawnConn:Disconnect() end) getgenv()._kbSpawnConn = nil end
+        WindUI:Notify({ Title = "删除重生点", Content = "重生点已删除", Duration = 3 })
     end
-})Tabs.MainTab:Dropdown({
+})
     Title = "选择要伪装成的玩家",
     Multi = false,
     Options = {},
