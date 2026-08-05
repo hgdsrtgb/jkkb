@@ -57818,10 +57818,10 @@ Library:Notify({
 
 local Tabs = {
     Notice = Window:AddTab("通知", "info"),
-    Obtain = Window:AddTab("获取类", "download"),
-    Kill = Window:AddTab("杀戮类", "sword"),
-    God = Window:AddTab("无敌类", "shield"),
-    Teleport = Window:AddTab("传送类", "map-pin"),
+    Obtain = Window:AddTab("获取", "download"),
+    Kill = Window:AddTab("杀戮", "sword"),
+    God = Window:AddTab("无敌", "shield"),
+    Teleport = Window:AddTab("传送", "map-pin"),
     General = Window:AddTab("通用", "settings"),
     Settings = Window:AddTab("设置", "settings"),
 }
@@ -57842,6 +57842,8 @@ states.speedValue = 16
 states.speedConn = nil
 states.godSpamThread = nil
 states.godCharConn = nil
+states.vipEnabled = false
+states.vipCharConn = nil
 
 local function getHRP()
     local char = player.Character
@@ -57865,6 +57867,7 @@ NoticeGroup:AddLabel('创作者：恐拜大帝')
 
 local ObtainLeft = Tabs.Obtain:AddLeftGroupbox("商店道具")
 local ObtainRight = Tabs.Obtain:AddRightGroupbox("道具获取")
+local VipGroup = Tabs.Obtain:AddRightGroupbox("VIP")
 
 local function stealTool(toolName)
     for _, plr in ipairs(Players:GetPlayers()) do
@@ -57903,41 +57906,32 @@ local function createFreezeGun()
     tool.Name = "freeze gun"
     tool.RequiresHandle = true
     tool.CanBeDropped = true
-
     local ls1 = Instance.new("LocalScript")
     ls1.Name = "LocalScript"
     ls1.Parent = tool
-
     local ls2 = Instance.new("LocalScript")
     ls2.Name = "Client"
     ls2.Parent = tool
-
     local s = Instance.new("Script")
     s.Name = "Server"
     s.Parent = tool
-
     local lf = Instance.new("ModuleScript")
     lf.Name = "LightningFunctions"
     lf.Source = "return {}"
     lf.Parent = s
-
     local ss = Instance.new("Script")
     ss.Name = "StunScript"
     ss.Parent = s
-
     local cc = Instance.new("RemoteFunction")
     cc.Name = "ClientControl"
     cc.Parent = tool
-
     local sc = Instance.new("RemoteFunction")
     sc.Name = "ServerControl"
     sc.Parent = tool
-
     local vip = Instance.new("IntValue")
     vip.Name = "vip"
     vip.Value = 1
     vip.Parent = tool
-
     local handle = Instance.new("Part")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
@@ -57946,17 +57940,14 @@ local function createFreezeGun()
     handle.Color = Color3.fromRGB(0, 150, 255)
     handle.Material = Enum.Material.Neon
     handle.Parent = tool
-
     local fire = Instance.new("Sound")
     fire.Name = "Fire"
     fire.SoundId = "rbxassetid://9113083740"
     fire.Parent = handle
-
     local mesh = Instance.new("SpecialMesh")
     mesh.MeshType = Enum.MeshType.Brick
     mesh.Scale = Vector3.new(0.3, 0.3, 2)
     mesh.Parent = handle
-
     return tool
 end
 
@@ -57965,25 +57956,20 @@ local function createVipCoil()
     tool.Name = "vip coil"
     tool.RequiresHandle = true
     tool.CanBeDropped = true
-
     local s = Instance.new("Script")
     s.Name = "Server"
     s.Parent = tool
-
     local ls = Instance.new("LocalScript")
     ls.Name = "LocalScript"
     ls.Parent = tool
-
     local re = Instance.new("RemoteEvent")
     re.Name = "RemoteEvent"
     re.Parent = tool
-
     local bb = Instance.new("BillboardGui")
     bb.Name = "coins"
     bb.Size = UDim2.new(0, 60, 0, 30)
     bb.StudsOffset = Vector3.new(0, 3, 0)
     bb.Parent = tool
-
     local tl = Instance.new("TextLabel")
     tl.Size = UDim2.new(1, 0, 1, 0)
     tl.BackgroundTransparency = 1
@@ -57992,7 +57978,6 @@ local function createVipCoil()
     tl.Font = Enum.Font.GothamBold
     tl.TextSize = 14
     tl.Parent = bb
-
     local handle = Instance.new("Part")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
@@ -58001,32 +57986,26 @@ local function createVipCoil()
     handle.Color = Color3.fromRGB(255, 215, 0)
     handle.Material = Enum.Material.Neon
     handle.Parent = tool
-
     local pop = Instance.new("Sound")
     pop.Name = "Pop"
     pop.SoundId = "rbxassetid://9113083740"
     pop.Parent = handle
-
     local cs = Instance.new("Sound")
     cs.Name = "CoilSound"
     cs.SoundId = "rbxassetid://9113083740"
     cs.Looped = true
     cs.Parent = handle
-
     local sp = Instance.new("Sparkles")
     sp.Name = "Sparkles"
     sp.SparkleColor = Color3.fromRGB(255, 215, 0)
     sp.Parent = handle
-
     local mesh = Instance.new("SpecialMesh")
     mesh.MeshType = Enum.MeshType.Sphere
     mesh.Scale = Vector3.new(0.8, 0.2, 0.8)
     mesh.Parent = handle
-
     local rga = Instance.new("Attachment")
     rga.Name = "RightGripAttachment"
     rga.Parent = handle
-
     return tool
 end
 
@@ -58035,28 +58014,22 @@ local function createRadio()
     tool.Name = "radio"
     tool.RequiresHandle = true
     tool.CanBeDropped = true
-
     local cls = Instance.new("LocalScript")
     cls.Name = "Client"
     cls.Parent = tool
-
     local ss = Instance.new("Script")
     ss.Name = "Server"
     ss.Parent = tool
-
     local s = Instance.new("Script")
     s.Name = "Script"
     s.Parent = tool
-
     local re = Instance.new("RemoteEvent")
     re.Name = "Remote"
     re.Parent = tool
-
     local vip = Instance.new("IntValue")
     vip.Name = "vip"
     vip.Value = 1
     vip.Parent = tool
-
     local handle = Instance.new("Part")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
@@ -58065,24 +58038,20 @@ local function createRadio()
     handle.Color = Color3.fromRGB(80, 80, 80)
     handle.Material = Enum.Material.Metal
     handle.Parent = tool
-
     local snd = Instance.new("Sound")
     snd.Name = "Sound"
     snd.SoundId = "rbxassetid://9113083740"
     snd.Parent = handle
-
     local mesh = Instance.new("SpecialMesh")
     mesh.MeshType = Enum.MeshType.Brick
     mesh.Scale = Vector3.new(0.8, 0.5, 0.3)
     mesh.Parent = handle
-
     local pp = Instance.new("ProximityPrompt")
     pp.Name = "ProximityPrompt"
     pp.ActionText = "播放"
     pp.ObjectText = "收音机"
     pp.MaxActivationDistance = 5
     pp.Parent = handle
-
     return tool
 end
 
@@ -58091,11 +58060,9 @@ local function createRainbowFlashlight()
     tool.Name = "rainbow flashlight"
     tool.RequiresHandle = true
     tool.CanBeDropped = true
-
     local s = Instance.new("Script")
     s.Name = "Script"
     s.Parent = tool
-
     local handle = Instance.new("Part")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
@@ -58104,24 +58071,20 @@ local function createRainbowFlashlight()
     handle.Color = Color3.fromRGB(255, 255, 255)
     handle.Material = Enum.Material.SmoothPlastic
     handle.Parent = tool
-
     local snd = Instance.new("Sound")
     snd.Name = "Sound"
     snd.SoundId = "rbxassetid://9113083740"
     snd.Parent = handle
-
     local sl = Instance.new("SpotLight")
     sl.Name = "SpotLight"
     sl.Brightness = 10
     sl.Range = 30
     sl.Color = Color3.fromRGB(255, 0, 0)
     sl.Parent = handle
-
     local mesh = Instance.new("SpecialMesh")
     mesh.MeshType = Enum.MeshType.Cylinder
     mesh.Scale = Vector3.new(0.3, 0.3, 2)
     mesh.Parent = handle
-
     return tool
 end
 
@@ -58130,25 +58093,20 @@ local function createJetpack()
     tool.Name = "Jetpack"
     tool.RequiresHandle = true
     tool.CanBeDropped = true
-
     local s = Instance.new("Script")
     s.Name = "Script"
     s.Parent = tool
-
     local cfg = Instance.new("Configuration")
     cfg.Name = "Configuration"
     cfg.Parent = tool
-
     local cd = Instance.new("NumberValue")
     cd.Name = "Cooldown"
     cd.Value = 0.5
     cd.Parent = cfg
-
     local pw = Instance.new("NumberValue")
     pw.Name = "Power"
     pw.Value = 100
     pw.Parent = cfg
-
     local handle = Instance.new("Part")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
@@ -58157,26 +58115,21 @@ local function createJetpack()
     handle.Color = Color3.fromRGB(200, 50, 50)
     handle.Material = Enum.Material.Metal
     handle.Parent = tool
-
     local att0 = Instance.new("Attachment")
     att0.Name = "Attachment0"
     att0.Parent = handle
-
     local vf = Instance.new("VectorForce")
     vf.Name = "VectorForce"
     vf.Force = Vector3.new(0, 500, 0)
     vf.Attachment0 = att0
     vf.Parent = handle
-
     local mesh = Instance.new("SpecialMesh")
     mesh.MeshType = Enum.MeshType.Brick
     mesh.Scale = Vector3.new(1.2, 0.8, 0.4)
     mesh.Parent = handle
-
     local att = Instance.new("Attachment")
     att.Name = "Attachment"
     att.Parent = handle
-
     local pe1 = Instance.new("ParticleEmitter")
     pe1.Name = "Fire"
     pe1.Color = ColorSequence.new(Color3.fromRGB(255, 100, 0))
@@ -58184,7 +58137,6 @@ local function createJetpack()
     pe1.Lifetime = NumberRange.new(0.5)
     pe1.Rate = 50
     pe1.Parent = att
-
     local pe2 = Instance.new("ParticleEmitter")
     pe2.Name = "Smoke"
     pe2.Color = ColorSequence.new(Color3.fromRGB(100, 100, 100))
@@ -58192,13 +58144,11 @@ local function createJetpack()
     pe2.Lifetime = NumberRange.new(1)
     pe2.Rate = 30
     pe2.Parent = att
-
     local wc = Instance.new("WeldConstraint")
     wc.Name = "WeldConstraint"
     wc.Part0 = handle
     wc.Part1 = handle
     wc.Parent = handle
-
     return tool
 end
 
@@ -58207,23 +58157,18 @@ local function createInsanityCoil()
     tool.Name = "Insanity Coil"
     tool.RequiresHandle = true
     tool.CanBeDropped = true
-
     local cls = Instance.new("LocalScript")
     cls.Name = "Client"
     cls.Parent = tool
-
     local ss = Instance.new("Script")
     ss.Name = "Server"
     ss.Parent = tool
-
     local beamFolder = Instance.new("Folder")
     beamFolder.Name = "Beam"
     beamFolder.Parent = tool
-
     local att1 = Instance.new("Attachment")
     att1.Name = "att1"
     att1.Parent = beamFolder
-
     local ib = Instance.new("Beam")
     ib.Name = "innerBeam"
     ib.Attachment0 = att1
@@ -58232,7 +58177,6 @@ local function createInsanityCoil()
     ib.Width0 = 0.2
     ib.Width1 = 0.2
     ib.Parent = beamFolder
-
     local ob = Instance.new("Beam")
     ob.Name = "outerBeam"
     ob.Attachment0 = att1
@@ -58241,7 +58185,6 @@ local function createInsanityCoil()
     ob.Width0 = 0.5
     ob.Width1 = 0.5
     ob.Parent = beamFolder
-
     local aura = Instance.new("ParticleEmitter")
     aura.Name = "Aura"
     aura.Color = ColorSequence.new(Color3.fromRGB(128, 0, 128))
@@ -58249,22 +58192,18 @@ local function createInsanityCoil()
     aura.Lifetime = NumberRange.new(2)
     aura.Rate = 20
     aura.Parent = tool
-
     local sg = Instance.new("ScreenGui")
     sg.Name = "ScreenGui"
     sg.Parent = tool
-
     local il = Instance.new("ImageLabel")
     il.Name = "ImageLabel"
     il.Size = UDim2.new(0, 100, 0, 100)
     il.BackgroundTransparency = 1
     il.Image = "rbxassetid://0"
     il.Parent = sg
-
     local runAnim = Instance.new("Animation")
     runAnim.Name = "Run"
     runAnim.Parent = tool
-
     local handle = Instance.new("Part")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
@@ -58273,22 +58212,18 @@ local function createInsanityCoil()
     handle.Color = Color3.fromRGB(128, 0, 128)
     handle.Material = Enum.Material.Neon
     handle.Parent = tool
-
     local ls = Instance.new("Sound")
     ls.Name = "lightning_strike"
     ls.SoundId = "rbxassetid://9113083740"
     ls.Parent = handle
-
     local mesh = Instance.new("SpecialMesh")
     mesh.MeshType = Enum.MeshType.Sphere
     mesh.Scale = Vector3.new(0.8, 0.2, 0.8)
     mesh.Parent = handle
-
     local aps = Instance.new("StringValue")
     aps.Name = "AvatarPartScaleType"
     aps.Value = "Classic"
     aps.Parent = handle
-
     local pe = Instance.new("ParticleEmitter")
     pe.Name = "ParticleEmitter"
     pe.Color = ColorSequence.new(Color3.fromRGB(255, 0, 255))
@@ -58296,18 +58231,15 @@ local function createInsanityCoil()
     pe.Lifetime = NumberRange.new(1)
     pe.Rate = 30
     pe.Parent = handle
-
     local att2 = Instance.new("Attachment")
     att2.Name = "att2"
     att2.Parent = handle
-
     local pl = Instance.new("PointLight")
     pl.Name = "PointLight"
     pl.Color = Color3.fromRGB(128, 0, 128)
     pl.Brightness = 5
     pl.Range = 5
     pl.Parent = handle
-
     return tool
 end
 
@@ -58316,54 +58248,43 @@ local function createGuestsGrimoire()
     tool.Name = "Guest's Grimoire"
     tool.RequiresHandle = true
     tool.CanBeDropped = true
-
     local s1 = Instance.new("Script")
     s1.Name = "Script1"
     s1.Parent = tool
-
     local s2 = Instance.new("Script")
     s2.Name = "Script2"
     s2.Parent = tool
-
     local ls1 = Instance.new("LocalScript")
     ls1.Name = "LocalScript1"
     ls1.Parent = tool
-
     local ls2 = Instance.new("LocalScript")
     ls2.Name = "LocalScript2"
     ls2.Parent = tool
-
     local open = Instance.new("Sound")
     open.Name = "Open"
     open.SoundId = "rbxassetid://9113083740"
     open.Parent = tool
-
     local cc = Instance.new("ColorCorrectionEffect")
     cc.Name = "ColorCorrection"
     cc.TintColor = Color3.fromRGB(255, 0, 0)
     cc.Brightness = 0.1
     cc.Contrast = 0.2
     cc.Parent = tool
-
     local re1 = Instance.new("RemoteEvent")
     re1.Name = "RemoteEvent1"
     re1.Parent = tool
-
     local re2 = Instance.new("RemoteEvent")
     re2.Name = "RemoteEvent2"
     re2.Parent = tool
-
     local pl = Instance.new("PointLight")
     pl.Name = "PointLight"
     pl.Color = Color3.fromRGB(255, 0, 0)
     pl.Brightness = 10
     pl.Range = 10
     pl.Parent = tool
-
     local beam = Instance.new("Beam")
     beam.Name = "Beam"
     beam.Parent = tool
-
     local ln = Instance.new("ParticleEmitter")
     ln.Name = "Lightning"
     ln.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0))
@@ -58371,7 +58292,6 @@ local function createGuestsGrimoire()
     ln.Lifetime = NumberRange.new(0.3)
     ln.Rate = 50
     ln.Parent = tool
-
     local smoke = Instance.new("ParticleEmitter")
     smoke.Name = "Smoke"
     smoke.Color = ColorSequence.new(Color3.fromRGB(50, 50, 50))
@@ -58379,26 +58299,21 @@ local function createGuestsGrimoire()
     smoke.Lifetime = NumberRange.new(2)
     smoke.Rate = 20
     smoke.Parent = tool
-
     local act = Instance.new("Animation")
     act.Name = "activate"
     act.Parent = tool
-
     local sg = Instance.new("ScreenGui")
     sg.Name = "ScreenGui"
     sg.Parent = tool
-
     local il = Instance.new("ImageLabel")
     il.Name = "ImageLabel"
     il.Size = UDim2.new(1, 0, 1, 0)
     il.BackgroundTransparency = 1
     il.Image = "rbxassetid://0"
     il.Parent = sg
-
     local anim = Instance.new("Animation")
     anim.Name = "Animation"
     anim.Parent = tool
-
     local handle = Instance.new("Part")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
@@ -58407,12 +58322,10 @@ local function createGuestsGrimoire()
     handle.Color = Color3.fromRGB(80, 0, 0)
     handle.Material = Enum.Material.SmoothPlastic
     handle.Parent = tool
-
     local snd = Instance.new("Sound")
     snd.Name = "Sound"
     snd.SoundId = "rbxassetid://9113083740"
     snd.Parent = handle
-
     local glow = Instance.new("ParticleEmitter")
     glow.Name = "Glow"
     glow.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
@@ -58420,17 +58333,14 @@ local function createGuestsGrimoire()
     glow.Lifetime = NumberRange.new(1)
     glow.Rate = 20
     glow.Parent = handle
-
     local d1 = Instance.new("Decal")
     d1.Name = "Pentagram"
     d1.Texture = "rbxassetid://0"
     d1.Parent = handle
-
     local mesh = Instance.new("SpecialMesh")
     mesh.MeshType = Enum.MeshType.Brick
     mesh.Scale = Vector3.new(0.8, 1.2, 0.2)
     mesh.Parent = handle
-
     for i = 1, 4 do
         local p = Instance.new("Part")
         p.Name = "Part" .. i
@@ -58439,17 +58349,14 @@ local function createGuestsGrimoire()
         p.Transparency = 0.3
         p.Color = Color3.fromRGB(255, 0, 0)
         p.Parent = handle
-
         local w = Instance.new("WeldConstraint")
         w.Name = "Weld" .. i
         w.Part0 = handle
         w.Part1 = p
         w.Parent = p
-
         local sg2 = Instance.new("SurfaceGui")
         sg2.Name = "SurfaceGui" .. i
         sg2.Parent = p
-
         local tl = Instance.new("TextLabel")
         tl.Name = "Text"
         tl.Size = UDim2.new(1, 0, 1, 0)
@@ -58460,12 +58367,10 @@ local function createGuestsGrimoire()
         tl.TextSize = 8
         tl.Parent = sg2
     end
-
     local rc = Instance.new("Decal")
     rc.Name = "RedCross"
     rc.Texture = "rbxassetid://0"
     rc.Parent = handle
-
     return tool
 end
 
@@ -58474,19 +58379,15 @@ local function createSecondChance()
     tool.Name = "Second Chance"
     tool.RequiresHandle = true
     tool.CanBeDropped = true
-
     local ls = Instance.new("LocalScript")
     ls.Name = "LocalScript"
     ls.Parent = tool
-
     local s = Instance.new("Script")
     s.Name = "Script"
     s.Parent = tool
-
     local auraFolder = Instance.new("Folder")
     auraFolder.Name = "Aura"
     auraFolder.Parent = tool
-
     local a1 = Instance.new("ParticleEmitter")
     a1.Name = "secondChanceAura1"
     a1.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
@@ -58494,7 +58395,6 @@ local function createSecondChance()
     a1.Lifetime = NumberRange.new(2)
     a1.Rate = 20
     a1.Parent = auraFolder
-
     local a2 = Instance.new("ParticleEmitter")
     a2.Name = "secondChanceAura2"
     a2.Color = ColorSequence.new(Color3.fromRGB(200, 200, 255))
@@ -58502,15 +58402,12 @@ local function createSecondChance()
     a2.Lifetime = NumberRange.new(1.5)
     a2.Rate = 15
     a2.Parent = auraFolder
-
     local act = Instance.new("Animation")
     act.Name = "activate"
     act.Parent = tool
-
     local cui = Instance.new("RemoteEvent")
     cui.Name = "clientUI"
     cui.Parent = tool
-
     local handle = Instance.new("MeshPart")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
@@ -58519,24 +58416,20 @@ local function createSecondChance()
     handle.Color = Color3.fromRGB(255, 255, 255)
     handle.Material = Enum.Material.Glass
     handle.Parent = tool
-
     local shatter = Instance.new("Sound")
     shatter.Name = "shatter"
     shatter.SoundId = "rbxassetid://9113083740"
     shatter.Parent = handle
-
     local charge = Instance.new("Sound")
     charge.Name = "charge"
     charge.SoundId = "rbxassetid://9113083740"
     charge.Looped = true
     charge.Parent = handle
-
     local hl = Instance.new("Highlight")
     hl.Name = "Highlight"
     hl.FillColor = Color3.fromRGB(255, 255, 255)
     hl.OutlineColor = Color3.fromRGB(200, 200, 255)
     hl.Parent = handle
-
     local gs = Instance.new("ParticleEmitter")
     gs.Name = "GlassShatter"
     gs.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
@@ -58544,7 +58437,6 @@ local function createSecondChance()
     gs.Lifetime = NumberRange.new(1)
     gs.Rate = 0
     gs.Parent = handle
-
     local glare = Instance.new("ParticleEmitter")
     glare.Name = "glare"
     glare.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
@@ -58552,7 +58444,6 @@ local function createSecondChance()
     glare.Lifetime = NumberRange.new(0.5)
     glare.Rate = 0
     glare.Parent = handle
-
     return tool
 end
 
@@ -58561,82 +58452,65 @@ local function createGodMode()
     tool.Name = "God Mode"
     tool.RequiresHandle = true
     tool.CanBeDropped = false
-
     local s = Instance.new("Script")
     s.Name = "Script"
     s.Parent = tool
-
     local ls = Instance.new("LocalScript")
     ls.Name = "LocalScript"
     ls.Parent = tool
-
     local anims = Instance.new("Folder")
     anims.Name = "Animations"
     anims.Parent = ls
-
     local a1 = Instance.new("Animation")
     a1.Name = "activate"
     a1.Parent = anims
-
     local a2 = Instance.new("Animation")
     a2.Name = "cast"
     a2.Parent = anims
-
     local a3 = Instance.new("Animation")
     a3.Name = "idle"
     a3.Parent = anims
-
     local theme = Instance.new("Sound")
     theme.Name = "Theme"
     theme.SoundId = "rbxassetid://9113083740"
     theme.Looped = true
     theme.Parent = ls
-
     local funcs = Instance.new("ModuleScript")
     funcs.Name = "Functions"
     funcs.Source = "return {}"
     funcs.Parent = tool
-
     local handle = Instance.new("MeshPart")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
     handle.CanCollide = false
     handle.Transparency = 1
     handle.Parent = tool
-
     local equip = Instance.new("Sound")
     equip.Name = "Equip"
     equip.SoundId = "rbxassetid://9113083740"
     equip.Parent = handle
-
     local choir = Instance.new("Sound")
     choir.Name = "choir"
     choir.SoundId = "rbxassetid://9113083740"
     choir.Parent = handle
-
     local heal = Instance.new("Sound")
     heal.Name = "heal"
     heal.SoundId = "rbxassetid://9113083740"
     heal.Parent = handle
-
     local sb = Instance.new("Sound")
     sb.Name = "startBeam"
     sb.SoundId = "rbxassetid://9113083740"
     sb.Parent = handle
-
     local pss = Instance.new("PitchShiftSoundEffect")
     pss.Name = "PitchShift"
     pss.Octave = 1.5
     pss.Parent = sb
-
     local att = Instance.new("Attachment")
     att.Name = "Attachment"
     att.Parent = handle
-
     local re = Instance.new("RemoteEvent")
     re.Name = "Replication"
     re.Parent = tool
-
     return tool
 end
 
@@ -58804,9 +58678,6 @@ ObtainLeft:AddButton("免费获取全部商店道具", function()
     end
 end)
 
-local vipGroup = Tabs.Obtain:AddLeftGroupbox("VIP道具")
-local paidGroup = Tabs.Obtain:AddRightGroupbox("付费道具")
-
 local vipItems = {
     {en = "freeze gun", zh = "冰冻枪"},
     {en = "vip coil", zh = "VIP线圈"},
@@ -58835,7 +58706,7 @@ for _, v in ipairs(paidItems) do
     table.insert(paidValues, v.zh)
 end
 
-vipGroup:AddDropdown("VIP道具选择", {
+ObtainRight:AddDropdown("VIP道具选择", {
     Values = vipValues,
     Default = 1,
     Multi = true,
@@ -58859,7 +58730,7 @@ vipGroup:AddDropdown("VIP道具选择", {
     end
 })
 
-vipGroup:AddButton("获取选中VIP道具", function()
+ObtainRight:AddButton("获取选中VIP道具", function()
     if #selectedVipItems == 0 then return end
     for _, enName in ipairs(selectedVipItems) do
         getItem(enName)
@@ -58870,13 +58741,13 @@ vipGroup:AddButton("获取选中VIP道具", function()
     end)
 end)
 
-vipGroup:AddButton("获取全部VIP道具", function()
+ObtainRight:AddButton("获取全部VIP道具", function()
     for _, item in ipairs(vipItems) do
         getItem(item.en)
     end
 end)
 
-vipGroup:AddButton("购买选中VIP道具", function()
+ObtainRight:AddButton("购买选中VIP道具", function()
     if #selectedVipItems == 0 then return end
     for _, enName in ipairs(selectedVipItems) do
         buyItem(enName)
@@ -58887,7 +58758,7 @@ vipGroup:AddButton("购买选中VIP道具", function()
     end)
 end)
 
-paidGroup:AddDropdown("付费道具选择", {
+ObtainRight:AddDropdown("付费道具选择", {
     Values = paidValues,
     Default = 1,
     Multi = true,
@@ -58911,7 +58782,7 @@ paidGroup:AddDropdown("付费道具选择", {
     end
 })
 
-paidGroup:AddButton("获取选中付费道具", function()
+ObtainRight:AddButton("获取选中付费道具", function()
     if #selectedPaidItems == 0 then return end
     for _, enName in ipairs(selectedPaidItems) do
         getItem(enName)
@@ -58922,13 +58793,13 @@ paidGroup:AddButton("获取选中付费道具", function()
     end)
 end)
 
-paidGroup:AddButton("获取全部付费道具", function()
+ObtainRight:AddButton("获取全部付费道具", function()
     for _, item in ipairs(paidItems) do
         getItem(item.en)
     end
 end)
 
-paidGroup:AddButton("购买选中付费道具", function()
+ObtainRight:AddButton("购买选中付费道具", function()
     if #selectedPaidItems == 0 then return end
     for _, enName in ipairs(selectedPaidItems) do
         buyItem(enName)
@@ -59000,6 +58871,147 @@ ObtainRight:AddButton("偷别人道具", function()
             end
         end
     end
+end)
+
+local function setVipState(state)
+    states.vipEnabled = state
+    local char = player.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+    if state then
+        if not head:FindFirstChild("恐脚本VIP") then
+            local vipGui = Instance.new("BillboardGui")
+            vipGui.Name = "恐脚本VIP"
+            vipGui.Size = UDim2.new(0, 120, 0, 50)
+            vipGui.StudsOffset = Vector3.new(0, 2.8, 0)
+            vipGui.AlwaysOnTop = false
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Name = "PlayerName"
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.Text = "VIP"
+            textLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+            textLabel.TextStrokeTransparency = 0
+            textLabel.TextScaled = true
+            textLabel.Font = Enum.Font.GothamBold
+            textLabel.Parent = vipGui
+            local gradient = Instance.new("UIGradient")
+            gradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 215, 0)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 140, 0))
+            })
+            gradient.Parent = textLabel
+            vipGui.Parent = head
+        end
+        local vipDoor = workspace:FindFirstChild("VIP Door")
+        if vipDoor then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                pcall(function()
+                    firetouchinterest(hrp, vipDoor, 0)
+                    task.wait(0.1)
+                    firetouchinterest(hrp, vipDoor, 1)
+                end)
+            end
+        end
+        Library:Notify("VIP已开启", 3)
+    else
+        local vipGui = head:FindFirstChild("恐脚本VIP")
+        if vipGui then
+            vipGui:Destroy()
+        end
+        Library:Notify("VIP已关闭", 3)
+    end
+end
+
+if states.vipCharConn then
+    pcall(function() states.vipCharConn:Disconnect() end)
+end
+states.vipCharConn = player.CharacterAdded:Connect(function(char)
+    if states.vipEnabled then
+        task.wait(0.5)
+        setVipState(true)
+    end
+end)
+
+VipGroup:AddToggle("开启VIP", {
+    Text = "开启VIP",
+    Default = false,
+    Callback = function(value)
+        setVipState(value)
+    end
+})
+
+VipGroup:AddButton("获取所有付费道具", function()
+    local backpack = player:WaitForChild("Backpack")
+    local vipNames = {
+        ["vip coil"] = true, ["freeze gun"] = true, ["radio"] = true,
+        ["rainbow flashlight"] = true, ["jetpack"] = true,
+        ["ghostly coil"] = true, ["magic carpet"] = true,
+        ["guest's grimoire"] = true, ["slap hand"] = true,
+        ["stolen knife"] = true, ["insanity coil"] = true,
+        ["body swap potion"] = true, ["god mode"] = true,
+        ["second chance"] = true, ["ruler"] = true, ["bloxy award"] = true
+    }
+    local function isVIP(name)
+        return vipNames[name:lower()] == true
+    end
+    local count = 0
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then
+            local bp = p:FindFirstChild("Backpack")
+            if bp then
+                for _, tool in ipairs(bp:GetChildren()) do
+                    if tool:IsA("Tool") and isVIP(tool.Name) and not backpack:FindFirstChild(tool.Name) then
+                        tool:Clone().Parent = backpack
+                        count = count + 1
+                    end
+                end
+            end
+            local c = p.Character
+            if c then
+                for _, tool in ipairs(c:GetChildren()) do
+                    if tool:IsA("Tool") and isVIP(tool.Name) and not backpack:FindFirstChild(tool.Name) then
+                        tool:Clone().Parent = backpack
+                        count = count + 1
+                    end
+                end
+            end
+        end
+    end
+    local vipGivers = workspace:FindFirstChild("VIP Givers")
+    if vipGivers then
+        for _, item in ipairs(vipGivers:GetChildren()) do
+            if not backpack:FindFirstChild(item.Name) then
+                local tool = Instance.new("Tool")
+                tool.Name = item.Name
+                tool.CanBeDropped = true
+                local model = item:Clone()
+                model.Name = "Handle"
+                local primary = model:FindFirstChildWhichIsA("BasePart", true)
+                if primary then
+                    for _, part in ipairs(model:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.Anchored = false
+                            part.CanCollide = false
+                            if part ~= primary then
+                                local weld = Instance.new("Weld")
+                                weld.Part0 = primary
+                                weld.Part1 = part
+                                weld.C0 = primary.CFrame:Inverse() * part.CFrame
+                                weld.Parent = primary
+                            end
+                        end
+                    end
+                    model.Parent = tool
+                end
+                tool.Parent = backpack
+                count = count + 1
+            end
+        end
+    end
+    Library:Notify("获取完成(" .. count .. ")", 3)
 end)
 
 local KillGroup = Tabs.Kill:AddLeftGroupbox("杀戮功能")
@@ -59219,79 +59231,64 @@ local function createFakeGodMode()
     tool.Name = "God Mode"
     tool.RequiresHandle = true
     tool.CanBeDropped = false
-
     local handle = Instance.new("MeshPart")
     handle.Name = "Handle"
     handle.Size = Vector3.new(1, 1, 1)
     handle.CanCollide = false
     handle.Transparency = 1
     handle.Parent = tool
-
     local re = Instance.new("RemoteEvent")
     re.Name = "Replication"
     re.Parent = tool
-
     local funcs = Instance.new("ModuleScript")
     funcs.Name = "Functions"
     funcs.Source = "return {}"
     funcs.Parent = tool
-
     local ls = Instance.new("LocalScript")
     ls.Name = "LocalScript"
     ls.Parent = tool
-
     local theme = Instance.new("Sound")
     theme.Name = "Theme"
     theme.Parent = ls
-
     local anims = Instance.new("Folder")
     anims.Name = "Animations"
     anims.Parent = ls
-
     local a1 = Instance.new("Animation")
     a1.Name = "activate"
     a1.Parent = anims
-
     local a2 = Instance.new("Animation")
     a2.Name = "cast"
     a2.Parent = anims
-
     local a3 = Instance.new("Animation")
     a3.Name = "idle"
     a3.Parent = anims
-
     return tool
 end
 
 local function applyGodMode(char)
     local hum = char:WaitForChild("Humanoid", 3)
     if not hum then return end
-
     local ff = char:FindFirstChild("恐脚本GodMode")
     if not ff then
         ff = Instance.new("ForceField")
         ff.Name = "恐脚本GodMode"
         ff.Parent = char
     end
-
     local tool = findGodMode()
     if tool then
         tool = tool:Clone()
     else
         tool = createFakeGodMode()
     end
-
     tool.Parent = player.Backpack
     task.wait(0.1)
     pcall(function() hum:EquipTool(tool) end)
-
     local re = tool:FindFirstChild("Replication")
     if re then
         for i = 1, 5 do
             pcall(function() re:FireServer() end)
         end
     end
-
     states.godSpamThread = task.spawn(function()
         while states.permanentGod do
             pcall(function()
@@ -59303,7 +59300,6 @@ local function applyGodMode(char)
             task.wait(0.15)
         end
     end)
-
     pcall(function()
         tool.Unequipped:Connect(function()
             if states.permanentGod then
@@ -59312,7 +59308,6 @@ local function applyGodMode(char)
             end
         end)
     end)
-
     hum.HealthChanged:Connect(function()
         if states.permanentGod then
             hum.Health = hum.MaxHealth
@@ -59581,6 +59576,7 @@ UnloadGroup:AddButton("卸载脚本", function()
     if states.espConn then states.espConn:Disconnect() end
     if states.godCharConn then states.godCharConn:Disconnect() end
     if states.speedConn then states.speedConn:Disconnect() end
+    if states.vipCharConn then states.vipCharConn:Disconnect() end
     clearGodMode()
     clearESP()
     Library:Unload()
