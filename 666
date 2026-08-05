@@ -2507,62 +2507,47 @@ Tabs.MainTab:Button({
         WindUI:Notify({ Title = "设置重生点", Content = "重生点已设置", Duration = 3 })
     end
 })
-local autoRespawnEnabled = false
-local autoRespawnDeathPos = nil
-local autoRespawnConn = nil
-local autoRespawnCharConn = nil
-
-local function startAutoRespawn()
-    autoRespawnEnabled = true
-    autoRespawnDeathPos = nil
-    if autoRespawnConn then autoRespawnConn:Disconnect() autoRespawnConn = nil end
-    if autoRespawnCharConn then autoRespawnCharConn:Disconnect() autoRespawnCharConn = nil end
-    local lastHealth = nil
-    autoRespawnConn = RunService.Heartbeat:Connect(function()
-        if not autoRespawnEnabled then return end
-        local char = player.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum then return end
-        if lastHealth and lastHealth > 0 and hum.Health <= 0 then
-            autoRespawnDeathPos = hrp.Position
-        end
-        lastHealth = hum.Health
-    end)
-    autoRespawnCharConn = player.CharacterAdded:Connect(function(newChar)
-        if not autoRespawnEnabled then return end
-        if autoRespawnDeathPos then
-            task.spawn(function()
-                local newHrp = newChar:WaitForChild("HumanoidRootPart", 3)
-                if newHrp then
-                    task.wait(0.1)
-                    pcall(function()
-                        newHrp.CFrame = CFrame.new(autoRespawnDeathPos)
-                    end)
-                end
-            end)
-        end
-    end)
-end
-
-local function stopAutoRespawn()
-    autoRespawnEnabled = false
-    autoRespawnDeathPos = nil
-    if autoRespawnConn then autoRespawnConn:Disconnect() autoRespawnConn = nil end
-    if autoRespawnCharConn then autoRespawnCharConn:Disconnect() autoRespawnCharConn = nil end
-end
-
 Tabs.MainTab:Toggle({
     Title = "原地复活",
     Default = false,
     Callback = function(state)
         kbPlayDing()
         if state then
-            startAutoRespawn()
+            getgenv()._kbReOn = true
+            getgenv()._kbRePos = nil
+            if getgenv()._kbReH then pcall(function() getgenv()._kbReH:Disconnect() end) end
+            if getgenv()._kbReC then pcall(function() getgenv()._kbReC:Disconnect() end) end
+            local _lastHP = nil
+            getgenv()._kbReH = RunService.Heartbeat:Connect(function()
+                if not getgenv()._kbReOn then return end
+                local c = player.Character
+                if not c then return end
+                local r = c:FindFirstChild("HumanoidRootPart")
+                local h = c:FindFirstChildOfClass("Humanoid")
+                if not r or not h then return end
+                if _lastHP and _lastHP > 0 and h.Health <= 0 then
+                    getgenv()._kbRePos = r.Position
+                end
+                _lastHP = h.Health
+            end)
+            getgenv()._kbReC = player.CharacterAdded:Connect(function(nc)
+                if not getgenv()._kbReOn then return end
+                if getgenv()._kbRePos then
+                    task.spawn(function()
+                        local nr = nc:WaitForChild("HumanoidRootPart", 3)
+                        if nr then
+                            task.wait(0.1)
+                            pcall(function() nr.CFrame = CFrame.new(getgenv()._kbRePos) end)
+                        end
+                    end)
+                end
+            end)
             WindUI:Notify({ Title = "原地复活", Content = "已开启", Duration = 3 })
         else
-            stopAutoRespawn()
+            getgenv()._kbReOn = false
+            getgenv()._kbRePos = nil
+            if getgenv()._kbReH then pcall(function() getgenv()._kbReH:Disconnect() end) getgenv()._kbReH = nil end
+            if getgenv()._kbReC then pcall(function() getgenv()._kbReC:Disconnect() end) getgenv()._kbReC = nil end
             WindUI:Notify({ Title = "原地复活", Content = "已关闭", Duration = 3 })
         end
     end
@@ -3655,7 +3640,7 @@ kbApplyBackground = function(name)
         ["银花背景图2"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339141889_101.jpg",
         ["银花背景图3"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339140644_893.jpg",
         ["白子背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785395257153_996.jpg",
-        ["新增背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785866305554_326.jpg",
+        ["东京喰种背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785866305554_326.jpg",
     }
     local kbSetBgImage = function(asset)
         local bg = Window.UIElements.Main.Background
@@ -3711,7 +3696,7 @@ end
 local kbBgSelected = nil
 local kbBgDropdown = Tabs.SettingsTab:Dropdown({
     Title = "切换背景图",
-    Values = {"默认背景图", "恐脚本背景图", "eva背景图", "新增背景图"},
+    Values = {"默认背景图", "恐脚本背景图", "eva背景图", "东京喰种背景图"},
     Callback = function(v)
         kbBgSelected = v
     end
