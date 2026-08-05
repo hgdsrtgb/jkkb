@@ -57050,13 +57050,7 @@ local Window = Library:CreateWindow({
     ShowCustomCursor = true,
 })
 
-Library:Notify({
-    Title = "疯狂电梯",
-    Description = "创作者：恐拜大帝
-QQ：3999698324
-脚本已加载成功",
-    Time = 5,
-})
+Library:Notify("疯狂电梯脚本已加载 - 创作者：恐拜大帝 | QQ：3999698324", 5)
 
 local Tabs = {
     Notice = Window:AddTab("通知", "info"),
