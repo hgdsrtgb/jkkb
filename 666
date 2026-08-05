@@ -2507,65 +2507,66 @@ Tabs.MainTab:Button({
         WindUI:Notify({ Title = "设置重生点", Content = "重生点已设置", Duration = 3 })
     end
 })
-local kbRespawnEnabled = false
-local kbRespawnDeathPos = nil
-local kbRespawnConn = nil
-local kbRespawnCharConn = nil
-local kbRespawnLastHealth = nil
-local kbRespawnDead = false
+local autoRespawnEnabled = false
+local autoRespawnDeathPos = nil
+local autoRespawnConn = nil
+local autoRespawnCharConn = nil
+
+local function startAutoRespawn()
+    autoRespawnEnabled = true
+    autoRespawnDeathPos = nil
+    if autoRespawnConn then autoRespawnConn:Disconnect() autoRespawnConn = nil end
+    if autoRespawnCharConn then autoRespawnCharConn:Disconnect() autoRespawnCharConn = nil end
+    local lastHealth = nil
+    autoRespawnConn = RunService.Heartbeat:Connect(function()
+        if not autoRespawnEnabled then return end
+        local char = player.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+        if lastHealth and lastHealth > 0 and hum.Health <= 0 then
+            autoRespawnDeathPos = hrp.Position
+        end
+        lastHealth = hum.Health
+    end)
+    autoRespawnCharConn = player.CharacterAdded:Connect(function(newChar)
+        if not autoRespawnEnabled then return end
+        if autoRespawnDeathPos then
+            task.spawn(function()
+                local newHrp = newChar:WaitForChild("HumanoidRootPart", 3)
+                if newHrp then
+                    task.wait(0.1)
+                    pcall(function()
+                        newHrp.CFrame = CFrame.new(autoRespawnDeathPos)
+                    end)
+                end
+            end)
+        end
+    end)
+end
+
+local function stopAutoRespawn()
+    autoRespawnEnabled = false
+    autoRespawnDeathPos = nil
+    if autoRespawnConn then autoRespawnConn:Disconnect() autoRespawnConn = nil end
+    if autoRespawnCharConn then autoRespawnCharConn:Disconnect() autoRespawnCharConn = nil end
+end
+
 Tabs.MainTab:Toggle({
     Title = "原地复活",
     Default = false,
     Callback = function(state)
         kbPlayDing()
-        kbRespawnEnabled = state
         if state then
-            kbRespawnDeathPos = nil
-            kbRespawnLastHealth = nil
-            kbRespawnDead = false
-            if kbRespawnConn then kbRespawnConn:Disconnect() kbRespawnConn = nil end
-            if kbRespawnCharConn then kbRespawnCharConn:Disconnect() kbRespawnCharConn = nil end
-            kbRespawnConn = RunService.Heartbeat:Connect(function()
-                if not kbRespawnEnabled then return end
-                local char = player.Character
-                if not char then return end
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if not hum or not hrp then return end
-                local health = hum.Health
-                if kbRespawnLastHealth and kbRespawnLastHealth > 0 and health <= 0 and not kbRespawnDead then
-                    kbRespawnDead = true
-                    kbRespawnDeathPos = hrp.Position
-                end
-                if health > 0 then
-                    kbRespawnDead = false
-                end
-                kbRespawnLastHealth = health
-            end)
-            kbRespawnCharConn = player.CharacterAdded:Connect(function(newChar)
-                if not kbRespawnEnabled then return end
-                if kbRespawnDeathPos then
-                    task.spawn(function()
-                        local hrp = newChar:WaitForChild("HumanoidRootPart", 3)
-                        if hrp then
-                            hrp.CFrame = CFrame.new(kbRespawnDeathPos)
-                        end
-                        kbRespawnDeathPos = nil
-                    end)
-                end
-            end)
+            startAutoRespawn()
             WindUI:Notify({ Title = "原地复活", Content = "已开启", Duration = 3 })
         else
-            if kbRespawnConn then kbRespawnConn:Disconnect() kbRespawnConn = nil end
-            if kbRespawnCharConn then kbRespawnCharConn:Disconnect() kbRespawnCharConn = nil end
-            kbRespawnDeathPos = nil
-            kbRespawnLastHealth = nil
-            kbRespawnDead = false
+            stopAutoRespawn()
             WindUI:Notify({ Title = "原地复活", Content = "已关闭", Duration = 3 })
         end
     end
-})
-local ImpersonateDropdown = Tabs.MainTab:Dropdown({
+})Tabs.MainTab:Dropdown({
     Title = "选择要伪装成的玩家",
     Multi = false,
     Options = {},
@@ -3654,7 +3655,7 @@ kbApplyBackground = function(name)
         ["银花背景图2"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339141889_101.jpg",
         ["银花背景图3"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339140644_893.jpg",
         ["白子背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785395257153_996.jpg",
-        ["新背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785866305554_326.jpg",
+        ["新增背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785866305554_326.jpg",
     }
     local kbSetBgImage = function(asset)
         local bg = Window.UIElements.Main.Background
@@ -3710,7 +3711,7 @@ end
 local kbBgSelected = nil
 local kbBgDropdown = Tabs.SettingsTab:Dropdown({
     Title = "切换背景图",
-    Values = {"默认背景图", "恐脚本背景图", "eva背景图", "新背景图"},
+    Values = {"默认背景图", "恐脚本背景图", "eva背景图", "新增背景图"},
     Callback = function(v)
         kbBgSelected = v
     end
