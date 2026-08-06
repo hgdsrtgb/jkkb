@@ -48,9 +48,7 @@ kbPlayDing = function()
         kbDingSound.Volume = 2
         kbDingSound.Parent = game:GetService("SoundService")
         game:GetService("SoundService"):PlayLocalSound(kbDingSound)
-        kbDingSound.Ended:Connect(function()
-            kbDingSound:Destroy()
-        end)
+        kbDingSound.Ended:Connect(function() kbDingSound:Destroy() end)
     end)
 end
 kbPlayTada = function()
@@ -67,9 +65,7 @@ kbPlayTada = function()
         kbTadaSound.Volume = 2
         kbTadaSound.Parent = game:GetService("SoundService")
         game:GetService("SoundService"):PlayLocalSound(kbTadaSound)
-        kbTadaSound.Ended:Connect(function()
-            kbTadaSound:Destroy()
-        end)
+        kbTadaSound.Ended:Connect(function() kbTadaSound:Destroy() end)
     end)
 end
 local Player = player
@@ -87,9 +83,7 @@ local sliderReleaseActions = {}
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         for id, value in pairs(pendingSliderValues) do
-            if sliderReleaseActions[id] then
-                sliderReleaseActions[id](value)
-            end
+            if sliderReleaseActions[id] then sliderReleaseActions[id](value) end
             pendingSliderValues[id] = nil
         end
     end
@@ -160,9 +154,7 @@ local function createESP(player)
     if not hrp then
         task.spawn(function()
             local success = pcall(function() char:WaitForChild("HumanoidRootPart", 5) end)
-            if success and espEnabled and player.Parent then
-                createESP(player)
-            end
+            if success and espEnabled and player.Parent then createESP(player) end
         end)
         return
     end
@@ -226,27 +218,16 @@ local function setupPlayerESP(player)
     end)
     table.insert(espConnections[player], charAddedConn)
     table.insert(espConnections[player], charRemovingConn)
-    if player.Character and espEnabled then
-        createESP(player)
-    end
+    if player.Character and espEnabled then createESP(player) end
 end
 Players.PlayerAdded:Connect(function(player)
-    if espEnabled then
-        task.spawn(function()
-            setupPlayerESP(player)
-        end)
-    end
-    if AntiFlingEnabled then
-        task.spawn(function()
-            setupAntiFlingForPlayer(player)
-        end)
-    end
+    if espEnabled then task.spawn(function() setupPlayerESP(player) end) end
+    if AntiFlingEnabled then task.spawn(function() setupAntiFlingForPlayer(player) end) end
 end)
 Players.PlayerRemoving:Connect(function(player)
     cleanupESP(player)
 end)
-local function quickFlashCleanup()
-end
+local function quickFlashCleanup() end
 local function startEspLoops()
     if espRenderConn then return end
     espRenderConn = RunService.RenderStepped:Connect(function()
@@ -276,7 +257,10 @@ local function startEspLoops()
     end)
 end
 local function stopEspLoops()
-    if espRenderConn then espRenderConn:Disconnect() espRenderConn = nil end
+    if espRenderConn then
+        espRenderConn:Disconnect()
+        espRenderConn = nil
+    end
     espCleanupActive = false
 end
 local infiniteJumpConn = nil
@@ -310,9 +294,7 @@ local function disablePlayerCollision(player)
     pcall(function()
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
-                if antiFlingOriginalStates[part] == nil then
-                    antiFlingOriginalStates[part] = part.CanCollide
-                end
+                if antiFlingOriginalStates[part] == nil then antiFlingOriginalStates[part] = part.CanCollide end
                 part.CanCollide = false
             end
         end
@@ -335,11 +317,7 @@ local function enablePlayerCollision(player)
 end
 local function enableAllPlayersCollision()
     for part, state in pairs(antiFlingOriginalStates) do
-        pcall(function()
-            if part and part.Parent then
-                part.CanCollide = state
-            end
-        end)
+        pcall(function() if part and part.Parent then part.CanCollide = state end end)
     end
     antiFlingOriginalStates = {}
 end
@@ -353,9 +331,7 @@ local function setupAntiFlingForPlayer(player)
         if not AntiFlingEnabled then return end
         task.spawn(function()
             task.wait(0.3)
-            if AntiFlingEnabled and player.Parent then
-                disablePlayerCollision(player)
-            end
+            if AntiFlingEnabled and player.Parent then disablePlayerCollision(player) end
         end)
     end)
 end
@@ -368,9 +344,7 @@ local function cleanupAntiFlingForPlayer(player)
 end
 local function startAntiFling()
     if AntiFlingConnection then AntiFlingConnection:Disconnect() end
-    for _, p in ipairs(Players:GetPlayers()) do
-        setupAntiFlingForPlayer(p)
-    end
+    for _, p in ipairs(Players:GetPlayers()) do setupAntiFlingForPlayer(p) end
     local lastAntiFlingCheck = 0
     AntiFlingConnection = RunService.Heartbeat:Connect(function()
         local now = tick()
@@ -381,9 +355,7 @@ local function startAntiFling()
                     pcall(function()
                         for _, part in ipairs(p.Character:GetDescendants()) do
                             if part:IsA("BasePart") and part.CanCollide then
-                                if antiFlingOriginalStates[part] == nil then
-                                    antiFlingOriginalStates[part] = part.CanCollide
-                                end
+                                if antiFlingOriginalStates[part] == nil then antiFlingOriginalStates[part] = part.CanCollide end
                                 part.CanCollide = false
                             end
                         end
@@ -395,12 +367,8 @@ local function startAntiFling()
         if char then
             local root = char:FindFirstChild("HumanoidRootPart")
             if root then
-                if root.AssemblyLinearVelocity.Magnitude > 100 then
-                    root.AssemblyLinearVelocity = Vector3.zero
-                end
-                if root.AssemblyAngularVelocity.Magnitude > 20 then
-                    root.AssemblyAngularVelocity = Vector3.zero
-                end
+                if root.AssemblyLinearVelocity.Magnitude > 100 then root.AssemblyLinearVelocity = Vector3.zero end
+                if root.AssemblyAngularVelocity.Magnitude > 20 then root.AssemblyAngularVelocity = Vector3.zero end
             end
         end
     end)
@@ -461,9 +429,7 @@ local function startInfiniteJump()
         local char = LocalPlayer.Character
         if char then
             local HRP = char:FindFirstChild("HumanoidRootPart")
-            if HRP then
-                HRP.Velocity = Vector3.new(HRP.Velocity.X, 50, HRP.Velocity.Z)
-            end
+            if HRP then HRP.Velocity = Vector3.new(HRP.Velocity.X, 50, HRP.Velocity.Z) end
         end
     end)
 end
@@ -528,20 +494,14 @@ local function startCameraModeLoop()
     if CameraModeConn then CameraModeConn:Disconnect() end
     CameraModeConn = RunService.RenderStepped:Connect(function()
         if ForceFirstPersonEnabled then
-            if Camera.CameraMode ~= Enum.CameraMode.LockFirstPerson then
-                Camera.CameraMode = Enum.CameraMode.LockFirstPerson
-            end
+            if Camera.CameraMode ~= Enum.CameraMode.LockFirstPerson then Camera.CameraMode = Enum.CameraMode.LockFirstPerson end
         elseif ForceThirdPersonEnabled then
-            if Camera.CameraMode ~= Enum.CameraMode.Classic then
-                Camera.CameraMode = Enum.CameraMode.Classic
-            end
+            if Camera.CameraMode ~= Enum.CameraMode.Classic then Camera.CameraMode = Enum.CameraMode.Classic end
         end
     end)
     if FOVConn then FOVConn:Disconnect() end
     FOVConn = RunService.RenderStepped:Connect(function()
-        if Camera.FieldOfView ~= FieldOfViewValue then
-            Camera.FieldOfView = FieldOfViewValue
-        end
+        if Camera.FieldOfView ~= FieldOfViewValue then Camera.FieldOfView = FieldOfViewValue end
     end)
 end
 local function stopCameraModeLoop()
@@ -592,7 +552,6 @@ local function createCrosshair()
 end
 local crosshairLastUpdate = 0
 local crosshairConn = nil
-
 local function startCrosshairLoop()
     if crosshairConn then return end
     crosshairConn = RunService.Heartbeat:Connect(function()
@@ -612,7 +571,6 @@ local function startCrosshairLoop()
         CrosshairFrame.Visible = true
     end)
 end
-
 local function stopCrosshairLoop()
     if crosshairConn then crosshairConn:Disconnect() end
     crosshairConn = nil
@@ -641,9 +599,7 @@ local function stealAllItems()
             if not container then continue end
             for _, item in ipairs(container:GetChildren()) do
                 if item:IsA("Tool") or item:IsA("Model") or item:IsA("Part") or item:IsA("Accessory") then
-                    local success = pcall(function()
-                        item.Parent = myBackpack
-                    end)
+                    local success = pcall(function() item.Parent = myBackpack end)
                     if success then count = count + 1; task.wait(0.1) end
                 end
             end
@@ -656,17 +612,13 @@ local function beautifyStats()
     local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
     if leaderstats then
         for _, stat in ipairs(leaderstats:GetChildren()) do
-            if stat:IsA("IntValue") or stat:IsA("NumberValue") then
-                stat.Value = 999
-            end
+            if stat:IsA("IntValue") or stat:IsA("NumberValue") then stat.Value = 999 end
         end
     end
     local stats = LocalPlayer:FindFirstChild("Stats") or LocalPlayer:FindFirstChild("stats")
     if stats then
         for _, v in ipairs(stats:GetChildren()) do
-            if v:IsA("IntValue") or v:IsA("NumberValue") then
-                v.Value = 999
-            end
+            if v:IsA("IntValue") or v:IsA("NumberValue") then v.Value = 999 end
         end
     end
 end
@@ -693,9 +645,7 @@ local function translateText(text)
         local url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=" .. HttpService:UrlEncode(text)
         local response = game:HttpGet(url)
         local decoded = HttpService:JSONDecode(response)
-        if decoded and decoded[1] and decoded[1][1] and decoded[1][1][1] then
-            return decoded[1][1][1]
-        end
+        if decoded and decoded[1] and decoded[1][1] and decoded[1][1][1] then return decoded[1][1][1] end
         return nil
     end)
     if success and result then translatedTexts[text] = result; return result end
@@ -715,9 +665,7 @@ local function scanAndTranslate(container, maxCount)
     for _, obj in ipairs(container:GetDescendants()) do
         if c >= maxCount then break end
         if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-            if isEnglish(obj.Text) then
-                processTextObject(obj); c = c + 1
-            end
+            if isEnglish(obj.Text) then processTextObject(obj); c = c + 1 end
         end
     end
 end
@@ -781,9 +729,12 @@ local function powerfulFling(targetPlayer)
     end
     if root.Velocity.Magnitude < 50 then getgenv().OldPos = root.CFrame end
     if not getgenv().FPDH then getgenv().FPDH = Workspace.FallenPartsDestroyHeight end
-    if tHead then Workspace.CurrentCamera.CameraSubject = tHead
-    elseif not tHead and handle then Workspace.CurrentCamera.CameraSubject = handle
-    elseif tHum and tRoot then Workspace.CurrentCamera.CameraSubject = tHum
+    if tHead then
+        Workspace.CurrentCamera.CameraSubject = tHead
+    elseif not tHead and handle then
+        Workspace.CurrentCamera.CameraSubject = handle
+    elseif tHum and tRoot then
+        Workspace.CurrentCamera.CameraSubject = tHum
     end
     if not tChar:FindFirstChildWhichIsA("BasePart") then
         WindUI:Notify({ Title = "提示", Content = "目标没有有效部位", Duration = 3 })
@@ -836,7 +787,9 @@ local function powerfulFling(targetPlayer)
                     FPos(bp, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
                     task.wait()
                 end
-            else break end
+            else
+                break
+            end
         until bp.Velocity.Magnitude > 500 or bp.Parent ~= targetPlayer.Character or targetPlayer.Parent ~= Players or targetPlayer.Character ~= tChar or (tHum and tHum.Sit) or hum.Health <= 0 or tick() > timeout
     end
     Workspace.FallenPartsDestroyHeight = 0 / 0
@@ -847,11 +800,19 @@ local function powerfulFling(targetPlayer)
     bv.MaxForce = Vector3.new(1 / 0, 1 / 0, 1 / 0)
     hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
     if tRoot and tHead then
-        if (tRoot.CFrame.p - tHead.CFrame.p).Magnitude > 5 then SFBasePart(tHead) else SFBasePart(tRoot) end
-    elseif tRoot and not tHead then SFBasePart(tRoot)
-    elseif not tRoot and tHead then SFBasePart(tHead)
-    elseif not tRoot and not tHead and acc and handle then SFBasePart(handle)
-    else WindUI:Notify({ Title = "提示", Content = "找不到合适的甩飞部位", Duration = 3 })
+        if (tRoot.CFrame.p - tHead.CFrame.p).Magnitude > 5 then
+            SFBasePart(tHead)
+        else
+            SFBasePart(tRoot)
+        end
+    elseif tRoot and not tHead then
+        SFBasePart(tRoot)
+    elseif not tRoot and tHead then
+        SFBasePart(tHead)
+    elseif not tRoot and not tHead and acc and handle then
+        SFBasePart(handle)
+    else
+        WindUI:Notify({ Title = "提示", Content = "找不到合适的甩飞部位", Duration = 3 })
         bv:Destroy()
         return
     end
@@ -899,17 +860,13 @@ local active = false
 local braking = false
 local rotConn, flyConn, animTrack
 local bodyVelocity
-local function getCharacter()
-    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-end
-local function getRoot()
-    return getCharacter():WaitForChild("HumanoidRootPart")
-end
-local function getHum()
-    return getCharacter():FindFirstChildWhichIsA("Humanoid")
-end
+local function getCharacter() return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait() end
+local function getRoot() return getCharacter():WaitForChild("HumanoidRootPart") end
+local function getHum() return getCharacter():FindFirstChildWhichIsA("Humanoid") end
 local function setTPWalk(state)
-    if syn or getgenv then pcall(function() setfflag("tpwalk", state and "1" or "0") end) end
+    if syn or getgenv then
+        pcall(function() setfflag("tpwalk", state and "1" or "0") end)
+    end
 end
 local function playFlyAnimation()
     local hum = getHum()
@@ -995,6 +952,159 @@ local function toggleBrake()
     stopAnimation()
     if braking then playBrakeAnimation() else playFlyAnimation() end
 end
+local kbBypassFlySpeed = 100
+local kbBypassFlyState = { enabled = false, hrp = nil, hum = nil, microThread = nil, healthThread = nil, diedConn = nil, targetPos = nil, lastTime = 0 }
+local kbBypassFlyAnchor = { active = false, head = nil, hrp = nil, hum = nil, rayLength = 3.5, rayCount = 12, verticalLayers = 3 }
+local kbBypassFlyControl
+task.spawn(function()
+    pcall(function()
+        local pm = player.PlayerScripts:FindFirstChild("PlayerModule")
+        if pm then kbBypassFlyControl = require(pm):GetControls() end
+    end)
+end)
+local function kbBypassFlyRefreshParts()
+    local char = player.Character
+    if not char then
+        kbBypassFlyState.hrp = nil
+        kbBypassFlyState.hum = nil
+        kbBypassFlyAnchor.hrp = nil
+        kbBypassFlyAnchor.head = nil
+        kbBypassFlyAnchor.hum = nil
+        return
+    end
+    kbBypassFlyState.hrp = char:FindFirstChild("HumanoidRootPart")
+    kbBypassFlyState.hum = char:FindFirstChildOfClass("Humanoid")
+    kbBypassFlyAnchor.hrp = kbBypassFlyState.hrp
+    kbBypassFlyAnchor.head = char:FindFirstChild("Head")
+    kbBypassFlyAnchor.hum = kbBypassFlyState.hum
+end
+local function kbBypassFlyDetectWall()
+    local hrp = kbBypassFlyAnchor.hrp
+    if not hrp then return false end
+    local pos = hrp.Position
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = { player.Character }
+    for i = 1, kbBypassFlyAnchor.rayCount do
+        local angle = (i / kbBypassFlyAnchor.rayCount) * 2 * math.pi
+        local dx = math.cos(angle)
+        local dz = math.sin(angle)
+        for j = -(kbBypassFlyAnchor.verticalLayers - 1) // 2, (kbBypassFlyAnchor.verticalLayers - 1) // 2 do
+            local dir = Vector3.new(dx, j * 0.5, dz).Unit
+            local result = workspace:Raycast(pos, dir * kbBypassFlyAnchor.rayLength, params)
+            if result and result.Instance and result.Instance.CanCollide and result.Instance.Transparency < 0.9 then
+                return true
+            end
+        end
+    end
+    return false
+end
+local function kbBypassFlyEnterAnchor()
+    if kbBypassFlyAnchor.active then return end
+    if not kbBypassFlyAnchor.head or not kbBypassFlyAnchor.hrp or not kbBypassFlyAnchor.hum then return end
+    kbBypassFlyAnchor.head.Anchored = true
+    kbBypassFlyAnchor.hum.PlatformStand = true
+    kbBypassFlyAnchor.active = true
+end
+local function kbBypassFlyExitAnchor()
+    if not kbBypassFlyAnchor.active then return end
+    if kbBypassFlyAnchor.head and kbBypassFlyAnchor.hum then
+        kbBypassFlyAnchor.head.Anchored = false
+        kbBypassFlyAnchor.hum.PlatformStand = false
+    end
+    kbBypassFlyAnchor.active = false
+end
+local function kbBypassFlyMicroStepLoop()
+    kbBypassFlyState.targetPos = kbBypassFlyState.hrp.Position
+    kbBypassFlyState.lastTime = tick()
+    while kbBypassFlyState.enabled do
+        local now = tick()
+        local dt = now - kbBypassFlyState.lastTime
+        kbBypassFlyState.lastTime = now
+        if not kbBypassFlyState.hrp or not kbBypassFlyState.hrp.Parent then break end
+        local inWall = kbBypassFlyDetectWall()
+        if inWall and not kbBypassFlyAnchor.active then
+            kbBypassFlyEnterAnchor()
+        elseif not inWall and kbBypassFlyAnchor.active then
+            kbBypassFlyExitAnchor()
+        end
+        local moveDir
+        if kbBypassFlyControl then
+            local mv = kbBypassFlyControl:GetMoveVector()
+            local cf = workspace.CurrentCamera.CFrame
+            moveDir = (cf.LookVector * -mv.Z) + (cf.RightVector * mv.X)
+        else
+            moveDir = (kbBypassFlyState.hum and kbBypassFlyState.hum.MoveDirection) or Vector3.zero
+        end
+        local vertical = 0
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            vertical = 1
+        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            vertical = -1
+        end
+        local delta = (moveDir + Vector3.new(0, vertical, 0)) * kbBypassFlySpeed * dt
+        kbBypassFlyState.targetPos = kbBypassFlyState.targetPos + delta
+        local currentPos = kbBypassFlyState.hrp.Position
+        local remaining = kbBypassFlyState.targetPos - currentPos
+        local distance = remaining.Magnitude
+        if distance > 0 then
+            local steps = math.ceil(distance / 10)
+            local stepVec = remaining / steps
+            for i = 1, steps do
+                if not kbBypassFlyState.enabled then break end
+                currentPos = currentPos + stepVec
+                kbBypassFlyState.hrp.CFrame = CFrame.new(currentPos) * kbBypassFlyState.hrp.CFrame.Rotation
+                kbBypassFlyState.hrp.Velocity = Vector3.zero
+            end
+        else
+            kbBypassFlyState.hrp.CFrame = CFrame.new(kbBypassFlyState.targetPos) * kbBypassFlyState.hrp.CFrame.Rotation
+            kbBypassFlyState.hrp.Velocity = Vector3.zero
+        end
+        if kbBypassFlyState.hum then
+            kbBypassFlyState.hum:ChangeState(Enum.HumanoidStateType.Climbing)
+        end
+        task.wait(0.001)
+    end
+end
+local function kbBypassFlyHealthLockLoop()
+    while kbBypassFlyState.enabled do
+        if kbBypassFlyState.hum and kbBypassFlyState.hum.Health <= 0 then
+            kbBypassFlyState.hum.Health = kbBypassFlyState.hum.MaxHealth
+        end
+        task.wait(0.1)
+    end
+end
+local function kbBypassFlyStart()
+    if kbBypassFlyState.enabled then return end
+    kbBypassFlyRefreshParts()
+    if not kbBypassFlyState.hrp or not kbBypassFlyState.hum then return end
+    kbBypassFlyState.enabled = true
+    kbBypassFlyState.hum:ChangeState(Enum.HumanoidStateType.Climbing)
+    kbBypassFlyState.microThread = task.spawn(kbBypassFlyMicroStepLoop)
+    kbBypassFlyState.healthThread = task.spawn(kbBypassFlyHealthLockLoop)
+    kbBypassFlyState.diedConn = kbBypassFlyState.hum.Died:Connect(function()
+        if kbBypassFlyState.hum and kbBypassFlyState.enabled then
+            kbBypassFlyState.hum.Health = kbBypassFlyState.hum.MaxHealth
+            kbBypassFlyState.hum:ChangeState(Enum.HumanoidStateType.Running)
+        end
+    end)
+end
+local function kbBypassFlyStop()
+    kbBypassFlyState.enabled = false
+    kbBypassFlyExitAnchor()
+    if kbBypassFlyState.microThread then pcall(function() task.cancel(kbBypassFlyState.microThread) end) kbBypassFlyState.microThread = nil end
+    if kbBypassFlyState.healthThread then pcall(function() task.cancel(kbBypassFlyState.healthThread) end) kbBypassFlyState.healthThread = nil end
+    if kbBypassFlyState.diedConn then kbBypassFlyState.diedConn:Disconnect() kbBypassFlyState.diedConn = nil end
+    if kbBypassFlyState.hum then kbBypassFlyState.hum:ChangeState(Enum.HumanoidStateType.Running) end
+end
+player.CharacterAdded:Connect(function()
+    if kbBypassFlyState.enabled then
+        kbBypassFlyStop()
+        task.wait(0.2)
+        kbBypassFlyStart()
+    end
+end)
+
 local function createFlyUI()
     if screenGui then return end
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -1057,9 +1167,7 @@ local function loadLuGuan()
             local oldTool = player.Character:FindFirstChild(ToolName)
             if oldTool then oldTool:Destroy() end
         end
-        if workspace:FindFirstChild("animationContainer") then
-            workspace.animationContainer:Destroy()
-        end
+        if workspace:FindFirstChild("animationContainer") then workspace.animationContainer:Destroy() end
     end
     local function giveTool()
         cleanupOldTool()
@@ -1260,7 +1368,9 @@ local function createJumpFloat()
         inputBox.Text = "60"
         heightLabel.Text = "跳跃高度：" .. jumpHeight
     end)
-    gearBtn.MouseButton1Click:Connect(function() jumpPanel.Visible = not jumpPanel.Visible end)
+    gearBtn.MouseButton1Click:Connect(function()
+        jumpPanel.Visible = not jumpPanel.Visible
+    end)
     local function performJump()
         if not jumpFloatActive then return end
         local char = LocalPlayer.Character
@@ -1274,7 +1384,12 @@ local function createJumpFloat()
     jumpFloatBtn.MouseButton1Click:Connect(performJump)
 end
 local function destroyJumpFloat()
-    if jumpFloatGui then jumpFloatGui:Destroy() jumpFloatGui = nil jumpPanel = nil jumpFloatBtn = nil end
+    if jumpFloatGui then
+        jumpFloatGui:Destroy()
+        jumpFloatGui = nil
+        jumpPanel = nil
+        jumpFloatBtn = nil
+    end
 end
 local serversFile = "servers_" .. plrId .. ".json"
 local savedServers = {}
@@ -1285,8 +1400,10 @@ local function loadSavedServers()
         if decoded and type(decoded) == "table" then
             savedServers = {}
             for _, item in ipairs(decoded) do
-                if type(item) == "string" then table.insert(savedServers, {id = item, name = item})
-                elseif type(item) == "table" and item.id then table.insert(savedServers, {id = tostring(item.id), name = item.name or tostring(item.id)})
+                if type(item) == "string" then
+                    table.insert(savedServers, {id = item, name = item})
+                elseif type(item) == "table" and item.id then
+                    table.insert(savedServers, {id = tostring(item.id), name = item.name or tostring(item.id)})
                 end
             end
         end
@@ -1294,15 +1411,16 @@ local function loadSavedServers()
     local seen = {}
     local unique = {}
     for _, entry in ipairs(savedServers) do
-        if not seen[entry.id] then seen[entry.id] = true table.insert(unique, entry) end
+        if not seen[entry.id] then
+            seen[entry.id] = true
+            table.insert(unique, entry)
+        end
     end
     savedServers = unique
 end
 local function saveServers()
     task.spawn(function()
-        pcall(function()
-            writefile(serversFile, HttpService:JSONEncode(savedServers))
-        end)
+        pcall(function() writefile(serversFile, HttpService:JSONEncode(savedServers)) end)
     end)
 end
 local function addServerId(id, name)
@@ -1310,7 +1428,10 @@ local function addServerId(id, name)
     local sid = tostring(id)
     for _, entry in ipairs(savedServers) do
         if entry.id == sid then
-            if name and name ~= entry.name then entry.name = name saveServers() end
+            if name and name ~= entry.name then
+                entry.name = name
+                saveServers()
+            end
             return
         end
     end
@@ -1326,9 +1447,7 @@ local function removeServerId(id)
     end
     savedServers = newList
     task.spawn(function()
-        pcall(function()
-            writefile(serversFile, HttpService:JSONEncode(savedServers))
-        end)
+        pcall(function() writefile(serversFile, HttpService:JSONEncode(savedServers)) end)
     end)
     return true
 end
@@ -1347,9 +1466,13 @@ end
 loadSavedServers()
 local function copyToClipboard(text, label)
     local success = pcall(function()
-        if setclipboard then setclipboard(text)
-        elseif game:GetService("ClipboardService") then game:GetService("ClipboardService"):SetClipboard(text)
-        else error("无法访问剪贴板") end
+        if setclipboard then
+            setclipboard(text)
+        elseif game:GetService("ClipboardService") then
+            game:GetService("ClipboardService"):SetClipboard(text)
+        else
+            error("无法访问剪贴板")
+        end
     end)
     WindUI:Notify({
         Title = label or "提示",
@@ -1366,9 +1489,7 @@ local Window = WindUI:CreateWindow({
     Size = UDim2.fromOffset(800, 450),
     Transparent = true,
     Theme = "Dark",
-    User = {
-        Enabled = false,
-    },
+    User = { Enabled = false, },
     SideBarWidth = 200,
     ScrollBarEnabled = true,
     ToggleKey = Enum.KeyCode.N,
@@ -1444,9 +1565,7 @@ function kbSaveConfig(name)
             data[key] = {t = item.mtype, v = v}
         end
     end
-    if kbCurrentBg then
-        data["SettingsTab/切换背景图"] = {t = "Background", v = kbCurrentBg}
-    end
+    if kbCurrentBg then data["SettingsTab/切换背景图"] = {t = "Background", v = kbCurrentBg} end
     writefile(kbCfgFolder .. "/" .. name .. ".json", HttpService:JSONEncode(data))
 end
 function kbLoadConfig(name)
@@ -1593,7 +1712,11 @@ Tabs.NotifyTab:Button({
                 WindUI:Notify({ Title = "捐赠我", Content = "赞赏码已保存到相册，不会再保存", Duration = 3 })
             end
             local parentGui = CoreGui
-            if not pcall(function() local t = Instance.new("ScreenGui") t.Parent = CoreGui t:Destroy() end) then
+            if not pcall(function()
+                local t = Instance.new("ScreenGui")
+                t.Parent = CoreGui
+                t:Destroy()
+            end) then
                 parentGui = LocalPlayer:WaitForChild("PlayerGui")
             end
             local old = parentGui:FindFirstChild("DonateGui")
@@ -1618,20 +1741,15 @@ Tabs.NotifyTab:Button({
             closeBtn.TextScaled = true
             closeBtn.Font = Enum.Font.SourceSansBold
             closeBtn.Parent = img
-            closeBtn.MouseButton1Click:Connect(function()
-                gui:Destroy()
-            end)
+            closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
             img:TweenSize(UDim2.new(0, 300, 0, 300), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.3, true)
         end)
     end
 })
-
-
 Tabs.NotifyTab:Paragraph({
     Title = "目前捐赠最多的人：",
     Desc = "宥\nQQ：1072765538\n捐赠金额：52（牛逼）",
 })
-
 Tabs.MainTab:Toggle({
     Title = "透视",
     Value = false,
@@ -1696,9 +1814,7 @@ local function startFlyV2()
         if not flyV2BV or not flyV2BV.Parent then return end
         local mv = Vector3.zero
         if controlModule then
-            local ok, v = pcall(function()
-                return controlModule:GetMoveVector()
-            end)
+            local ok, v = pcall(function() return controlModule:GetMoveVector() end)
             if ok and v then mv = v end
         end
         flyV2BV.Velocity = Camera.CFrame:VectorToWorldSpace(mv) * flyV2Speed
@@ -1723,14 +1839,8 @@ Tabs.MainTab:Toggle({
 })
 local flyV2SpeedSlider = Tabs.MainTab:Slider({
     Title = "飞行v2速度 (当前: 50)",
-    Value = {
-        Min = 10,
-        Max = 200,
-        Default = 50,
-    },
-    Callback = function(value)
-        pendingSliderValues["flyv2speed"] = value
-    end
+    Value = { Min = 10, Max = 200, Default = 50, },
+    Callback = function(value) pendingSliderValues["flyv2speed"] = value end
 })
 sliderReleaseActions["flyv2speed"] = function(v)
     kbPlayDing()
@@ -1806,19 +1916,13 @@ do
     })
     local flyCarSpeedSlider = Tabs.MainTab:Slider({
         Title = "飞车速度 (当前: 50)",
-        Value = {
-            Min = 10,
-            Max = 200,
-            Default = 50,
-        },
+        Value = { Min = 10, Max = 200, Default = 50, },
         Callback = function(value)
             flyCarSpeed = value
             pendingSliderValues["flycarspeed"] = value
         end
     })
-    sliderReleaseActions["flycarspeed"] = function(v)
-        kbPlayDing()
-    end
+    sliderReleaseActions["flycarspeed"] = function(v) kbPlayDing() end
     Tabs.MainTab:Input({
         Title = "输入飞车速度",
         Placeholder = "10 - 200",
@@ -1868,9 +1972,7 @@ Tabs.MainTab:Toggle({
                     for _, child in pairs(workspace:GetChildren()) do
                         if child.Name == Players.LocalPlayer.Name then
                             for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                                if part:IsA("BasePart") then
-                                    part.CanCollide = false
-                                end
+                                if part:IsA("BasePart") then part.CanCollide = false end
                             end
                         end
                     end
@@ -1882,9 +1984,7 @@ Tabs.MainTab:Toggle({
             for _, child in pairs(workspace:GetChildren()) do
                 if child.Name == Players.LocalPlayer.Name then
                     for _, part in pairs(workspace[Players.LocalPlayer.Name]:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = true
-                        end
+                        if part:IsA("BasePart") then part.CanCollide = true end
                     end
                 end
             end
@@ -1917,11 +2017,7 @@ Tabs.MainTab:Toggle({
 })
 local speedSlider = Tabs.MainTab:Slider({
     Title = "移速数值 (当前: 16)",
-    Value = {
-        Min = 5,
-        Max = 1000,
-        Default = 16,
-    },
+    Value = { Min = 5, Max = 1000, Default = 16, },
     Callback = function(value)
         speedValue = value
         pendingSliderValues["speedvalue"] = value
@@ -1932,9 +2028,7 @@ local speedSlider = Tabs.MainTab:Slider({
         end
     end
 })
-sliderReleaseActions["speedvalue"] = function(v)
-    kbPlayDing()
-end
+sliderReleaseActions["speedvalue"] = function(v) kbPlayDing() end
 Tabs.MainTab:Input({
     Title = "输入移速数值",
     Placeholder = "5 - 1000",
@@ -2036,7 +2130,9 @@ Tabs.MainTab:Toggle({
                 getgenv().kbTouchFlingBV.Velocity = Vector3.zero
             end
             getgenv().kbTFConns = getgenv().kbTFConns or {}
-            for _, v in pairs(getgenv().kbTFConns) do pcall(function() v:Disconnect() end) end
+            for _, v in pairs(getgenv().kbTFConns) do
+                pcall(function() v:Disconnect() end)
+            end
             getgenv().kbTFConns = {}
             if c then
                 for _, part in ipairs(c:GetDescendants()) do
@@ -2059,7 +2155,9 @@ Tabs.MainTab:Toggle({
             getgenv().kbTouchFlingCA = LocalPlayer.CharacterAdded:Connect(function(nc)
                 task.wait(0.3)
                 if not getgenv().kbTouchFlingOn then return end
-                for _, v in pairs(getgenv().kbTFConns) do pcall(function() v:Disconnect() end) end
+                for _, v in pairs(getgenv().kbTFConns) do
+                    pcall(function() v:Disconnect() end)
+                end
                 getgenv().kbTFConns = {}
                 for _, part in ipairs(nc:GetDescendants()) do
                     if part:IsA("BasePart") then
@@ -2092,7 +2190,9 @@ Tabs.MainTab:Toggle({
             coroutine.resume(getgenv().kbTouchFlingThread)
         else
             getgenv().kbTouchFlingOn = false
-            for _, v in pairs(getgenv().kbTFConns or {}) do pcall(function() v:Disconnect() end) end
+            for _, v in pairs(getgenv().kbTFConns or {}) do
+                pcall(function() v:Disconnect() end)
+            end
             getgenv().kbTFConns = {}
             pcall(function() if getgenv().kbTouchFlingCA then getgenv().kbTouchFlingCA:Disconnect() end end)
             pcall(function() if getgenv().kbTouchFlingBV then getgenv().kbTouchFlingBV:Destroy() end end)
@@ -2102,7 +2202,6 @@ Tabs.MainTab:Toggle({
         if state then kbPlayDing() end
     end
 })
-
 Tabs.MainTab:Button({
     Title = "甩飞最近的人",
     Callback = function()
@@ -2202,14 +2301,10 @@ local function resetImpersonate()
     if realChar and realChar.Parent then
         LocalPlayer.Character = realChar
         local rh = realChar:FindFirstChildOfClass("Humanoid")
-        if rh then
-            rh.PlatformStand = false
-        end
+        if rh then rh.PlatformStand = false end
         Camera.CameraSubject = rh
         for _, v in ipairs(realChar:GetDescendants()) do
-            if v:IsA("BasePart") or v:IsA("Decal") then
-                v.Transparency = 0
-            end
+            if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = 0 end
         end
         if realChar:FindFirstChild("HumanoidRootPart") then
             realChar.HumanoidRootPart.CanCollide = false
@@ -2244,9 +2339,7 @@ local function startImpersonate(targetName)
             v:Destroy()
         end
     end
-    if cloneRoot then
-        cloneRoot.Transparency = 1
-    end
+    if cloneRoot then cloneRoot.Transparency = 1 end
     if cloneHum then
         cloneHum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
         cloneHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
@@ -2260,12 +2353,8 @@ local function startImpersonate(targetName)
         end
     end
     for _, v in ipairs(realChar:GetDescendants()) do
-        if v:IsA("BasePart") or v:IsA("Decal") then
-            v.Transparency = 1
-        end
-        if v:IsA("BasePart") then
-            v.CanCollide = false
-        end
+        if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = 1 end
+        if v:IsA("BasePart") then v.CanCollide = false end
     end
     if realChar:FindFirstChild("HumanoidRootPart") then
         realChar.HumanoidRootPart.CanCollide = false
@@ -2280,14 +2369,10 @@ local function startImpersonate(targetName)
     end
     local realHum = realChar:FindFirstChildOfClass("Humanoid")
     if realHum then
-        realHum.Died:Connect(function()
-            resetImpersonate()
-        end)
+        realHum.Died:Connect(function() resetImpersonate() end)
     end
     local realHum2 = realChar:FindFirstChildOfClass("Humanoid")
-    if realHum2 then
-        realHum2.PlatformStand = true
-    end
+    if realHum2 then realHum2.PlatformStand = true end
     impersonateHeartbeat = RunService.Heartbeat:Connect(function()
         if clone and clone.Parent and cloneRoot and impersonateRealChar and impersonateRealChar:FindFirstChild("HumanoidRootPart") then
             local realRoot = impersonateRealChar.HumanoidRootPart
@@ -2296,12 +2381,8 @@ local function startImpersonate(targetName)
             realRoot.AssemblyAngularVelocity = Vector3.zero
             for _, v in ipairs(impersonateRealChar:GetDescendants()) do
                 if v:IsA("BasePart") then
-                    if v.CanCollide then
-                        v.CanCollide = false
-                    end
-                    if v.Transparency < 1 then
-                        v.Transparency = 1
-                    end
+                    if v.CanCollide then v.CanCollide = false end
+                    if v.Transparency < 1 then v.Transparency = 1 end
                 elseif v:IsA("Decal") and v.Transparency < 1 then
                     v.Transparency = 1
                 end
@@ -2345,12 +2426,18 @@ function kbInvResetAll()
     kbSoulOriginCF = nil
     kbInv1On = false
     kbInv2On = false
-    if kbInvRespawnConn then pcall(function() kbInvRespawnConn:Disconnect() end) kbInvRespawnConn = nil end
+    if kbInvRespawnConn then
+        pcall(function() kbInvRespawnConn:Disconnect() end)
+        kbInvRespawnConn = nil
+    end
     kbInvResetTrans()
     pcall(function() if kbInvFakeChar then kbInvFakeChar:Destroy() end end)
     kbInvFakeChar = nil
     kbInvRealChar = nil
-    if kbInvOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end) kbInvOldFPDH = nil end
+    if kbInvOldFPDH then
+        pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end)
+        kbInvOldFPDH = nil
+    end
 end
 function kbInvSetup()
     if kbInvFakeChar and kbInvFakeChar.Parent then return true end
@@ -2383,7 +2470,9 @@ function kbInvSetup()
     kbInvRespawnConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
         local had = kbInvFakeChar ~= nil or kbInvRealChar ~= nil
         kbInvResetAll()
-        pcall(function() for _, t in pairs(kbInvToggles) do t:Set(false) end end)
+        pcall(function()
+            for _, t in pairs(kbInvToggles) do t:Set(false) end
+        end)
         if had then
             task.spawn(function()
                 task.wait(0.5)
@@ -2403,16 +2492,24 @@ function kbInvCheckRestore()
         local h = fake:FindFirstChild("HumanoidRootPart")
         if h then backCF = h.CFrame end
     end
-    if kbInvRespawnConn then pcall(function() kbInvRespawnConn:Disconnect() end) kbInvRespawnConn = nil end
+    if kbInvRespawnConn then
+        pcall(function() kbInvRespawnConn:Disconnect() end)
+        kbInvRespawnConn = nil
+    end
     kbInvResetTrans()
     pcall(function() if fake then fake:Destroy() end end)
     kbInvFakeChar = nil
     kbInvRealChar = nil
-    if kbInvOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end) kbInvOldFPDH = nil end
+    if kbInvOldFPDH then
+        pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end)
+        kbInvOldFPDH = nil
+    end
     if real and real.Parent ~= nil then
         pcall(function() real.Parent = workspace end)
         LocalPlayer.Character = real
-        if backCF then pcall(function() real:MoveTo(backCF.Position) end) end
+        if backCF then
+            pcall(function() real:MoveTo(backCF.Position) end)
+        end
         local hum = real:FindFirstChildOfClass("Humanoid")
         if hum then workspace.CurrentCamera.CameraSubject = hum end
     end
@@ -2423,7 +2520,10 @@ kbInvToggles[2] = Tabs.MainTab:Toggle({
     Callback = function(state)
         kbPlayDing()
         if state then
-            if not kbInvSetup() then pcall(function() kbInvToggles[2]:Set(false) end) return end
+            if not kbInvSetup() then
+                pcall(function() kbInvToggles[2]:Set(false) end)
+                return
+            end
             kbInv1On = true
             task.spawn(function()
                 local real = kbInvRealChar
@@ -2437,7 +2537,11 @@ kbInvToggles[2] = Tabs.MainTab:Toggle({
             WindUI:Notify({Title = "隐身v1", Content = "已开启", Duration = 3})
         else
             kbInv1On = false
-            pcall(function() if kbInvRealChar then kbInvRealChar:MoveTo(kbInvRealChar:GetPivot().Position + Vector3.new(0, 10000, 0)) end end)
+            pcall(function()
+                if kbInvRealChar then
+                    kbInvRealChar:MoveTo(kbInvRealChar:GetPivot().Position + Vector3.new(0, 10000, 0))
+                end
+            end)
             kbInvCheckRestore()
             WindUI:Notify({Title = "隐身v1", Content = "已关闭", Duration = 3})
         end
@@ -2457,7 +2561,10 @@ kbInvToggles[3] = Tabs.MainTab:Toggle({
             end
             kbInv2On = true
             task.spawn(function()
-                if kbInvOldFPDH then pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end) kbInvOldFPDH = nil end
+                if kbInvOldFPDH then
+                    pcall(function() workspace.FallenPartsDestroyHeight = kbInvOldFPDH end)
+                    kbInvOldFPDH = nil
+                end
                 pcall(function() char:MoveTo(Vector3.new(0, -1000000, 0)) end)
             end)
             WindUI:Notify({Title = "隐身v2", Content = "已开启", Duration = 3})
@@ -2510,7 +2617,7 @@ Tabs.MainTab:Button({
         part.Parent = workspace
         local bb = Instance.new("BillboardGui")
         bb.Size = UDim2.new(0, 120, 0, 40)
-        bb.StudsOffset = Vector3.new(0, 2, 0)
+        bb.StudsOffset = Vector3.new(0, -3, 0)
         bb.AlwaysOnTop = true
         bb.Parent = part
         local lbl = Instance.new("TextLabel")
@@ -2523,7 +2630,9 @@ Tabs.MainTab:Button({
         lbl.Font = Enum.Font.SourceSansBold
         lbl.Parent = bb
         getgenv()._kbSpawnPart = part
-        if getgenv()._kbSpawnConn then pcall(function() getgenv()._kbSpawnConn:Disconnect() end) end
+        if getgenv()._kbSpawnConn then
+            pcall(function() getgenv()._kbSpawnConn:Disconnect() end)
+        end
         getgenv()._kbSpawnConn = player.CharacterAdded:Connect(function(nc)
             if not getgenv()._kbSpawnPos then return end
             task.spawn(function()
@@ -2537,7 +2646,6 @@ Tabs.MainTab:Button({
         WindUI:Notify({ Title = "设置重生点", Content = "重生点已设置", Duration = 3 })
     end
 })
-
 Tabs.MainTab:Button({
     Title = "删除重生点",
     Callback = function()
@@ -2547,16 +2655,18 @@ Tabs.MainTab:Button({
             getgenv()._kbSpawnPart:Destroy()
         end
         getgenv()._kbSpawnPart = nil
-        if getgenv()._kbSpawnConn then pcall(function() getgenv()._kbSpawnConn:Disconnect() end) getgenv()._kbSpawnConn = nil end
+        if getgenv()._kbSpawnConn then
+            pcall(function() getgenv()._kbSpawnConn:Disconnect() end)
+            getgenv()._kbSpawnConn = nil
+        end
         WindUI:Notify({ Title = "删除重生点", Content = "重生点已删除", Duration = 3 })
     end
-})Tabs.MainTab:Dropdown({
+})
+ImpersonateDropdown = Tabs.MainTab:Dropdown({
     Title = "选择要伪装成的玩家",
     Multi = false,
-    Options = {},
-    Callback = function(value)
-        selectedImpersonateName = value
-    end,
+    Values = {},
+    Callback = function(value) selectedImpersonateName = value end,
 })
 local refreshScheduled = false
 local function refreshAllDropdowns()
@@ -2566,9 +2676,7 @@ local function refreshAllDropdowns()
         refreshScheduled = false
         local names = {}
         for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then
-                table.insert(names, p.Name)
-            end
+            if p ~= LocalPlayer then table.insert(names, p.Name) end
         end
         if flingDropdown then flingDropdown:Refresh(names) end
         if followDropdown then followDropdown:Refresh(names) end
@@ -2611,7 +2719,10 @@ kbInvToggles[1] = Tabs.SecondaryTab:Toggle({
     Callback = function(state)
         kbPlayDing()
         if state then
-            if not kbInvSetup() then pcall(function() kbInvToggles[1]:Set(false) end) return end
+            if not kbInvSetup() then
+                pcall(function() kbInvToggles[1]:Set(false) end)
+                return
+            end
             kbSoulOn = true
             kbInvApplyTrans(kbInvFakeChar)
             local real = kbInvRealChar
@@ -2717,15 +2828,11 @@ local markerList = {}
 local markerCount = 0
 local selectedMarkers = {}
 local markerLoopEnabled = false
-local function getMarkerName(n)
-    return "标点" .. tostring(n)
-end
+local function getMarkerName(n) return "标点" .. tostring(n) end
 local function refreshMarkerDropdown()
     if not markerDropdown then return end
     local names = {}
-    for _, m in ipairs(markerList) do
-        table.insert(names, m.name)
-    end
+    for _, m in ipairs(markerList) do table.insert(names, m.name) end
     markerDropdown:Refresh(names)
 end
 local function teleportToMarker(m)
@@ -2831,9 +2938,7 @@ Tabs.SecondaryTab:Toggle({
                             task.wait(0.5)
                         end
                     end
-                    if tpCount == 0 then
-                        task.wait(0.5)
-                    end
+                    if tpCount == 0 then task.wait(0.5) end
                 end
             end)
         end
@@ -2939,6 +3044,21 @@ Tabs.SecondaryTab:Toggle({
         if state then kbPlayDing() end
     end
 })
+Tabs.SecondaryTab:Toggle({
+    Title = "绕过飞行（大部分游戏能绕过）",
+    Value = false,
+    Callback = function(state)
+        if state then
+            kbBypassFlyStart()
+            WindUI:Notify({ Title = "绕过飞行", Content = "已开启（大部分游戏能绕过）", Duration = 3 })
+            kbPlayDing()
+        else
+            kbBypassFlyStop()
+            WindUI:Notify({ Title = "绕过飞行", Content = "已关闭", Duration = 3 })
+            kbPlayDing()
+        end
+    end
+})
 local currentHarassTarget = nil
 harassDropdown = Tabs.SecondaryTab:Dropdown({
     Title = "选定操人目标",
@@ -2978,14 +3098,8 @@ Tabs.SecondaryTab:Button({
 })
 Tabs.SecondaryTab:Slider({
     Title = "操人速度 (当前: 5)",
-    Value = {
-        Min = 1,
-        Max = 20,
-        Default = 5,
-    },
-    Callback = function(value)
-        pendingSliderValues["harassspeed"] = value
-    end
+    Value = { Min = 1, Max = 20, Default = 5, },
+    Callback = function(value) pendingSliderValues["harassspeed"] = value end
 })
 sliderReleaseActions["harassspeed"] = function(speed)
     kbPlayDing()
@@ -3023,14 +3137,8 @@ Tabs.SecondaryTab:Toggle({
 })
 Tabs.SecondaryTab:Slider({
     Title = "旋转速度 (当前: 360)",
-    Value = {
-        Min = 1,
-        Max = 10000,
-        Default = 360,
-    },
-    Callback = function(value)
-        pendingSliderValues["spinspeed"] = value
-    end
+    Value = { Min = 1, Max = 10000, Default = 360, },
+    Callback = function(value) pendingSliderValues["spinspeed"] = value end
 })
 sliderReleaseActions["spinspeed"] = function(speed)
     kbPlayDing()
@@ -3128,9 +3236,7 @@ Tabs.MiscTab:Toggle({
         local Lighting = game:GetService("Lighting")
         if state then
             local sky = Lighting:FindFirstChildOfClass("Sky")
-            if sky and not kbOldSky then
-                kbOldSky = sky:Clone()
-            end
+            if sky and not kbOldSky then kbOldSky = sky:Clone() end
             if sky then sky:Destroy() end
             local newSky = Instance.new("Sky")
             newSky.SkyboxBk = "rbxassetid://113517588654522"
@@ -3331,41 +3437,60 @@ Tabs.MiscTab:Input({
         end
     end
 })
-local kickTitle, kickContent = "你被踢出了游戏", "Error Code: 267"
-Tabs.MiscTab:Input({
-    Title = "自定义踢出标题",
-    Placeholder = "输入踢出标题",
-    Callback = function(v)
-        if v and v ~= "" then kickTitle = v kbPlayDing() end
-    end
-})
+Tabs.MiscTab:Divider()
+local kickContent = "你被踢出了游戏"
+local kickErrorCode = ""
 Tabs.MiscTab:Input({
     Title = "自定义踢出内容",
     Placeholder = "输入踢出内容",
     Callback = function(v)
-        if v and v ~= "" then kickContent = v kbPlayDing() end
+        if v and v ~= "" then
+            kickContent = v
+            kbPlayDing()
+        end
+    end
+})
+Tabs.MiscTab:Input({
+    Title = "自定义错误代码",
+    Placeholder = "输入错误代码，例如: 267",
+    Callback = function(v)
+        if v and v ~= "" then
+            kbPlayDing()
+            kickErrorCode = v
+        end
     end
 })
 Tabs.MiscTab:Button({
     Title = "执行自定义踢出",
     Callback = function()
         kbPlayDing()
-        LocalPlayer:Kick(kickContent)
+        local kickMsg = kickContent
+        if kickErrorCode and kickErrorCode ~= "" then
+            kickMsg = kickMsg .. "\n\n（错误代码：" .. kickErrorCode .. "）"
+        end
+        LocalPlayer:Kick(kickMsg)
     end
 })
+Tabs.MiscTab:Divider()
 local confirmTitle, confirmContent = "确认操作", "你确定要执行此操作吗？"
 Tabs.MiscTab:Input({
     Title = "弹窗标题",
     Placeholder = "输入弹窗标题",
     Callback = function(v)
-        if v and v ~= "" then confirmTitle = v kbPlayDing() end
+        if v and v ~= "" then
+            confirmTitle = v
+            kbPlayDing()
+        end
     end
 })
 Tabs.MiscTab:Input({
     Title = "弹窗内容",
     Placeholder = "输入弹窗内容",
     Callback = function(v)
-        if v and v ~= "" then confirmContent = v kbPlayDing() end
+        if v and v ~= "" then
+            confirmContent = v
+            kbPlayDing()
+        end
     end
 })
 Tabs.MiscTab:Button({
@@ -3375,13 +3500,12 @@ Tabs.MiscTab:Button({
         WindUI:Notify({ Title = confirmTitle, Content = confirmContent, Duration = 10 })
     end
 })
+Tabs.MiscTab:Divider()
 Tabs.MiscTab:Button({
     Title = "坐下",
     Callback = function()
         kbPlayDing()
-        pcall(function()
-            game.Players.LocalPlayer.Character.Humanoid.Sit = true
-        end)
+        pcall(function() game.Players.LocalPlayer.Character.Humanoid.Sit = true end)
     end,
 })
 Tabs.GamesTab:Button({
@@ -3415,9 +3539,7 @@ task.spawn(function()
         serverListText = "加载失败，请检查链接"
     end
     if serverListLabel then
-        pcall(function()
-            serverListLabel:SetDesc(serverListText)
-        end)
+        pcall(function() serverListLabel:SetDesc(serverListText) end)
     end
 end)
 serverListLabel = Tabs.GamesTab:Paragraph({
@@ -3436,327 +3558,311 @@ Window:OnClose(function()
     print("界面已关闭。")
 end)
 task.spawn(function()
-local kbStartupSoundMuted = false
-Tabs.SettingsTab:Toggle({
-    Title = "关闭启动音效",
-    Desc = "需要保存配置使用",
-    Value = false,
-    Callback = function(state)
-        kbStartupSoundMuted = state
-        WindUI:Notify({ Title = "关闭启动音效", Content = state and "启动音效已静音" or "启动音效已恢复", Duration = 3 })
-        if state then kbPlayDing() end
-    end
-})
-Tabs.SettingsTab:Toggle({
-    Title = "关闭开关音效",
-    Desc = "需要保存配置使用",
-    Value = false,
-    Callback = function(state)
-        kbToggleSoundMuted = state
-        WindUI:Notify({ Title = "关闭开关音效", Content = state and "开关音效已静音" or "开关音效已恢复", Duration = 3 })
-        if state then kbPlayDing() end
-    end
-})
-local kbSelectedConfig = nil
-local kbConfigDropdown = nil
-local kbAutoDropdown = nil
-local kbDeleteDropdown = nil
-local function kbRefreshAllDropdowns()
-    local kbNewList = kbListConfigs()
-    if kbConfigDropdown then
-        kbConfigDropdown.Values = kbNewList
-        pcall(function() kbConfigDropdown:Refresh(kbNewList) end)
-    end
-    if kbAutoDropdown then
-        kbAutoDropdown.Values = kbNewList
-        pcall(function() kbAutoDropdown:Refresh(kbNewList) end)
-    end
-    if kbDeleteDropdown then
-        kbDeleteDropdown.Values = kbNewList
-        pcall(function() kbDeleteDropdown:Refresh(kbNewList) end)
-    end
-end
-local kbCfgSaveName = ""
-Tabs.SettingsTab:Input({
-    Title = "输入配置名字",
-    Placeholder = "配置名字",
-    Callback = function(text)
-        if not text or text == "" then return end
-        kbPlayDing()
-        kbCfgSaveName = text
-    end
-})
-Tabs.SettingsTab:Button({
-    Title = "保存当前配置",
-    Callback = function()
-        kbPlayDing()
-        if not kbCfgSaveName or kbCfgSaveName == "" then
-            WindUI:Notify({ Title = "保存当前配置", Content = "请先在上面输入配置名字", Duration = 3 })
-            return
+    local kbStartupSoundMuted = false
+    Tabs.SettingsTab:Toggle({
+        Title = "关闭启动音效",
+        Desc = "需要保存配置使用",
+        Value = false,
+        Callback = function(state)
+            kbStartupSoundMuted = state
+            WindUI:Notify({ Title = "关闭启动音效", Content = state and "启动音效已静音" or "启动音效已恢复", Duration = 3 })
+            if state then kbPlayDing() end
         end
-        local ok, err = pcall(function() kbSaveConfig(kbCfgSaveName) end)
-        if ok then
-            WindUI:Notify({ Title = "保存当前配置", Content = "已保存配置：" .. kbCfgSaveName, Duration = 3 })
-            kbRefreshAllDropdowns()
-        else
-            WindUI:Notify({ Title = "保存当前配置", Content = "保存失败：" .. tostring(err), Duration = 3 })
+    })
+    Tabs.SettingsTab:Toggle({
+        Title = "关闭开关音效",
+        Desc = "需要保存配置使用",
+        Value = false,
+        Callback = function(state)
+            kbToggleSoundMuted = state
+            WindUI:Notify({ Title = "关闭开关音效", Content = state and "开关音效已静音" or "开关音效已恢复", Duration = 3 })
+            if state then kbPlayDing() end
+        end
+    })
+    local kbSelectedConfig = nil
+    local kbConfigDropdown = nil
+    local kbAutoDropdown = nil
+    local kbDeleteDropdown = nil
+    local function kbRefreshAllDropdowns()
+        local kbNewList = kbListConfigs()
+        if kbConfigDropdown then
+            kbConfigDropdown.Values = kbNewList
+            pcall(function() kbConfigDropdown:Refresh(kbNewList) end)
+        end
+        if kbAutoDropdown then
+            kbAutoDropdown.Values = kbNewList
+            pcall(function() kbAutoDropdown:Refresh(kbNewList) end)
+        end
+        if kbDeleteDropdown then
+            kbDeleteDropdown.Values = kbNewList
+            pcall(function() kbDeleteDropdown:Refresh(kbNewList) end)
         end
     end
-})
-kbConfigDropdown = Tabs.SettingsTab:Dropdown({
-    Title = "选择配置",
-    Values = kbListConfigs(),
-    Callback = function(v)
-        kbSelectedConfig = v
-    end
-})
-Tabs.SettingsTab:Button({
-    Title = "加载配置",
-    Callback = function()
-        kbPlayDing()
-        if not kbSelectedConfig then
-            WindUI:Notify({ Title = "加载配置", Content = "请先在上面选择一个配置", Duration = 3 })
-            return
+    local kbCfgSaveName = ""
+    Tabs.SettingsTab:Input({
+        Title = "输入配置名字",
+        Placeholder = "配置名字",
+        Callback = function(text)
+            if not text or text == "" then return end
+            kbPlayDing()
+            kbCfgSaveName = text
         end
-        local name = kbSelectedConfig
-        if kbLoadConfig(name) then
-            WindUI:Notify({ Title = "加载配置", Content = "已加载配置：" .. name, Duration = 3 })
-        else
-            WindUI:Notify({ Title = "加载配置", Content = "加载失败：" .. name, Duration = 3 })
-        end
-        kbSelectedConfig = nil
-        pcall(function() kbConfigDropdown:Select(nil) end)
-    end
-})
-local kbAutoLoadName = nil
-local kbAutoPath = kbCfgFolder .. "/autoload.txt"
-if isfile and isfile(kbAutoPath) then
-    local nm = readfile(kbAutoPath)
-    if nm and nm ~= "" then kbAutoLoadName = nm end
-end
-kbAutoDropdown = Tabs.SettingsTab:Dropdown({
-    Title = "自动加载配置",
-    Values = kbListConfigs(),
-    Callback = function(v)
-        kbAutoLoadName = v
-    end
-})
-local kbAutoToggle = nil
-kbAutoToggle = Tabs.SettingsTab:Toggle({
-    Title = "自动加载",
-    Value = kbAutoLoadName ~= nil,
-    Callback = function(state)
-        if state then
-            if not kbAutoLoadName then
-                WindUI:Notify({ Title = "自动加载", Content = "请先在上面选择一个配置", Duration = 3 })
-                if kbAutoToggle then pcall(function() kbAutoToggle:Set(false) end) end
+    })
+    Tabs.SettingsTab:Button({
+        Title = "保存当前配置",
+        Callback = function()
+            kbPlayDing()
+            if not kbCfgSaveName or kbCfgSaveName == "" then
+                WindUI:Notify({ Title = "保存当前配置", Content = "请先在上面输入配置名字", Duration = 3 })
                 return
             end
-            writefile(kbAutoPath, kbAutoLoadName)
-            WindUI:Notify({ Title = "自动加载", Content = "已设置自动加载配置：" .. kbAutoLoadName, Duration = 3 })
-            if state then kbPlayDing() end
-        else
-            pcall(function()
-                if isfile(kbAutoPath) then delfile(kbAutoPath) end
-            end)
-            WindUI:Notify({ Title = "自动加载", Content = "已关闭自动加载", Duration = 3 })
-            if state then kbPlayDing() end
-        end
-    end
-})
-local kbDeleteSelected = {}
-kbDeleteDropdown = Tabs.SettingsTab:Dropdown({
-    Title = "删除配置",
-    Values = kbListConfigs(),
-    Multi = true,
-    Callback = function(v)
-        kbDeleteSelected = v
-    end
-})
-Tabs.SettingsTab:Button({
-    Title = "删除此配置",
-    Callback = function()
-        kbPlayDing()
-        local names = {}
-        if type(kbDeleteSelected) == "table" then
-            for _, n in pairs(kbDeleteSelected) do
-                if type(n) == "table" and n.Title then
-                    table.insert(names, n.Title)
-                elseif type(n) == "string" then
-                    table.insert(names, n)
-                end
-            end
-        elseif type(kbDeleteSelected) == "string" then
-            table.insert(names, kbDeleteSelected)
-        end
-        if #names == 0 then
-            WindUI:Notify({ Title = "删除此配置", Content = "请先在上面选择一个或多个配置", Duration = 3 })
-            return
-        end
-        local deleted = 0
-        for _, n in ipairs(names) do
-            local p = kbCfgFolder .. "/" .. n .. ".json"
-            pcall(function()
-                if isfile(p) then
-                    delfile(p)
-                    deleted = deleted + 1
-                end
-            end)
-            if kbAutoLoadName == n then
-                kbAutoLoadName = nil
-                pcall(function()
-                    if isfile(kbAutoPath) then delfile(kbAutoPath) end
-                end)
-                pcall(function() kbAutoToggle:Set(false) end)
+            local ok, err = pcall(function() kbSaveConfig(kbCfgSaveName) end)
+            if ok then
+                WindUI:Notify({ Title = "保存当前配置", Content = "已保存配置：" .. kbCfgSaveName, Duration = 3 })
+                kbRefreshAllDropdowns()
+            else
+                WindUI:Notify({ Title = "保存当前配置", Content = "保存失败：" .. tostring(err), Duration = 3 })
             end
         end
-        WindUI:Notify({ Title = "删除此配置", Content = "已删除 " .. deleted .. " 个配置", Duration = 3 })
-        kbDeleteSelected = {}
-        pcall(function() kbDeleteDropdown:Select(nil) end)
-        kbRefreshAllDropdowns()
-    end
-})
-kbCurrentBg = nil
-kbApplyBackground = function(name)
-    if name == "默认背景图" then
-        local ok, err = pcall(function()
-            local bg = Window.UIElements.Main.Background
-            local img = bg:FindFirstChild("KbBgImage")
-            if img then img:Destroy() end
-        end)
-        if ok then
-            kbCurrentBg = name
-            WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
-        else
-            WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
-        end
-        return
-    end
-    local kbBgUrls = {
-        ["eva背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339712342_469.jpg",
-        ["银花背景图1"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339143310_475.jpg",
-        ["银花背景图2"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339141889_101.jpg",
-        ["银花背景图3"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339140644_893.jpg",
-        ["白子背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785395257153_996.jpg",
-        ["东京喰种背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785866305554_326.jpg",
-    }
-    local kbSetBgImage = function(asset)
-        local bg = Window.UIElements.Main.Background
-        local img = bg:FindFirstChild("KbBgImage")
-        if not img then
-            img = Instance.new("ImageLabel")
-            img.Name = "KbBgImage"
-            img.BackgroundTransparency = 1
-            img.Size = UDim2.new(1, 0, 1, 0)
-            img.ScaleType = Enum.ScaleType.Crop
-            img.ImageTransparency = 0
-            img.ZIndex = 1
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0, Window.UICorner or 16)
-            corner.Parent = img
-            img.Parent = bg
-        end
-        img.Image = asset
-        img.Visible = true
-        pcall(function() Window:SetBackgroundImage(asset) end)
-    end
-    if name == "恐脚本背景图" then
-        local ok, err = pcall(function()
-            kbSetBgImage("rbxassetid://113517588654522")
-        end)
-        if ok then
-            kbCurrentBg = name
-            WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
-        else
-            WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
-        end
-        return
-    end
-    if kbBgUrls[name] then
-        local ok, err = pcall(function()
-            local fileName = "恐脚本/bg_" .. name .. ".jpg"
-            if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
-            if not (isfile and isfile(fileName)) then
-                local data = game:HttpGet(kbBgUrls[name])
-                writefile(fileName, data)
+    })
+    kbConfigDropdown = Tabs.SettingsTab:Dropdown({
+        Title = "选择配置",
+        Values = kbListConfigs(),
+        Callback = function(v) kbSelectedConfig = v end
+    })
+    Tabs.SettingsTab:Button({
+        Title = "加载配置",
+        Callback = function()
+            kbPlayDing()
+            if not kbSelectedConfig then
+                WindUI:Notify({ Title = "加载配置", Content = "请先在上面选择一个配置", Duration = 3 })
+                return
             end
-            local asset = getcustomasset(fileName)
-            kbSetBgImage(asset)
-        end)
-        if ok then
-            kbCurrentBg = name
-            WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
-        else
-            WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
+            local name = kbSelectedConfig
+            if kbLoadConfig(name) then
+                WindUI:Notify({ Title = "加载配置", Content = "已加载配置：" .. name, Duration = 3 })
+            else
+                WindUI:Notify({ Title = "加载配置", Content = "加载失败：" .. name, Duration = 3 })
+            end
+            kbSelectedConfig = nil
+            pcall(function() kbConfigDropdown:Select(nil) end)
         end
-    end
-end
-local kbBgSelected = nil
-local kbBgDropdown = Tabs.SettingsTab:Dropdown({
-    Title = "切换背景图",
-    Values = {"默认背景图", "恐脚本背景图", "eva背景图", "东京喰种背景图"},
-    Callback = function(v)
-        kbBgSelected = v
-    end
-})
-Tabs.SettingsTab:Button({
-    Title = "切换此背景图",
-    Callback = function()
-        kbPlayDing()
-        if not kbBgSelected then
-            WindUI:Notify({ Title = "切换此背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
-            return
-        end
-        kbApplyBackground(kbBgSelected)
-        kbBgSelected = nil
-        pcall(function() kbBgDropdown:Select(nil) end)
-    end
-})
-local kbFanBgSelected = nil
-local kbFanBgDropdown = Tabs.SettingsTab:Dropdown({
-    Title = "粉丝定制背景图",
-    Desc = "想要定制的进我的群找：空白大帝",
-    Values = {"银花背景图1", "银花背景图2", "银花背景图3", "白子背景图"},
-    Callback = function(v)
-        kbFanBgSelected = v
-    end
-})
-Tabs.SettingsTab:Button({
-    Title = "切换此定制背景图",
-    Callback = function()
-        kbPlayDing()
-        if not kbFanBgSelected then
-            WindUI:Notify({ Title = "切换此定制背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
-            return
-        end
-        kbApplyBackground(kbFanBgSelected)
-        kbFanBgSelected = nil
-        pcall(function() kbFanBgDropdown:Select(nil) end)
-    end
-})
-task.spawn(function()
-    task.wait(0.5)
+    })
+    local kbAutoLoadName = nil
+    local kbAutoPath = kbCfgFolder .. "/autoload.txt"
     if isfile and isfile(kbAutoPath) then
         local nm = readfile(kbAutoPath)
-        if nm and nm ~= "" then
-            local ok = kbLoadConfig(nm)
+        if nm and nm ~= "" then kbAutoLoadName = nm end
+    end
+    kbAutoDropdown = Tabs.SettingsTab:Dropdown({
+        Title = "自动加载配置",
+        Values = kbListConfigs(),
+        Callback = function(v) kbAutoLoadName = v end
+    })
+    local kbAutoToggle = nil
+    kbAutoToggle = Tabs.SettingsTab:Toggle({
+        Title = "自动加载",
+        Value = kbAutoLoadName ~= nil,
+        Callback = function(state)
+            if state then
+                if not kbAutoLoadName then
+                    WindUI:Notify({ Title = "自动加载", Content = "请先在上面选择一个配置", Duration = 3 })
+                    if kbAutoToggle then
+                        pcall(function() kbAutoToggle:Set(false) end)
+                    end
+                    return
+                end
+                writefile(kbAutoPath, kbAutoLoadName)
+                WindUI:Notify({ Title = "自动加载", Content = "已设置自动加载配置：" .. kbAutoLoadName, Duration = 3 })
+                if state then kbPlayDing() end
+            else
+                pcall(function() if isfile(kbAutoPath) then delfile(kbAutoPath) end end)
+                WindUI:Notify({ Title = "自动加载", Content = "已关闭自动加载", Duration = 3 })
+                if state then kbPlayDing() end
+            end
+        end
+    })
+    local kbDeleteSelected = {}
+    kbDeleteDropdown = Tabs.SettingsTab:Dropdown({
+        Title = "删除配置",
+        Values = kbListConfigs(),
+        Multi = true,
+        Callback = function(v) kbDeleteSelected = v end
+    })
+    Tabs.SettingsTab:Button({
+        Title = "删除此配置",
+        Callback = function()
+            kbPlayDing()
+            local names = {}
+            if type(kbDeleteSelected) == "table" then
+                for _, n in pairs(kbDeleteSelected) do
+                    if type(n) == "table" and n.Title then
+                        table.insert(names, n.Title)
+                    elseif type(n) == "string" then
+                        table.insert(names, n)
+                    end
+                end
+            elseif type(kbDeleteSelected) == "string" then
+                table.insert(names, kbDeleteSelected)
+            end
+            if #names == 0 then
+                WindUI:Notify({ Title = "删除此配置", Content = "请先在上面选择一个或多个配置", Duration = 3 })
+                return
+            end
+            local deleted = 0
+            for _, n in ipairs(names) do
+                local p = kbCfgFolder .. "/" .. n .. ".json"
+                pcall(function()
+                    if isfile(p) then
+                        delfile(p)
+                        deleted = deleted + 1
+                    end
+                end)
+                if kbAutoLoadName == n then
+                    kbAutoLoadName = nil
+                    pcall(function() if isfile(kbAutoPath) then delfile(kbAutoPath) end end)
+                    pcall(function() kbAutoToggle:Set(false) end)
+                end
+            end
+            WindUI:Notify({ Title = "删除此配置", Content = "已删除 " .. deleted .. " 个配置", Duration = 3 })
+            kbDeleteSelected = {}
+            pcall(function() kbDeleteDropdown:Select(nil) end)
+            kbRefreshAllDropdowns()
+        end
+    })
+    kbCurrentBg = nil
+    kbApplyBackground = function(name)
+        if name == "默认背景图" then
+            local ok, err = pcall(function()
+                local bg = Window.UIElements.Main.Background
+                local img = bg:FindFirstChild("KbBgImage")
+                if img then img:Destroy() end
+            end)
             if ok then
-                WindUI:Notify({ Title = "配置", Content = "已自动加载配置：" .. nm, Duration = 3 })
+                kbCurrentBg = name
+                WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
+            else
+                WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
+            end
+            return
+        end
+        local kbBgUrls = {
+            ["eva背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339712342_469.jpg",
+            ["银花背景图1"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339143310_475.jpg",
+            ["银花背景图2"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339141889_101.jpg",
+            ["银花背景图3"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785339140644_893.jpg",
+            ["白子背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785395257153_996.jpg",
+            ["东京喰种背景图"] = "https://raw.githubusercontent.com/kongbaNB/TB/refs/heads/main/Image_1785866305554_326.jpg",
+        }
+        local kbSetBgImage = function(asset)
+            local bg = Window.UIElements.Main.Background
+            local img = bg:FindFirstChild("KbBgImage")
+            if not img then
+                img = Instance.new("ImageLabel")
+                img.Name = "KbBgImage"
+                img.BackgroundTransparency = 1
+                img.Size = UDim2.new(1, 0, 1, 0)
+                img.ScaleType = Enum.ScaleType.Crop
+                img.ImageTransparency = 0
+                img.ZIndex = 1
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(0, Window.UICorner or 16)
+                corner.Parent = img
+                img.Parent = bg
+            end
+            img.Image = asset
+            img.Visible = true
+            pcall(function() Window:SetBackgroundImage(asset) end)
+        end
+        if name == "恐脚本背景图" then
+            local ok, err = pcall(function() kbSetBgImage("rbxassetid://113517588654522") end)
+            if ok then
+                kbCurrentBg = name
+                WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
+            else
+                WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
+            end
+            return
+        end
+        if kbBgUrls[name] then
+            local ok, err = pcall(function()
+                local fileName = "恐脚本/bg_" .. name .. ".jpg"
+                if makefolder and not isfolder("恐脚本") then makefolder("恐脚本") end
+                if not (isfile and isfile(fileName)) then
+                    local data = game:HttpGet(kbBgUrls[name])
+                    writefile(fileName, data)
+                end
+                local asset = getcustomasset(fileName)
+                kbSetBgImage(asset)
+            end)
+            if ok then
+                kbCurrentBg = name
+                WindUI:Notify({ Title = "切换背景图", Content = "已切换为：" .. name, Duration = 3 })
+            else
+                WindUI:Notify({ Title = "切换背景图", Content = "切换失败", Duration = 3 })
             end
         end
     end
-    task.wait(0.2)
-    if not kbStartupSoundMuted and kbTadaAsset then
-        pcall(function()
-            local kbSound = Instance.new("Sound")
-            kbSound.SoundId = kbTadaAsset
-            kbSound.Volume = 2
-            kbSound.Parent = CoreGui
-            kbSound:Play()
-            kbSound.Ended:Connect(function()
-                kbSound:Destroy()
+    local kbBgSelected = nil
+    local kbBgDropdown = Tabs.SettingsTab:Dropdown({
+        Title = "切换背景图",
+        Values = {"默认背景图", "恐脚本背景图", "eva背景图", "东京喰种背景图"},
+        Callback = function(v) kbBgSelected = v end
+    })
+    Tabs.SettingsTab:Button({
+        Title = "切换此背景图",
+        Callback = function()
+            kbPlayDing()
+            if not kbBgSelected then
+                WindUI:Notify({ Title = "切换此背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
+                return
+            end
+            kbApplyBackground(kbBgSelected)
+            kbBgSelected = nil
+            pcall(function() kbBgDropdown:Select(nil) end)
+        end
+    })
+    local kbFanBgSelected = nil
+    local kbFanBgDropdown = Tabs.SettingsTab:Dropdown({
+        Title = "粉丝定制背景图",
+        Desc = "想要定制的进我的群找：空白大帝",
+        Values = {"银花背景图1", "银花背景图2", "银花背景图3", "白子背景图"},
+        Callback = function(v) kbFanBgSelected = v end
+    })
+    Tabs.SettingsTab:Button({
+        Title = "切换此定制背景图",
+        Callback = function()
+            kbPlayDing()
+            if not kbFanBgSelected then
+                WindUI:Notify({ Title = "切换此定制背景图", Content = "请先在上面选择一个背景图", Duration = 3 })
+                return
+            end
+            kbApplyBackground(kbFanBgSelected)
+            kbFanBgSelected = nil
+            pcall(function() kbFanBgDropdown:Select(nil) end)
+        end
+    })
+    task.spawn(function()
+        task.wait(0.5)
+        if isfile and isfile(kbAutoPath) then
+            local nm = readfile(kbAutoPath)
+            if nm and nm ~= "" then
+                local ok = kbLoadConfig(nm)
+                if ok then
+                    WindUI:Notify({ Title = "配置", Content = "已自动加载配置：" .. nm, Duration = 3 })
+                end
+            end
+        end
+        task.wait(0.2)
+        if not kbStartupSoundMuted and kbTadaAsset then
+            pcall(function()
+                local kbSound = Instance.new("Sound")
+                kbSound.SoundId = kbTadaAsset
+                kbSound.Volume = 2
+                kbSound.Parent = CoreGui
+                kbSound:Play()
+                kbSound.Ended:Connect(function() kbSound:Destroy() end)
             end)
-        end)
-    end
-end)
+        end
+    end)
 end)
