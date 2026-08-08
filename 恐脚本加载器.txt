@@ -61741,9 +61741,7 @@ local Window = Library:CreateWindow({
 pcall(function()
     Library:Notify({
         Title = "地铁冲浪",
-        Description = "创作者：恐拜大帝
-QQ：3999698324
-脚本已加载成功",
+        Description = "创作者：恐拜大帝\nQQ：3999698324\n脚本已加载成功",
         Time = 5,
     })
 end)
