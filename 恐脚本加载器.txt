@@ -62075,13 +62075,13 @@ UnloadGroup:AddButton("卸载脚本", function()
     Library:Unload()
 end)
 
-if ThemeManager then
+if ThemeManager and type(ThemeManager) == "table" and ThemeManager.SetLibrary and ThemeManager.SetFolder and ThemeManager.ApplyToTab then
     ThemeManager:SetLibrary(Library)
     ThemeManager:SetFolder("MyScriptTheme")
     ThemeManager:ApplyToTab(Tabs.Settings)
 end
 
-if SaveManager then
+if SaveManager and type(SaveManager) == "table" and SaveManager.SetLibrary and SaveManager.IgnoreThemeSettings and SaveManager.SetFolder and SaveManager.BuildConfigSection then
     SaveManager:SetLibrary(Library)
     SaveManager:IgnoreThemeSettings()
     SaveManager:SetFolder("MyScriptConfig")
