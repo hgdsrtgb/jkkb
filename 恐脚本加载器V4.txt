@@ -61860,7 +61860,11 @@ MainLeft:AddToggle("GodMode", {
             end
             pcall(function()
                 if G.SharedData.DiedFunc then
-                    G.SharedData.DiedFunc.OnInvoke = F.origDiedFunc
+                    if F.origDiedFunc then
+                        G.SharedData.DiedFunc.OnInvoke = F.origDiedFunc
+                    else
+                        G.SharedData.DiedFunc.OnInvoke = function() return false end
+                    end
                 end
             end)
             F.origDiedFunc = nil
@@ -62088,7 +62092,11 @@ UnloadGroup:AddButton("卸载脚本", function()
     end
     pcall(function()
         if G.SharedData and G.SharedData.DiedFunc then
-            G.SharedData.DiedFunc.OnInvoke = F.origDiedFunc
+            if F.origDiedFunc then
+                G.SharedData.DiedFunc.OnInvoke = F.origDiedFunc
+            else
+                G.SharedData.DiedFunc.OnInvoke = function() return false end
+            end
         end
     end)
     F.origDiedFunc = nil
