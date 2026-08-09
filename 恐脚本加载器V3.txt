@@ -61671,7 +61671,6 @@ local coinData = {}
 local coinLoop = false
 local coinThread = nil
 local coinAddedConn = nil
-local obsDescendantConn = nil
 
 local function addConn(c)
     table.insert(conns, c)
@@ -61795,6 +61794,8 @@ F.godConn = nil
 F.magnetConn = nil
 F.origDiedFunc = nil
 
+local obsDescendantConn = nil
+
 MainLeft:AddButton("一键完成新手教程", function()
     pcall(function()
         if G.CompleteTutorial then
@@ -61842,7 +61843,6 @@ MainLeft:AddToggle("GodMode", {
                 end)
                 return true
             end
-            if F.godConn then F.godConn:Disconnect() F.godConn = nil end
             F.godConn = V.RunService.Heartbeat:Connect(function()
                 pcall(function()
                     G.SharedData.IsDead = false
@@ -61876,6 +61876,7 @@ MainLeft:AddToggle("MagnetCoins", {
                             if o:IsA("BasePart") and (o.Name:lower():find("coin") or o.Name:lower():find("gold")) then
                                 pcall(function()
                                     o.CFrame = h.CFrame
+                                    o.CanCollide = false
                                 end)
                             end
                         end
@@ -61915,13 +61916,24 @@ MainLeft:AddToggle("AutoFarm", {
         if Value then
             task.spawn(function()
                 while F.autoFarm do
+                    pcall(function()
+                        if G.SharedData and G.SharedData.PickupEvent then
+                            G.SharedData.PickupEvent:Fire("fly")
+                        end
+                    end)
+                    task.wait(3)
+                end
+            end)
+            task.spawn(function()
+                while F.autoFarm do
                     local c = V.player.Character
                     if c and c:FindFirstChild("HumanoidRootPart") then
                         local h = c.HumanoidRootPart
                         for _, o in ipairs(V.Workspace:GetDescendants()) do
                             if o:IsA("BasePart") and (o.Name:lower():find("coin") or o.Name:lower():find("gold")) then
                                 pcall(function()
-                                    o.CFrame = h.CFrame + h.CFrame.LookVector * 2
+                                    o.CFrame = h.CFrame
+                                    o.CanCollide = false
                                 end)
                             end
                         end
@@ -61978,10 +61990,6 @@ MainLeft:AddToggle("CoinStrip", {
                 if isCoin(d) then
                     stripCoin(d)
                 end
-            end
-            if coinAddedConn then
-                pcall(function() coinAddedConn:Disconnect() end)
-                coinAddedConn = nil
             end
             coinAddedConn = V.Workspace.DescendantAdded:Connect(function(d)
                 if isCoin(d) then
@@ -62063,8 +62071,14 @@ UnloadGroup:AddButton("卸载脚本", function()
         pcall(function() obsDescendantConn:Disconnect() end)
         obsDescendantConn = nil
     end
-    if F.godConn then F.godConn:Disconnect() F.godConn = nil end
-    if F.magnetConn then F.magnetConn:Disconnect() F.magnetConn = nil end
+    if F.godConn then
+        pcall(function() F.godConn:Disconnect() end)
+        F.godConn = nil
+    end
+    if F.magnetConn then
+        pcall(function() F.magnetConn:Disconnect() end)
+        F.magnetConn = nil
+    end
     pcall(function()
         if G.SharedData and G.SharedData.DiedFunc then
             G.SharedData.DiedFunc.OnInvoke = F.origDiedFunc
@@ -62094,8 +62108,7 @@ if SaveManager and type(SaveManager) == "table" and SaveManager.SetLibrary and S
     SaveManager:IgnoreThemeSettings()
     SaveManager:SetFolder("MyScriptConfig")
     SaveManager:BuildConfigSection(Tabs.Settings)
-end
-]===]
+end]===]
 
 
 
