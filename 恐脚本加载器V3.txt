@@ -61785,16 +61785,11 @@ pcall(function()
 end)
 
 local F = {}
-F.god = false
 F.magnet = false
 F.penetrate = false
 F.fly = false
 F.autoFarm = false
-F.godConn = nil
 F.magnetConn = nil
-F.origDiedFunc = nil
-
-local obsDescendantConn = nil
 
 MainLeft:AddButton("一键完成新手教程", function()
     pcall(function()
@@ -61820,46 +61815,6 @@ MainLeft:AddButton("一键完成新手教程", function()
         })
     end)
 end)
-
-MainLeft:AddToggle("GodMode", {
-    Text = "无敌模式（撞到不死）",
-    Default = false,
-    Callback = function(Value)
-        F.god = Value
-        if not G.SharedData then return end
-        if Value then
-            F.origDiedFunc = G.SharedData.DiedFunc and G.SharedData.DiedFunc.OnInvoke
-            if not G.SharedData.DiedFunc then
-                G.SharedData.DiedFunc = Instance.new("BindableFunction")
-            end
-            G.SharedData.DiedFunc.OnInvoke = function()
-                pcall(function()
-                    if G.SharedData.PowerUps and G.SharedData.PowerUps.hoverboard then
-                        G.SharedData.PowerUps.hoverboard = false
-                        if G.SharedData.PowerUpsDuration then
-                            G.SharedData.PowerUpsDuration.hoverboard = 0
-                        end
-                    end
-                end)
-                return true
-            end
-            F.godConn = V.RunService.Heartbeat:Connect(function()
-                pcall(function()
-                    G.SharedData.IsDead = false
-                    G.SharedData.DeadVerified = false
-                end)
-            end)
-        else
-            if F.godConn then F.godConn:Disconnect() F.godConn = nil end
-            pcall(function()
-                if G.SharedData.DiedFunc then
-                    G.SharedData.DiedFunc.OnInvoke = F.origDiedFunc
-                end
-            end)
-            F.origDiedFunc = nil
-        end
-    end,
-})
 
 MainLeft:AddToggle("MagnetCoins", {
     Text = "疯狂吸金币",
@@ -61956,22 +61911,13 @@ MainLeft:AddToggle("ObstacleNoclip", {
                     d.CanCollide = false
                 end
             end
-            if obsDescendantConn then
-                pcall(function() obsDescendantConn:Disconnect() end)
-                obsDescendantConn = nil
-            end
-            obsDescendantConn = V.Workspace.DescendantAdded:Connect(function(d)
+            addConn(V.Workspace.DescendantAdded:Connect(function(d)
                 if isObstacle(d) then
                     if origObs[d] == nil then origObs[d] = d.CanCollide end
                     d.CanCollide = false
                 end
-            end)
-            addConn(obsDescendantConn)
+            end))
         else
-            if obsDescendantConn then
-                pcall(function() obsDescendantConn:Disconnect() end)
-                obsDescendantConn = nil
-            end
             for d, state in pairs(origObs) do
                 if d and d.Parent then d.CanCollide = state end
             end
@@ -62057,7 +62003,6 @@ addItemButton("飞行器", "获取飞行器 (Fly)", "fly")
 
 local UnloadGroup = Tabs.Settings:AddLeftGroupbox("脚本管理")
 UnloadGroup:AddButton("卸载脚本", function()
-    F.god = false
     F.magnet = false
     F.penetrate = false
     F.fly = false
@@ -62065,35 +62010,15 @@ UnloadGroup:AddButton("卸载脚本", function()
     coinLoop = false
     if coinAddedConn then
         pcall(function() coinAddedConn:Disconnect() end)
-        coinAddedConn = nil
     end
-    if obsDescendantConn then
-        pcall(function() obsDescendantConn:Disconnect() end)
-        obsDescendantConn = nil
-    end
-    if F.godConn then
-        pcall(function() F.godConn:Disconnect() end)
-        F.godConn = nil
-    end
-    if F.magnetConn then
-        pcall(function() F.magnetConn:Disconnect() end)
-        F.magnetConn = nil
-    end
-    pcall(function()
-        if G.SharedData and G.SharedData.DiedFunc then
-            G.SharedData.DiedFunc.OnInvoke = F.origDiedFunc
-        end
-    end)
-    F.origDiedFunc = nil
+    if F.magnetConn then F.magnetConn:Disconnect() F.magnetConn = nil end
     restoreAllCoins()
     for d, state in pairs(origObs) do
         if d and d.Parent then d.CanCollide = state end
     end
-    origObs = {}
     for _, c in ipairs(conns) do
         pcall(function() c:Disconnect() end)
     end
-    conns = {}
     Library:Unload()
 end)
 
